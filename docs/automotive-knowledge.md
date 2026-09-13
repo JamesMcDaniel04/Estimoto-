@@ -17,10 +17,13 @@ to a verified invoice, completed repair, OEM recommendation or shop endorsement.
 
 Estibot's local GraphRAG path starts from the authenticated customer's selected
 vehicle, traverses its service relationships, ranks relevant source records,
-and gives the bounded answer model at most six evidence records. A deterministic
+and gives the bounded model at most six evidence records to select from. The
+model can select only existing source IDs; the app renders their factual fields.
+Free-form generated names or claims cannot acquire source citations. A deterministic
 source summary remains available when the model fails. Retrieval filters every
 hop by customer before constructing context. Contact fields, VIN, insurance and
-free-text history notes are excluded from model evidence. The model has no
+free-text history notes are excluded from model evidence. Contact-like text pasted
+into entity labels keeps the entire answer local. The model has no
 action tools, and the API retains source references in its answer.
 
 The graph is rebuildable from operational records. Deleting history erases its

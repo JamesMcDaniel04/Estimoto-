@@ -517,6 +517,9 @@ def assistant(body: AssistantInput, request: Request, c: Customer = Depends(curr
     result = {"reply": reply, "intent": intent, "specialty": specialty,
               "providers": [provider(p) for p in matches], "videos": videos}
     evidence = []
+    if not urgent and re.search(r"\b(schedule|book|contact|reach out|appointment)\b", message) and re.search(r"\b(my|saved|usual|own|previous)\b.*\b(shop|mechanic|garage)\b", message):
+        return {"reply": "Open My shops to choose your shop and preferred times. I'll prepare the request for you to review and authorize. Your shop confirms the appointment.",
+                "intent": "shop_outreach", "specialty": specialty, "providers": [], "videos": []}
     if not urgent and history_question(message):
         evidence = retrieve_history(db, c.id, car.id if car else None, body.message)
         result = {"reply": history_answer(evidence), "intent": "advice", "specialty": None,
@@ -526,9 +529,6 @@ def assistant(body: AssistantInput, request: Request, c: Customer = Depends(curr
         if not evidence:
             return result
         intent = "advice"
-    elif not urgent and re.search(r"\b(schedule|book|contact|reach out|appointment)\b", message) and re.search(r"\b(my|saved|usual|own)\b.*\b(shop|mechanic|garage)\b", message):
-        return {"reply": "Open My shops to choose your shop and preferred times. I'll prepare the request for you to review and authorize. Your shop confirms the appointment.",
-                "intent": "shop_outreach", "specialty": specialty, "providers": [], "videos": []}
     if intent != "advice" or urgent or c.demo:
         return result
     if os.getenv("OPENAI_API_KEY") and os.getenv("ASSISTANT_ENABLED", "true").lower() == "true":

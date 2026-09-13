@@ -6,7 +6,7 @@ import pytest
 from sqlalchemy import func, select
 
 from estimoto_plus.graph import retrieve_history
-from estimoto_plus.graph_models import KnowledgeConsentEvent, KnowledgeRecord
+from estimoto_plus.graph_models import KnowledgeConsentEvent, KnowledgePreference, KnowledgeRecord
 from estimoto_plus.models import Customer
 from test_api import clients, create_vehicle, h
 
@@ -83,11 +83,17 @@ def test_aggregate_opt_in_threshold_unique_people_and_revocation(clients):
     assert aggregate["service_types"] == [{"category": "oil_change", "contributors_rounded": 10}]
     assert aggregate["parts_sources"] == [{"category": "NAPA", "contributors_rounded": 10}]
     assert all(s not in json.dumps(aggregate) for s in ("Mountain", "SECRET", "person", "@"))
+    with client.app.state.session_factory() as db:
+        db.get(KnowledgePreference, "person9").policy_version = "older-policy"
+        db.commit()
+    assert client.get(url, headers=headers).json()["service_types"] == []
+    client.put("/v1/knowledge/preferences", headers=h("person9"), json={"share_aggregate_insights": True})
+    assert client.get(url, headers=headers).json()["service_types"]
     client.put("/v1/knowledge/preferences", headers=h("person9"), json={"share_aggregate_insights": False})
     assert client.get(url, headers=headers).json()["service_types"] == []
     assert len(client.get("/v1/knowledge", headers=h("person9")).json()["records"]) == 2
     with client.app.state.session_factory() as db:
-        assert db.scalar(select(func.count()).select_from(KnowledgeConsentEvent)) == 11
+        assert db.scalar(select(func.count()).select_from(KnowledgeConsentEvent)) == 12
 
 
 @pytest.mark.parametrize("fields", [{"service_date": "2099-01-01"}, {"service_type": "verified_by_shop"}, {"source": "shop_verified"}, {"mileage": -1}])
@@ -115,11 +121,62 @@ def test_graph_rag_model_gets_only_selected_customer_evidence(clients, monkeypat
     observed = []
     def answer(request):
         observed.append(json.loads(request.content))
-        return httpx.Response(200, json={"status": "completed", "output": [{"type": "message", "role": "assistant", "content": [{"type": "output_text", "text": "You reported an oil change at Mountain Auto, with parts from NAPA."}]}]})
+        return httpx.Response(200, json={"status": "completed", "output": [{"type": "message", "role": "assistant", "content": [{"type": "output_text", "text": json.dumps({"selected_source_ids": [record["id"]]})}]}]})
     client.app.state.assistant_transport = httpx.MockTransport(answer)
     result = client.post("/v1/assistant", headers=h("alice"), json={"vehicle_id": vehicle, "message": "What shop did my last oil change?"}).json()
-    assert result["answer_source"] == "Your saved history · AI summary"
+    assert result["answer_source"] == "Your saved history"
+    assert "Mountain Auto" in result["reply"] and "NAPA" in result["reply"]
     context = json.loads(observed[0]["input"])
     assert context["saved_evidence"][0]["source_id"] == record["id"]
     assert "Bob private" not in json.dumps(context) and "SECRET" not in json.dumps(context)
     assert observed[0]["store"] is False and observed[0]["tools"] == []
+
+
+@pytest.mark.parametrize("model_text", ["Imaginary Auto performed your oil change", '{"selected_source_ids":["another-customer-record"]}'])
+def test_generated_facts_and_unknown_sources_cannot_borrow_provenance(clients, monkeypatch, model_text):
+    client, _ = clients
+    vehicle = create_vehicle(client)
+    add(client, vehicle)
+    monkeypatch.setenv("OPENAI_API_KEY", "test-key")
+    client.app.state.assistant_transport = httpx.MockTransport(lambda request: httpx.Response(200, json={
+        "status": "completed", "output": [{"type": "message", "role": "assistant", "content": [{"type": "output_text", "text": model_text}]}]}))
+    result = client.post("/v1/assistant", headers=h("alice"), json={"vehicle_id": vehicle, "message": "Which shop did my last oil change?"}).json()
+    assert "Imaginary" not in result["reply"]
+    assert "Mountain Auto" in result["reply"] and "reported by you" in result["reply"]
+
+
+@pytest.mark.parametrize("contact", ["shop@example.test", "Shop (303) 555-0199", "https://shop.example.test"])
+def test_contact_like_history_stays_in_local_answer(clients, monkeypatch, contact):
+    client, _ = clients
+    vehicle = create_vehicle(client)
+    add(client, vehicle, shop_name=contact)
+    monkeypatch.setenv("OPENAI_API_KEY", "test-key")
+    observed = []
+    client.app.state.assistant_transport = httpx.MockTransport(lambda request: observed.append(request) or httpx.Response(500))
+    result = client.post("/v1/assistant", headers=h("alice"), json={"vehicle_id": vehicle, "message": "Which shop did my last oil change?"}).json()
+    assert contact in result["reply"]
+    assert result["answer_source"] == "Your saved history"
+    assert observed == []
+
+
+def test_vehicle_fields_and_question_cannot_smuggle_contacts_into_model(clients, monkeypatch):
+    client, _ = clients
+    vehicle = create_vehicle(client)
+    monkeypatch.setenv("OPENAI_API_KEY", "test-key")
+    observed = []
+    client.app.state.assistant_transport = httpx.MockTransport(lambda request: observed.append(request) or httpx.Response(500))
+    for field, text in (("make", "Jane jane.private@example.test"), ("model", "303-555-0199")):
+        client.put(f"/v1/vehicles/{vehicle}", headers=h("alice"), json={field: text})
+        assert client.post("/v1/assistant", headers=h("alice"), json={"vehicle_id": vehicle, "message": "What is a cabin filter?"}).status_code == 200
+        client.put(f"/v1/vehicles/{vehicle}", headers=h("alice"), json={field: "Ford"})
+    assert client.post("/v1/assistant", headers=h("alice"), json={"vehicle_id": vehicle, "message": "What filter fits VIN 1FTFW1ET1EKE57183?"}).status_code == 200
+    assert observed == []
+
+
+@pytest.mark.parametrize("message", ["Book my saved shop where I had service last time", "Please reach out to my previous shop and schedule a tire inspection"])
+def test_scheduling_intent_takes_priority_over_history(clients, message):
+    client, _ = clients
+    vehicle = create_vehicle(client)
+    result = client.post("/v1/assistant", headers=h("alice"), json={"vehicle_id": vehicle, "message": message}).json()
+    assert result["intent"] == "shop_outreach"
+    assert "review and authorize" in result["reply"]

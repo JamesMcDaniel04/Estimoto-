@@ -13,7 +13,7 @@ from typing import Literal
 
 from fastapi import APIRouter, Depends, Header, HTTPException
 from pydantic import BaseModel, ConfigDict, Field, field_validator
-from sqlalchemy import delete, func, or_, select, update
+from sqlalchemy import case, delete, func, or_, select, update
 from sqlalchemy.orm import Session
 
 from .auth import bridge_authorized, current_customer, db_session
@@ -82,7 +82,10 @@ def knowledge(c: Customer = Depends(current_customer), db: Session = Depends(db_
 def save_preference(body: PreferenceInput, c: Customer = Depends(current_customer), db: Session = Depends(db_session)):
     lock_customer(db, c.id)
     preference = db.get(KnowledgePreference, c.id)
-    changed = preference is None or preference.share_aggregate_insights != body.share_aggregate_insights
+    changed = preference is None or preference.share_aggregate_insights != body.share_aggregate_insights or preference.policy_version != POLICY_VERSION
+    if changed:
+        from .customer_routes import consume_rate
+        consume_rate(db, c.id, "knowledge_consent", 20)
     if preference is None:
         preference = KnowledgePreference(customer_id=c.id)
         db.add(preference)
@@ -148,6 +151,8 @@ def create_record(body: RecordInput, idempotency_key: str | None = Header(defaul
         raise HTTPException(404, "Vehicle not found.")
     if db.scalar(select(func.count()).select_from(KnowledgeRecord).where(KnowledgeRecord.customer_id == c.id)) >= 1000:
         raise HTTPException(409, "Your saved history is full. Remove an entry before adding another.")
+    from .customer_routes import consume_rate
+    consume_rate(db, c.id, "knowledge_create", 30)
     record = KnowledgeRecord(id=uid(), customer_id=c.id, idempotency_key=idempotency_key,
                              payload_hash=digest, **body.model_dump())
     db.add(record)
@@ -163,6 +168,8 @@ def delete_record(record_id: str, c: Customer = Depends(current_customer), db: S
     record = db.get(KnowledgeRecord, record_id)
     if record is None or record.customer_id != c.id:
         raise HTTPException(404, "History not found.")
+    from .customer_routes import consume_rate
+    consume_rate(db, c.id, "knowledge_delete", 60)
     db.execute(delete(GraphEdge).where(GraphEdge.customer_id == c.id, GraphEdge.record_id == record.id))
     db.add(KnowledgeDeletion(customer_id=c.id, idempotency_key=record.idempotency_key))
     db.delete(record)
@@ -254,29 +261,24 @@ def history_answer(evidence):
 def aggregate_insights(db):
     # Only enumerated/coarse dimensions leave the customer context. Arbitrary
     # shop/supplier names and notes can contain PII and stay private.
-    rows = db.execute(select(KnowledgeRecord.customer_id, KnowledgeRecord.service_type, KnowledgeRecord.parts_source)
-                      .join(KnowledgePreference, KnowledgePreference.customer_id == KnowledgeRecord.customer_id)
-                      .join(Customer, Customer.id == KnowledgeRecord.customer_id)
-                      .where(KnowledgePreference.share_aggregate_insights.is_(True), Customer.demo.is_(False))).all()
-    services, suppliers, requests = defaultdict(set), defaultdict(set), defaultdict(set)
     known_sources = {"autozone": "AutoZone", "napa": "NAPA", "napa auto parts": "NAPA",
                      "o'reilly": "O'Reilly Auto Parts", "o'reilly auto parts": "O'Reilly Auto Parts",
                      "rockauto": "RockAuto", "advance auto parts": "Advance Auto Parts", "dealer": "Dealer"}
-    for customer_id, service, source in rows:
-        services[service].add(customer_id)
-        if source:
-            suppliers[known_sources.get(source.casefold().strip(), "Other supplier")].add(customer_id)
-    request_rows = db.execute(select(ServiceRequest.customer_id, ServiceRequest.specialty)
-                              .join(KnowledgePreference, KnowledgePreference.customer_id == ServiceRequest.customer_id)
-                              .join(Customer, Customer.id == ServiceRequest.customer_id)
-                              .where(KnowledgePreference.share_aggregate_insights.is_(True), Customer.demo.is_(False))).all()
-    for customer_id, specialty in request_rows:
-        if specialty in {"pdr", "collision", "maintenance", "mechanical"}:
-            requests[specialty].add(customer_id)
-    def counts(groups):
-        return [{"category": key, "contributors_rounded": len(people) // 5 * 5}
-                for key, people in sorted(groups.items()) if len(people) >= MIN_CONTRIBUTORS]
-    return {"service_types": counts(services), "parts_sources": counts(suppliers), "request_types": counts(requests),
+    supplier_category = case(known_sources, value=func.lower(func.trim(KnowledgeRecord.parts_source)), else_="Other supplier")
+    def counts(model, category, predicate):
+        count = func.count(func.distinct(model.customer_id))
+        statement = (select(category.label("category"), count.label("count"))
+                     .join(KnowledgePreference, KnowledgePreference.customer_id == model.customer_id)
+                     .join(Customer, Customer.id == model.customer_id)
+                     .where(KnowledgePreference.share_aggregate_insights.is_(True),
+                            KnowledgePreference.policy_version == POLICY_VERSION, Customer.demo.is_(False), predicate)
+                     .group_by(category).having(count >= MIN_CONTRIBUTORS).order_by(category))
+        # Database-side distinct aggregation keeps memory bounded by the fixed
+        # category vocabulary, even as the underlying source corpus grows.
+        return [{"category": row.category, "contributors_rounded": row.count // 5 * 5} for row in db.execute(statement)]
+    return {"service_types": counts(KnowledgeRecord, KnowledgeRecord.service_type, KnowledgeRecord.service_type.in_(ServiceType.__args__)),
+            "parts_sources": counts(KnowledgeRecord, supplier_category, KnowledgeRecord.parts_source != ""),
+            "request_types": counts(ServiceRequest, ServiceRequest.specialty, ServiceRequest.specialty.in_(["pdr", "collision", "maintenance", "mechanical"])),
             "minimum_contributors": MIN_CONTRIBUTORS, "source": "opted_in_customer_reports",
             "counts_rounded_to": 5, "includes_contacts": False}
 
