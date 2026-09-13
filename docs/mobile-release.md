@@ -6,7 +6,12 @@ Explicit demo mode is isolated and does not send requests.
 
 ## Android 0.1.0 (5)
 
-[Download APK](https://github.com/JamesMcDaniel04/Estimoto-/releases/download/v0.1.0-beta.5/estimoto-plus-0.1.0-5.apk) · [Release assets](https://github.com/JamesMcDaniel04/Estimoto-/releases/tag/v0.1.0-beta.5)
+[Download the latest released Plus APK](https://estimoto-plus-api.fly.dev/android/download) · [Current build and hash](https://estimoto-plus-api.fly.dev/android/current) · [Build-5 release assets](https://github.com/JamesMcDaniel04/Estimoto-/releases/tag/v0.1.0-beta.5)
+
+The download URL is permanent: it resolves the current verified release pointer
+on each request and presently serves build 5. Installing a newer APK over an
+existing Estimoto + installation keeps the Plus account; the app does not update
+itself automatically. The URL is a direct APK download, not a Google Play invite.
 
 Source `ec2dafffbd62b424ddd1b6928268b6ecce547365`. Vehicle cards use conservative
 CarsXE matching or private camera/gallery uploads. Uploads take priority and can
@@ -23,9 +28,10 @@ iOS applies its own mask to the master icon.
   in an Android emulator against the live backend. Killing the app process while
   its camera was open preserved the original vehicle destination, showed a saved
   capture on relaunch, and required explicit retry before upload.
-- The requested Android invite email containing the preceding build-4 APK was
-  delivered through Resend. The latest build-5 link is above. Google Play
-  publication and physical-device installation are separate checks.
+- The preceding build-4 invite and the newly requested permanent-link invite
+  were each delivered through Resend. The permanent link was independently
+  followed and matched the build-5 APK hash above. Google Play publication and
+  physical-device installation are separate checks.
 
 ## iOS 0.1.0 (5)
 
@@ -59,6 +65,15 @@ checks, hashes and provider states.
 `app/config/local.json` containing only the four supported public live fields. The
 script refuses demo mode or server credentials. CarsXE credentials stay on the
 backend. Record exact source, signatures and served hashes before distribution.
+
+**Required for every Android release:** publish the signed, versioned APK under
+the matching GitHub release tag, then run
+`cd backend && PYTHONPATH=. .venv/bin/python scripts/publish_android_current.py --apk ../app/build/app/outputs/flutter-apk/app-release.apk`.
+This verifies package identity, signing certificate, version increase and public
+bytes before switching the remote current pointer. Follow the permanent URL and
+compare the downloaded hash before sending an invite. See
+[the release workflow](../backend/docs/android-download.md). A new Android build
+is not current merely because its GitHub asset exists.
 
 `build_beta.sh` intentionally produces a labeled demo. See [release status](release-status.md)
 and [launch checks](launch/2026-09-14-customer-launch.md) for current evidence.

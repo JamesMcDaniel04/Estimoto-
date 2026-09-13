@@ -4,7 +4,7 @@ The customer companion to Estimoto. A separate mobile app for a saved garage, PD
 
 Estimoto + now has a live customer API, dedicated Supabase Auth/PostgreSQL storage, and a production bridge to Estimoto shops. See [release status](docs/release-status.md) for the exact verified scope and remaining launch checks.
 
-[Open Estimoto +](https://estimoto-plus-api.fly.dev/) · [Download Android](https://github.com/JamesMcDaniel04/Estimoto-/releases/download/v0.1.0-beta.5/estimoto-plus-0.1.0-5.apk) · [TestFlight status](docs/mobile-release.md)
+[Open Estimoto +](https://estimoto-plus-api.fly.dev/) · [Download the latest released Android beta](https://estimoto-plus-api.fly.dev/android/download) · [TestFlight status](docs/mobile-release.md)
 
 <img src="docs/screenshots/garage-carsxe-web.png" alt="Estimoto Plus garage with a representative CarsXE Audi Q5 image and clearly labeled demo data" width="300">
 
