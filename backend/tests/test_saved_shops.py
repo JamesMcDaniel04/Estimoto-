@@ -118,6 +118,7 @@ def test_shop_action_get_never_mutates_and_post_only_confirms_offered_slot(shops
     action_path = action_url.removeprefix("https://plus.example.test")
     before = client.get(f"/v1/shop-outreach/{reviewed['id']}", headers=auth()).json()
     assert before["status"] == "waiting_for_reply"
+    assert before["delivery_status"] == "provider_accepted"
     assert client.get(action_path).status_code == 200
     assert client.get(f"/v1/shop-outreach/{reviewed['id']}", headers=auth()).json()["status"] == "waiting_for_reply"
     assert client.post(action_path, data={"slot": slot(3)}).status_code == 422

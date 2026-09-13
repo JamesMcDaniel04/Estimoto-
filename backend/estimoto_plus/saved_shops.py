@@ -492,7 +492,7 @@ def _finish_mail(db, outbox_id, token, outreach_id, outcome, receipt):
         item.provider_id = receipt
         item.finished_at = current
         outreach.status = "waiting_for_reply"
-        outreach.delivery_status = "delivered"
+        outreach.delivery_status = "provider_accepted"
     elif outcome == "failed":
         item.finished_at = current
         outreach.status = "delivery_failed"
