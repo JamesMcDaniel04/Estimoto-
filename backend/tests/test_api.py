@@ -39,7 +39,7 @@ def h(who):
 def create_vehicle(client, who="alice"):
     response = client.post("/v1/vehicles", headers=h(who), json={"year": 2020, "make": "Ford", "model": "F-150"})
     assert response.status_code == 201, response.text
-    assert client.put("/v1/profile", headers=h(who), json={"postal_code": "80202"}).status_code == 200
+    assert client.put("/v1/profile", headers=h(who), json={"name": who.title(), "postal_code": "80202"}).status_code == 200
     return response.json()["id"]
 
 

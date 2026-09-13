@@ -34,7 +34,7 @@ def make(tmp_path):
         clients.append(client)
         vehicle = client.post("/v1/vehicles", headers=AUTH, json={"year": 2020, "make": "Ford", "model": "Truck"}).json()["id"]
         if postal is not None:
-            result = client.put("/v1/profile", headers=AUTH, json={"postal_code": postal})
+            result = client.put("/v1/profile", headers=AUTH, json={"name": "Alice", "postal_code": postal})
             assert result.status_code == (422 if postal == "not-a-zip" else 200)
         provider = client.post("/v1/bridge/providers", headers=BRIDGE, json={"source_id": "shop-1", "name": "Shop", "kind": "shop", "specialties": ["pdr"], "postal_codes": ["80202"], "public_visible": True, "accepting_requests": True}).json()["id"]
         body = {"vehicle_id": vehicle, "provider_id": provider, "specialty": "pdr", "description": "Dent", "share_contact": True}
@@ -305,7 +305,7 @@ def test_invalid_numeric_and_null_vehicle_update_return_safe_422(make):
     assert client.put(f"/v1/vehicles/{vehicle}", headers=AUTH, json={"nickname": "Pickup"}).json()["year"] == 2020
     assert client.post("/v1/reminders", headers=AUTH, json={"vehicle_id": vehicle, "title": "Oil", "due_mileage": 10**40}).status_code == 422
     assert client.post("/v1/bridge/estimates/snapshots", headers=BRIDGE, json={"source_id": "quote", "customer_id": "alice", "vehicle_id": vehicle, "discipline": "pdr", "description": "Dent", "status": "ready", "amount_cents": 10**40}).status_code == 422
-    assert client.post("/v1/bridge/providers", headers=BRIDGE, json={"source_id": "too-long", "name": "Shop", "kind": "shop", "specialties": ["pdr"], "postal_codes": ["80202"], "city": "x" * 101}).status_code == 422
+    assert client.post("/v1/bridge/providers", headers=BRIDGE, json={"source_id": "too-long", "name": "Shop", "kind": "shop", "specialties": ["pdr"], "postal_codes": ["80202"], "city": "x" * 121}).status_code == 422
 
 
 def test_assistant_clarifies_missing_vehicle_specialty_or_zip(make):

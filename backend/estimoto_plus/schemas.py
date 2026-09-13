@@ -115,8 +115,8 @@ class ProviderPublish(Strict):
     name: str = Field(min_length=1, max_length=200)
     kind: Literal["shop", "technician"]
     specialties: list[Literal["pdr", "collision", "maintenance", "mechanical"]] = Field(max_length=4)
-    postal_codes: list[str] = Field(max_length=500)
-    city: str = Field(default="", max_length=100)
+    postal_codes: list[str] = Field(max_length=2000)
+    city: str = Field(default="", max_length=120)
     address: str = Field(default="", max_length=300)
     phone: str = Field(default="", max_length=50)
     mobile_service: bool = False
@@ -167,6 +167,7 @@ class EstimateSnapshot(Strict):
     provider_source_id: str | None = Field(default=None, max_length=100)
     processing_state: Literal["pending", "processing", "failed", "complete"] | None = None
     processing_error: str | None = Field(default=None, max_length=500)
+    updated_at: datetime | None = None
 
 
 class RepairStage(Strict):

@@ -135,7 +135,9 @@ def test_estimate_payload_private_import_and_authoritative_status(plus):
     assert payload["vehicle_id"] == vehicle and payload["provider_source_id"] == "shop-1"
     assert payload["contact"]["phone"] == "3035550100"
     assert "policy_number" not in payload["vehicle"]
-    assert [p["capture_key"] for p in payload["photos"]] == [*KEYS, "panel_hood"]
+    assert payload["event"] == "submitted"
+    assert [p["label"] for p in payload["photos"]] == [*KEYS, "panel_hood"]
+    assert all(p["byte_size"] == len(png()) and p["mime_type"] == "image/png" for p in payload["photos"])
     assert payload["photos"][0]["sha256"] == hashlib.sha256(png()).hexdigest()
     assert client.get("/v1/bootstrap", headers=auth()).json()["estimates"][0]["delivery_status"] == "delivered"
     assert client.post("/v1/bridge/outbox/deliver", headers=BRIDGE).json()["delivered"] == 1

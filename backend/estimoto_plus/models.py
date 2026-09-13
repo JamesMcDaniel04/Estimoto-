@@ -58,7 +58,7 @@ class Provider(Base):
     kind: Mapped[str] = mapped_column(String(20))
     specialties: Mapped[list] = mapped_column(JSON)
     postal_codes: Mapped[list] = mapped_column(JSON)
-    city: Mapped[str] = mapped_column(String(100), default="")
+    city: Mapped[str] = mapped_column(String(120), default="")
     address: Mapped[str] = mapped_column(String(300), default="")
     phone: Mapped[str] = mapped_column(String(50), default="")
     mobile_service: Mapped[bool] = mapped_column(Boolean, default=False)

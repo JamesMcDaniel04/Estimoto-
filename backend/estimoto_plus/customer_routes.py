@@ -17,10 +17,12 @@ from sqlalchemy.orm import Session
 
 from .auth import current_customer, db_session
 from .assistant_model import enhance_advice
+from .graph import history_question, retrieve_history, history_answer
+from .graph_models import KnowledgeRecord
 from .models import Customer, Estimate, EstimateOutbox, Outbox, Photo, Provider, RateBucket, Reminder, Repair, RequestEvent, RequestRejection, ServiceRequest, Vehicle, now, uid
 from .postal import canonical_zip
 from .schemas import AssistantInput, EstimateCreate, EstimateSubmit, ProfileWrite, ReminderCreate, RequestCreate, VehicleCreate, VehicleUpdate
-from .workflow import creation_payload, payload_hash, queue_cancellation
+from .workflow import bridge_details, creation_payload, payload_hash, queue_cancellation
 
 router = APIRouter(prefix="/v1")
 ESTIMATE_PHOTO_KEYS = ("odometer", "engine_bay", "interior", "tire_tread", "front", "driver", "rear", "passenger")
@@ -147,7 +149,7 @@ def update_vehicle(vehicle_id: str, body: VehicleUpdate, c: Customer = Depends(c
 @router.delete("/vehicles/{vehicle_id}", status_code=204)
 def delete_vehicle(vehicle_id: str, c: Customer = Depends(current_customer), db: Session = Depends(db_session)):
     v = owned(db, Vehicle, vehicle_id, c)
-    if any(db.scalar(select(m.id).where(m.vehicle_id == v.id)) for m in (ServiceRequest, Estimate, Repair, Reminder)):
+    if any(db.scalar(select(m.id).where(m.vehicle_id == v.id)) for m in (ServiceRequest, Estimate, Repair, Reminder, KnowledgeRecord)):
         raise HTTPException(409, "Vehicle is in use.")
     db.delete(v)
     db.commit()
@@ -208,9 +210,16 @@ def create_request(body: RequestCreate, request: Request, idempotency_key: str |
         return reject(409, "Provider is not accepting this request.")
     if not c.demo and not (request.app.state.settings.bridge_url and request.app.state.settings.bridge_key):
         raise HTTPException(503, "Requests are unavailable right now. Please try again later.")
+    if not body.description.strip():
+        return reject(422, "Describe the help you need before requesting service.")
+    if not c.demo:
+        try:
+            bridge_details(c, v)
+        except ValueError as exc:
+            return reject(422, str(exc))
     status = "local_preview" if c.demo else "queued"
     r = ServiceRequest(id=uid(), customer_id=c.id, vehicle_id=body.vehicle_id, provider_id=body.provider_id,
-                       specialty=body.specialty, description=body.description, preferred_time=body.preferred_time,
+                       specialty=body.specialty, description=body.description.strip(), preferred_time=body.preferred_time.strip(),
                        idempotency_key=idempotency_key, payload_hash=digest, service_postal_code=service_zip,
                        delivery_status=status, created_at=now(), updated_at=now())
     db.add(r)
@@ -288,19 +297,17 @@ def submit_estimate(estimate_id: str, body: EstimateSubmit, request: Request,
     settings = request.app.state.settings
     if c.demo or not (settings.estimate_bridge_url and settings.bridge_key):
         raise HTTPException(503, "Estimate submission is unavailable right now.")
-    if (not c.name.strip() or not 3 <= len(c.email) <= 200 or not 7 <= len("".join(ch for ch in c.phone if ch.isdigit()))
-            or len(c.phone) > 40):
-        raise HTTPException(422, "Save your name and a reachable phone number before submitting.")
-    if len(e.description) > 2000 or len(e.claim_number) > 60:
-        raise HTTPException(422, "Estimate description or claim number is too long.")
+    e.description, e.claim_number = e.description.strip(), e.claim_number.strip()
+    if not 1 <= len(e.description) <= 2000 or len(e.claim_number) > 60:
+        raise HTTPException(422, "Review the estimate description and claim number before submitting.")
     service_zip = canonical_zip(c.postal_code)
     if not service_zip:
         raise HTTPException(422, "Save a valid ZIP code before submitting.")
     v = owned(db, Vehicle, e.vehicle_id, c)
-    if (not 1950 <= v.year <= 2050 or not 1 <= len(v.make.strip()) <= 60 or
-            not 1 <= len(v.model.strip()) <= 60 or not 0 <= v.mileage <= 9_999_999 or
-            (v.vin and not re.fullmatch(r"[A-HJ-NPR-Z0-9]{17}", v.vin))):
-        raise HTTPException(422, "Review the vehicle year, make, model, mileage, and VIN before submitting.")
+    try:
+        contact, car = bridge_details(c, v, estimate=True)
+    except ValueError as exc:
+        raise HTTPException(422, str(exc))
     p = db.get(Provider, body.provider_id)
     if not p or p.demo_only or not p.public_visible or not p.accepting_requests or p.kind != "shop" or e.discipline not in p.specialties or service_zip not in p.postal_codes:
         raise HTTPException(409, "Provider is not accepting this estimate.")
@@ -317,7 +324,7 @@ def submit_estimate(estimate_id: str, body: EstimateSubmit, request: Request,
     for label in (*ESTIMATE_PHOTO_KEYS, *sorted(set(by_label) - set(ESTIMATE_PHOTO_KEYS))):
         photo = by_label[label]
         permitted_extra = ({"panel_" + panel for panel in PDR_PANEL_TYPES} if e.discipline == "pdr" else
-                           {"damage_close", "damage_far"})
+                           {"corner_fl", "corner_fr", "corner_rl", "corner_rr", "roof"})
         if photo.label not in ESTIMATE_PHOTO_KEYS and photo.label not in permitted_extra:
             raise HTTPException(422, "Unsupported photo label: " + photo.label)
         photo_path = Path(settings.photo_dir) / photo.storage_name
@@ -333,15 +340,13 @@ def submit_estimate(estimate_id: str, body: EstimateSubmit, request: Request,
             raise HTTPException(422, "A photo is unavailable or changed. Please contact support.")
         photo.sha256 = digest.hexdigest()
         photo.byte_size = size
-        evidence.append({"id": photo.id, "capture_key": photo.label, "sha256": photo.sha256})
-    payload = {"estimate_id": e.id, "customer_id": c.id, "vehicle_id": v.id,
+        evidence.append({"id": photo.id, "label": photo.label, "sha256": photo.sha256,
+                         "byte_size": photo.byte_size, "mime_type": photo.mime_type})
+    payload = {"event": "submitted", "estimate_id": e.id, "customer_id": c.id, "vehicle_id": v.id,
                "provider_source_id": p.source_id, "service_postal_code": service_zip,
                "discipline": e.discipline, "description": e.description,
                "claim_number": e.claim_number, "date_of_loss": e.date_of_loss,
-               "contact": {"name": c.name, "email": c.email, "phone": c.phone,
-                           "contact_preference": c.contact_preference},
-               "vehicle": {"year": v.year, "make": v.make, "model": v.model,
-                           "vin": v.vin, "mileage": v.mileage}, "photos": evidence}
+               "contact": contact, "vehicle": car, "photos": evidence}
     e.provider_id = p.id
     e.provider_name = p.name
     e.status = "submitted"
@@ -509,6 +514,19 @@ def assistant(body: AssistantInput, request: Request, c: Customer = Depends(curr
         videos = [{"title": "Search YouTube for this maintenance topic", "url": f"https://www.youtube.com/results?search_query={search}", "source": "YouTube search · review vehicle compatibility"}]
     result = {"reply": reply, "intent": intent, "specialty": specialty,
               "providers": [provider(p) for p in matches], "videos": videos}
+    evidence = []
+    if not urgent and history_question(message):
+        evidence = retrieve_history(db, c.id, car.id if car else None, body.message)
+        result = {"reply": history_answer(evidence), "intent": "advice", "specialty": None,
+                  "providers": [], "videos": [], "answer_source": "Your saved history",
+                  "sources": [{"id": e["source_id"], "type": e["source"],
+                               "title": e["service_date"] + " · " + e["service_type"].replace("_", " ")} for e in evidence]}
+        if not evidence:
+            return result
+        intent = "advice"
+    elif not urgent and re.search(r"\b(schedule|book|contact|reach out|appointment)\b", message) and re.search(r"\b(my|saved|usual|own)\b.*\b(shop|mechanic|garage)\b", message):
+        return {"reply": "Open My shops to choose your shop and preferred times. I'll prepare the request for you to review and authorize. Your shop confirms the appointment.",
+                "intent": "shop_outreach", "specialty": specialty, "providers": [], "videos": []}
     if intent != "advice" or urgent or c.demo:
         return result
     if os.getenv("OPENAI_API_KEY") and os.getenv("ASSISTANT_ENABLED", "true").lower() == "true":
@@ -524,5 +542,5 @@ def assistant(body: AssistantInput, request: Request, c: Customer = Depends(curr
             raise
     return enhance_advice(result, message=body.message,
                           vehicle={k: getattr(car, k) for k in ("year", "make", "model", "mileage")} if car else None,
-                          settings=request.app.state.settings,
+                          settings=request.app.state.settings, evidence=evidence,
                           transport=getattr(request.app.state, "assistant_transport", None))

@@ -10,7 +10,7 @@ def customer(tmp_path):
     app = create_app(Settings(database_url=f'sqlite:///{tmp_path / "intents.sqlite"}', environment='test', bridge_url='https://fixture.invalid/receive', bridge_key='fixture-key', photo_dir=str(tmp_path / 'photos')), auth_verifier=lambda token: {'id': token, 'email': f'{token}@example.test', 'confirmed_at': 'ok'})
     with TestClient(app) as client:
         client.headers['Authorization'] = 'Bearer customer'
-        client.put('/v1/profile', json={'postal_code': '80202'})
+        client.put('/v1/profile', json={'name': 'Customer', 'postal_code': '80202'})
         vehicle = client.post('/v1/vehicles', json={'year': 2024, 'make': 'Toyota', 'model': 'Camry'}).json()
         yield client, vehicle['id']
     app.state.engine.dispose()

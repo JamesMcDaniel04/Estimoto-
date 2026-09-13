@@ -40,7 +40,7 @@ def test_catalog_optout_and_authoritative_request_events(tmp_path):
         assert client.post("/v1/bridge/sync", headers=BRIDGE).json()["providers_synced"] is True
         assert len(client.get("/v1/providers", headers=AUTH).json()) == 1
         vehicle = client.post("/v1/vehicles", headers=AUTH, json={"year": 2020, "make": "Ford", "model": "Truck"}).json()["id"]
-        client.put("/v1/profile", headers=AUTH, json={"postal_code": "80202"})
+        client.put("/v1/profile", headers=AUTH, json={"name": "Alice", "postal_code": "80202"})
         provider = client.get("/v1/providers", headers=AUTH).json()[0]["id"]
         created = client.post("/v1/requests", headers={**AUTH, "Idempotency-Key": "created"},
                               json={"vehicle_id": vehicle, "provider_id": provider, "specialty": "pdr",
