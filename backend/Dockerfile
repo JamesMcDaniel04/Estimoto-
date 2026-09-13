@@ -1,6 +1,10 @@
 FROM python:3.13-slim
 ARG SOURCE_SHA=unknown
 ENV PYTHONDONTWRITEBYTECODE=1 PYTHONUNBUFFERED=1 SOURCE_SHA=${SOURCE_SHA}
+# The entrypoint drops to the plus account before running migrations/API.
+# libpq resolves its optional client certificate under the effective user's
+# home, which must not remain the inaccessible root-account directory.
+ENV HOME=/home/plus
 WORKDIR /app/backend
 COPY backend/requirements.lock ./requirements.lock
 RUN pip install --no-cache-dir -r requirements.lock \
