@@ -4,6 +4,8 @@ The customer companion to Estimoto. A separate mobile app for a saved garage, PD
 
 This repository contains the first working app and customer API milestone. It is not connected to the production Estimoto database or published to the app stores. See [release status](docs/release-status.md) for verified behavior and remaining integration work.
 
+[Download the signed Android demo beta](https://github.com/JamesMcDaniel04/Estimoto-/releases/download/v0.1.0-beta.1/estimoto-plus-0.1.0-1.apk) · [Mobile/TestFlight setup status](docs/mobile-release.md)
+
 <img src="docs/screenshots/garage-ios.png" alt="Estimoto Plus garage on an iOS simulator with clearly labeled demo data" width="300">
 
 ## Explore the app

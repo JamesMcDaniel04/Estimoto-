@@ -1,0 +1,47 @@
+{
+  "date": "2026-09-13",
+  "ios": {
+    "CFBundleIdentifier": "io.estimoto.plus",
+    "CFBundleDisplayName": "Estimoto +",
+    "CFBundleShortVersionString": "0.1.0",
+    "CFBundleVersion": "1",
+    "ITSAppUsesNonExemptEncryption": false,
+    "path": "app/build/ios/ipa/Estimoto +.ipa",
+    "sha256": "09a68df1c46f58d3309c5e25050ec6018e8e9c71b7a5544a49c6fa6ef857d43b",
+    "source_sha": "558c35606bc29dac507e454fa264aa47a286eeef",
+    "mode": "fictional_demo",
+    "signature_verified": true,
+    "apple_bundle_registration_id": "SFACWALLYZ",
+    "distribution_profile_id": "82QT2M2C8V",
+    "simulator_installed_and_inspected": true,
+    "testflight_app_record_created": false,
+    "testflight_uploaded": false,
+    "testflight_blocker": "App Store Connect website sign-in is required to create the app record."
+  },
+  "android": {
+    "source_sha": "558c35606bc29dac507e454fa264aa47a286eeef",
+    "package": "io.estimoto.plus",
+    "version_name": "0.1.0",
+    "version_code": "1",
+    "display_name": "Estimoto +",
+    "mode": "fictional_demo",
+    "signer_sha256": "e6d106fccc6c0e77e04a46c64f8edffdafb11b502d4857e51606c725086581dd",
+    "apk_signature_verified": true,
+    "aab_signature_verified": true,
+    "files": [
+      {
+        "name": "estimoto-plus-0.1.0-1.apk",
+        "bytes": 56428039,
+        "sha256": "8dd89e2df6cbaa59c11c78dbf15e70321f589dbfbfe0f81f24f8a9923ca2a5d2"
+      },
+      {
+        "name": "estimoto-plus-0.1.0-1.aab",
+        "bytes": 55107733,
+        "sha256": "ba648173753e93d01357e0b02842b20281cec8dceeca21ba4e767a5ce4c639db"
+      }
+    ],
+    "physical_device_installed": false,
+    "public_download_hashes_verified": true,
+    "release_url": "https://github.com/JamesMcDaniel04/Estimoto-/releases/tag/v0.1.0-beta.1"
+  }
+}

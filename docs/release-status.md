@@ -2,6 +2,8 @@
 
 This is the first runnable Estimoto + app/API milestone. Source is independent of the Estimoto staff app. It is not a production customer launch.
 
+Subsequent mobile beta work added the requested E-plus branding, registered the separate Apple bundle ID, built signed iOS/Android artifacts and published a direct Android demo prerelease. See [current mobile delivery status](mobile-release.md); TestFlight app-record creation/upload still awaits website sign-in.
+
 ## Source delivery and review
 
 The reviewed source is published to [JamesMcDaniel04/Estimoto-](https://github.com/JamesMcDaniel04/Estimoto-) on `main`. The local demo is served at `http://127.0.0.1:4318/`; it runs only while the preview server is active.
@@ -47,7 +49,7 @@ API and demo assistant paths interpret mobile-service requests, provide determin
 4. Add push notifications and date/mileage reminder delivery. Current reminders persist and display in-app; they do not yet send alerts or read a vehicle's odometer automatically.
 5. Add model-backed Estibot and retrieved/curated video results, with evaluations for common repair questions and technician matching. Current search links are not verified individual videos.
 6. Confirm CARFAX partner access, data rights, coverage and mapping before implementing service-history ingestion and automatic maintenance alerts. No CARFAX integration is claimed.
-7. Finish app icons/store assets, signing, accessibility/device QA, privacy disclosures and store distribution. Generated launch icons are placeholders.
+7. Finish store assets, accessibility/device QA, privacy disclosures and store distribution. The E-plus icons and initial release signing are now implemented; subsequent beta delivery is tracked in the mobile release document above.
 
 ## Reproduce
 
