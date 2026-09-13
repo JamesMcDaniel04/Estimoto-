@@ -83,6 +83,19 @@ class _WelcomeScreenState extends State<WelcomeScreen> {
       child: PageBody(
         padding: const EdgeInsets.fromLTRB(28, 32, 28, 24),
         children: [
+          Align(
+            alignment: Alignment.centerLeft,
+            child: ClipRRect(
+              borderRadius: BorderRadius.circular(16),
+              child: Image.asset(
+                'assets/brand/estimoto-plus-icon.png',
+                width: 72,
+                height: 72,
+                excludeFromSemantics: true,
+              ),
+            ),
+          ),
+          const SizedBox(height: 16),
           const Text(
             'Estimoto +',
             style: TextStyle(

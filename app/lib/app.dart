@@ -47,21 +47,13 @@ class _HomeShellState extends State<_HomeShell> {
           titleSpacing: 20,
           title: Row(
             children: [
-              Container(
-                width: 29,
-                height: 29,
-                alignment: Alignment.center,
-                decoration: BoxDecoration(
-                  color: PlusColors.blue,
-                  borderRadius: BorderRadius.circular(8),
-                ),
-                child: const Text(
-                  'E',
-                  style: TextStyle(
-                    color: Colors.white,
-                    fontWeight: FontWeight.w800,
-                    fontSize: 22,
-                  ),
+              ClipRRect(
+                borderRadius: BorderRadius.circular(8),
+                child: Image.asset(
+                  'assets/brand/estimoto-plus-icon.png',
+                  width: 32,
+                  height: 32,
+                  excludeFromSemantics: true,
                 ),
               ),
               const SizedBox(width: 10),
