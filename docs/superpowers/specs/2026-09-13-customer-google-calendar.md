@@ -64,6 +64,7 @@ Base `/v1/calendar/google`:
 - `GET /calendars` → `{calendars:[{id, summary, primary, time_zone, selected}]}`. Bounded pagination; partial list must not be reported as complete.
 - `PUT /preferences` body `{selected_calendar_ids, time_zone, sync_confirmed}` → status response. Validate IDs against the customer's accessible calendars; bump generation on changed scheduling preferences. No app-calendar creation until explicitly enabling sync.
 - `POST /availability` body `{time_min,time_max,duration_minutes,time_zone,day_start_hour,day_end_hour}` → `{slots:[{start,end}],checked_at,generation,time_zone,duration_minutes}`. Hours default 9 and 17, weekdays by default; reject invalid windows. All selected calendars must succeed.
+- `POST /sync/retry` body `{source_kind:"request"|"outreach",source_id}` retries one owned existing Calendar-checked confirmed/scheduled booking. Rate-limit; recheck current preferences/freebusy, adopt current generation only for this source, preserve frozen confirmed UTC instant/duration/review zone and existing event operation ID. Reconcile uncertain prior writes before mutation. This is a customer action, not historical bulk sync.
 - `DELETE /connection` → `{disconnected:true}`. Local invalidation is committed even if revocation needs retry. Never silently leave the app connected after a provider outage.
 
 Extend outreach and directory request create bodies with optional
@@ -108,6 +109,12 @@ Persist the exact payload and operation ID before writes. Resolve timeout/409 by
 GET at that exact ID and verify private provenance; never overwrite an unrelated
 event. A durable lease prevents concurrent worker writes. Recheck generation on
 every operation, including retries and disconnect. No automatic unlimited retry.
+Confirmed Plus intervals from private source rows also block future offers when
+the app calendar is not selected. When an overlapping reschedule encounters its
+own copy in selected-calendar FreeBusy, do not subtract from merged busy ranges:
+that could hide another event. Preserve the booking and report attention_needed
+with a clear adjustment/deselect-and-retry action. Other reschedules update the
+same event ID. This conservative case requires customer recovery in this release.
 
 ## Verification and launch gates
 

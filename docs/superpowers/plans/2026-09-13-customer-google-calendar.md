@@ -115,7 +115,7 @@ The report must name tests for forged attempt/connection, late response after di
 
 **Interfaces:**
 - Consumes every Task 1 JSON API verb/path/body/response in the spec; read its report for any resolved exact adapter differences.
-- Produces repository methods `getCalendarStatus`, `connectGoogleCalendar`, `reconcileGoogleCalendar(String attemptId)`, `listGoogleCalendars`, `saveCalendarPreferences(Json body)`, `findCalendarAvailability(Json body)`, `disconnectGoogleCalendar`.
+- Produces repository methods `getCalendarStatus`, `connectGoogleCalendar`, `reconcileGoogleCalendar(String attemptId)`, `listGoogleCalendars`, `saveCalendarPreferences(Json body)`, `findCalendarAvailability(Json body)`, `disconnectGoogleCalendar`, `retryCalendarSync(Json body)`.
 - Calendar page uses `WorkspaceState` owner guards. Use default unsupported implementations in `PlusRepository` for older test fakes; API overrides exact endpoints. Demo is local-only and clearly labeled.
 
 - [ ] **Step 1: Add failing widget and repository contract tests.**
