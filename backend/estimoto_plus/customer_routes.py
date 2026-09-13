@@ -15,7 +15,7 @@ from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
 
 from .auth import current_customer, db_session
-from .models import Customer, Estimate, Outbox, Photo, Provider, Reminder, Repair, RequestEvent, ServiceRequest, Vehicle, now, uid
+from .models import Customer, Estimate, Outbox, Photo, Provider, Reminder, Repair, RequestEvent, RequestRejection, ServiceRequest, Vehicle, now, uid
 from .postal import canonical_zip
 from .schemas import AssistantInput, EstimateCreate, ProfileWrite, ReminderCreate, RequestCreate, VehicleCreate, VehicleUpdate
 from .workflow import creation_payload, payload_hash, queue_cancellation
@@ -148,20 +148,39 @@ def create_request(body: RequestCreate, request: Request, idempotency_key: str |
         raise HTTPException(422, "Idempotency-Key is required.")
     payload = body.model_dump()
     digest = hashlib.sha256(json.dumps(payload, sort_keys=True, separators=(",", ":")).encode()).hexdigest()
+    # Serialize request outcomes across API workers before reading either outcome
+    # table. A no-op UPDATE takes a PostgreSQL row lock and a SQLite write lock;
+    # SELECT FOR UPDATE alone would not protect the local SQLite deployment.
+    db.execute(update(Customer).where(Customer.id == c.id).values(id=Customer.id))
+    db.refresh(c)
     existing = db.scalar(select(ServiceRequest).where(ServiceRequest.customer_id == c.id, ServiceRequest.idempotency_key == idempotency_key))
     if existing:
         if existing.payload_hash != digest:
             raise HTTPException(409, "Idempotency key was used for another request.")
         return request_view(db, existing)
-    v = owned(db, Vehicle, body.vehicle_id, c)
+    rejected = db.get(RequestRejection, (c.id, idempotency_key))
+    if rejected:
+        if rejected.payload_hash != digest:
+            raise HTTPException(409, "Idempotency key was used for another request.")
+        return JSONResponse(status_code=rejected.status_code, content={"detail": rejected.detail, "code": rejected.code})
+
+    def reject(status_code, detail):
+        # Once reported as not created, this operation can never be created by
+        # a delayed retry, even if the provider or profile subsequently changes.
+        db.add(RequestRejection(customer_id=c.id, idempotency_key=idempotency_key,
+                                payload_hash=digest, status_code=status_code, detail=detail))
+        db.commit()
+        return JSONResponse(status_code=status_code, content={"detail": detail, "code": "request_not_created"})
+
+    v = db.get(Vehicle, body.vehicle_id)
+    if not v or v.customer_id != c.id:
+        return reject(404, "Not found.")
     service_zip = canonical_zip(c.postal_code)
     if not service_zip:
-        raise HTTPException(422, "Save a valid ZIP code before requesting service.")
+        return reject(422, "Save a valid ZIP code before requesting service.")
     p = db.get(Provider, body.provider_id)
     if not p or not p.public_visible or p.demo_only != c.demo or not p.accepting_requests or body.specialty not in p.specialties or service_zip not in p.postal_codes:
-        return JSONResponse(status_code=409, content={
-            "detail": "Provider is not accepting this request.", "code": "request_not_created",
-        })
+        return reject(409, "Provider is not accepting this request.")
     if not c.demo and not (request.app.state.settings.bridge_url and request.app.state.settings.bridge_key):
         raise HTTPException(503, "Requests are unavailable right now. Please try again later.")
     status = "local_preview" if c.demo else "queued"

@@ -80,6 +80,16 @@ class ServiceRequest(Base):
     scheduled_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
 
 
+class RequestRejection(Base):
+    __tablename__ = "request_rejections"
+    customer_id: Mapped[str] = mapped_column(ForeignKey("customers.id"), primary_key=True)
+    idempotency_key: Mapped[str] = mapped_column(String(200), primary_key=True)
+    payload_hash: Mapped[str] = mapped_column(String(64))
+    status_code: Mapped[int] = mapped_column(Integer)
+    detail: Mapped[str] = mapped_column(String(200))
+    code: Mapped[str] = mapped_column(String(40), default="request_not_created")
+
+
 class RequestEvent(Base):
     __tablename__ = "request_events"
     id: Mapped[str] = mapped_column(String(36), primary_key=True, default=uid)
