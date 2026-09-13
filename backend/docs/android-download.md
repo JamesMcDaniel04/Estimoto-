@@ -4,13 +4,12 @@ The permanent public tester link is `https://estimoto-plus-api.fly.dev/android/d
 
 The bucket is intentionally limited to 1 MB JSON objects; this project's Storage object-size limit is below the 58 MB beta.5 APK. GitHub releases host the versioned binaries, so the current pointer is the only mutable object. The publisher updates it last after proving the remote APK matches the local signed package. A new Android build does **not** require an API or web redeploy to advance the emailed link.
 
-For each release:
+For each release, use the executable publisher as the normal release path:
 
 1. Build the signed `io.estimoto.plus` APK with an increasing Android `versionCode`. Keep the existing release signing certificate.
-2. Publish the APK as `estimoto-plus-<versionName>-<versionCode>.apk` under GitHub tag `v<versionName>-beta.<versionCode>` in `JamesMcDaniel04/Estimoto-`. Keep this versioned asset immutable.
-3. From `backend/`, run `PYTHONPATH=. .venv/bin/python scripts/publish_android_current.py --apk ../app/build/app/outputs/flutter-apk/app-release.apk`. The script reads the private Plus Supabase URL and service-role key from `~/.config/estimoto-plus/`; never place the key in Fly, source, release notes, or client code.
-4. Verify `/android/current`, follow `/android/download` without authentication, and hash the downloaded APK. Do not email a new invitation until the stable URL resolves the new file and hash.
+2. Prepare a nonempty release-notes file, then run `scripts/publish_android.sh --notes docs/releases/<release-notes>.md`. Pass `--apk`, `--aab`, and optionally `--sums` for nonstandard artifact locations. `--dry-run` verifies the local artifacts and any existing release without writing. The command takes a local exclusive lock, checks source version, APK package/signature, AAB signature, and both checksums. It creates or resumes the exact versioned GitHub prerelease, refuses mismatched existing assets instead of overwriting them, downloads and hashes all public assets, and only then advances the remote current pointer. It verifies the live stable API after the pointer switch.
+3. Follow `/android/download` without authentication and compare the downloaded APK hash before emailing an invitation. The script reads the private Plus Supabase URL and service-role key from `~/.config/estimoto-plus/`; never place the key in Fly, source, release notes, or client code.
 
-The publisher rejects an unexpected package, signature, bad version, absent/mismatched public asset, and version rollback. Repeating the exact current release is a no-op. If Storage or the GitHub asset fails, it leaves the previous pointer in place. The endpoint is a direct APK download, not a Google Play invitation.
+The publisher rejects an unexpected package, signature, bad version, absent/mismatched public asset, and version rollback. Repeating the exact current release is a no-op. If Storage or the GitHub asset fails before the pointer switch, it leaves the previous pointer in place. The endpoint is a direct APK download, not a Google Play invitation.
 
 Current pointer: version `0.1.0+5`, APK SHA-256 `fcdccd1ac2ca87a31b63f6716058378b94dbecb9e367eaac0a1eeb56ee643934`, signing certificate SHA-256 `e6d106fccc6c0e77e04a46c64f8edffdafb11b502d4857e51606c725086581dd`.
