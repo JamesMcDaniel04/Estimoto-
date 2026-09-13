@@ -25,6 +25,7 @@ from .saved_shops import router as saved_shops_router, deliver_shop_batch
 from .graph import router as graph_router
 from .upload_limit import PhotoBodyLimit
 from .vehicle_images import router as vehicle_images_router
+from .android_download import router as android_download_router
 
 
 def create_app(settings: Settings | None = None, *, auth_verifier=None, auth_client=None, bridge_transport=None):
@@ -125,6 +126,7 @@ def create_app(settings: Settings | None = None, *, auth_verifier=None, auth_cli
     app.include_router(saved_shops_router)
     app.include_router(graph_router)
     app.include_router(vehicle_images_router)
+    app.include_router(android_download_router)
 
     @app.get("/health/live")
     def health_live():
