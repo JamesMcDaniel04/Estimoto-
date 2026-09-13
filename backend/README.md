@@ -22,6 +22,8 @@ Run `PYTHONPATH=. .venv/bin/pytest -q` from `backend/`. The tests use isolated S
 
 ## Authentication and authorization
 
+Private garage uploads and representative CarsXE imagery use the [vehicle-image contract](docs/vehicle-images.md). Run migration `e21870f6a94b` before deploying the image routes and configure `CARSXE_API_KEY` only on the server.
+
 All customer routes require a Supabase bearer access token. On every request the server calls the configured fixed `SUPABASE_URL/auth/v1/user` with the publishable key and bearer token. It accepts only an authenticated, confirmed, non-anonymous identity with a server-returned ID and email. User-editable metadata never grants access or binds records. Every vehicle, request, estimate, photo, reminder and repair lookup is scoped to that ID. A Supabase outage, rate limit, or malformed upstream response returns 503; invalid credentials return 401. The client must not contain a service-role key. In production, configured Supabase and bridge URLs must be HTTPS. Bridge routes use a separate `X-Bridge-Key`; customer bearer tokens do not authorize them.
 
 ## Estimoto bridge contract

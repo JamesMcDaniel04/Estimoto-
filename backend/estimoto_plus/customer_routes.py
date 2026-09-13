@@ -57,7 +57,7 @@ def profile(c):
 
 
 def vehicle(v):
-    return {k: getattr(v, k) for k in ("id", "nickname", "year", "make", "model", "vin", "mileage", "insurer", "policy_number")}
+    return {k: getattr(v, k) for k in ("id", "nickname", "year", "make", "model", "vin", "mileage", "insurer", "policy_number", "image_version")}
 
 
 def provider(p):
@@ -148,12 +148,18 @@ def update_vehicle(vehicle_id: str, body: VehicleUpdate, c: Customer = Depends(c
 
 
 @router.delete("/vehicles/{vehicle_id}", status_code=204)
-def delete_vehicle(vehicle_id: str, c: Customer = Depends(current_customer), db: Session = Depends(db_session)):
+def delete_vehicle(vehicle_id: str, request: Request, c: Customer = Depends(current_customer), db: Session = Depends(db_session)):
+    db.execute(update(Customer).where(Customer.id == c.id).values(id=Customer.id))
+    db.expire_all()
     v = owned(db, Vehicle, vehicle_id, c)
     if any(db.scalar(select(m.id).where(m.vehicle_id == v.id)) for m in (ServiceRequest, Estimate, Repair, Reminder, KnowledgeRecord)):
         raise HTTPException(409, "Vehicle is in use.")
+    image_name = v.image_storage_name
     db.delete(v)
     db.commit()
+    if image_name:
+        from .vehicle_images import remove_upload_file
+        remove_upload_file(request.app.state.settings, image_name)
 
 
 @router.get("/providers")

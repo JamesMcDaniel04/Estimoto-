@@ -1,7 +1,7 @@
 from datetime import datetime, timezone
 from uuid import uuid4
 
-from sqlalchemy import Boolean, DateTime, ForeignKey, Index, Integer, JSON, String, Text, UniqueConstraint
+from sqlalchemy import Boolean, DateTime, ForeignKey, Index, Integer, JSON, LargeBinary, String, Text, UniqueConstraint
 from sqlalchemy.orm import DeclarativeBase, Mapped, mapped_column
 
 
@@ -48,6 +48,27 @@ class Vehicle(Base):
     mileage: Mapped[int] = mapped_column(Integer, default=0)
     insurer: Mapped[str] = mapped_column(String(100), default="")
     policy_number: Mapped[str] = mapped_column(String(100), default="")
+    image_storage_name: Mapped[str | None] = mapped_column(String(36), nullable=True)
+    image_version: Mapped[str | None] = mapped_column(String(64), nullable=True)
+    image_byte_size: Mapped[int | None] = mapped_column(Integer, nullable=True)
+
+
+class VehicleImageCache(Base):
+    """Representative stock bytes only; never contains customer uploads or VINs."""
+    __tablename__ = "vehicle_image_cache"
+    cache_key: Mapped[str] = mapped_column(String(64), primary_key=True)
+    image_data: Mapped[bytes | None] = mapped_column(LargeBinary, nullable=True)
+    retry_at: Mapped[datetime] = mapped_column(DateTime(timezone=True))
+    lease_token: Mapped[str | None] = mapped_column(String(36), nullable=True)
+    lease_until: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+
+
+class VehicleImageProviderState(Base):
+    __tablename__ = "vehicle_image_provider_state"
+    id: Mapped[int] = mapped_column(Integer, primary_key=True)
+    day_bucket: Mapped[int] = mapped_column(Integer, default=0)
+    count: Mapped[int] = mapped_column(Integer, default=0)
+    blocked_until: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
 
 
 class Provider(Base):

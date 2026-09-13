@@ -24,6 +24,7 @@ from . import shop_models  # register private saved-shop tables before test meta
 from .saved_shops import router as saved_shops_router, deliver_shop_batch
 from .graph import router as graph_router
 from .upload_limit import PhotoBodyLimit
+from .vehicle_images import router as vehicle_images_router
 
 
 def create_app(settings: Settings | None = None, *, auth_verifier=None, auth_client=None, bridge_transport=None):
@@ -95,7 +96,8 @@ def create_app(settings: Settings | None = None, *, auth_verifier=None, auth_cli
     if origins:
         app.add_middleware(CORSMiddleware, allow_origins=origins, allow_credentials=False,
                            allow_methods=["GET", "POST", "PUT", "DELETE"],
-                           allow_headers=["Authorization", "Content-Type", "Idempotency-Key"])
+                           allow_headers=["Authorization", "Content-Type", "Idempotency-Key"],
+                           expose_headers=["X-Vehicle-Image-Source", "ETag", "Retry-After"])
 
     @app.exception_handler(RequestValidationError)
     def validation_error(_request, _exc):
@@ -122,6 +124,7 @@ def create_app(settings: Settings | None = None, *, auth_verifier=None, auth_cli
     app.include_router(bridge_router)
     app.include_router(saved_shops_router)
     app.include_router(graph_router)
+    app.include_router(vehicle_images_router)
 
     @app.get("/health/live")
     def health_live():
@@ -138,7 +141,7 @@ def create_app(settings: Settings | None = None, *, auth_verifier=None, auth_cli
                 revision = connection.scalar(sql_text("SELECT version_num FROM alembic_version"))
                 connection.execute(sql_text("SELECT 1"))
             photo_path = Path(settings.photo_dir)
-            if revision != "c54d09a2f173" or not photo_path.is_dir() or not os.access(photo_path, os.W_OK):
+            if revision != "e21870f6a94b" or not photo_path.is_dir() or not os.access(photo_path, os.W_OK):
                 raise RuntimeError("not ready")
             if settings.environment == "production" and not (os.path.ismount(photo_path) or os.path.ismount(photo_path.parent)):
                 raise RuntimeError("not ready")

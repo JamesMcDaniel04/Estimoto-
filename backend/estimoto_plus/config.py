@@ -5,6 +5,7 @@ from pathlib import Path
 
 @dataclass
 class Settings:
+    carsxe_api_key: str = field(default_factory=lambda: os.getenv("CARSXE_API_KEY", ""), repr=False)
     database_url: str = field(default_factory=lambda: os.getenv("DATABASE_URL", ""))
     environment: str = field(default_factory=lambda: os.getenv("ENVIRONMENT", "production"))
     supabase_url: str = field(default_factory=lambda: os.getenv("SUPABASE_URL", ""))

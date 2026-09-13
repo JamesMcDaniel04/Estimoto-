@@ -13,9 +13,11 @@ class PhotoBodyLimit:
         self.app = app
 
     async def __call__(self, scope, receive, send):
-        if (scope["type"] != "http" or scope["method"] != "POST" or
-                len(parts := scope["path"].split("/")) != 5 or
-                parts[1:3] != ["v1", "estimates"] or parts[4] != "photos"):
+        parts = scope.get("path", "").split("/")
+        bounded_upload = (len(parts) == 5 and parts[1] == "v1" and
+                          ((parts[2] == "estimates" and parts[4] == "photos") or
+                           (parts[2] == "vehicles" and parts[4] == "image")))
+        if scope["type"] != "http" or scope["method"] != "POST" or not bounded_upload:
             await self.app(scope, receive, send)
             return
         headers = dict(scope.get("headers", []))

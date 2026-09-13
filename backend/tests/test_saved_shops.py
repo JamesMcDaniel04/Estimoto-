@@ -66,13 +66,14 @@ def test_private_crud_immutable_review_and_explicit_authorization(shops):
     shop = create_shop(client, vehicle_id=vehicle)
     assert client.get("/v1/my-shops", headers=auth("bob")).json() == []
     assert client.put(f"/v1/my-shops/{shop['id']}", headers=auth("bob"), json={"name": "Hijack"}).status_code == 404
-    reviewed = draft(client, shop["id"], vehicle_id=vehicle).json()
+    offered = slot()
+    reviewed = draft(client, shop["id"], [offered], vehicle_id=vehicle).json()
     assert reviewed["recipient_email"] == "service@example.test"
     assert reviewed["shared_contact"]["email"] == "alice@example.test"
     assert reviewed["vehicle_summary"] == "2020 Toyota Camry"
     assert reviewed["status"] == "draft" and reviewed["delivery_status"] == "draft"
     assert sent == []
-    assert draft(client, shop["id"], vehicle_id=vehicle).json()["id"] == reviewed["id"]
+    assert draft(client, shop["id"], [offered], vehicle_id=vehicle).json()["id"] == reviewed["id"]
     assert client.put(f"/v1/my-shops/{shop['id']}", headers=auth(), json={"email": "changed@example.test"}).status_code == 200
     assert client.put("/v1/profile", headers=auth(), json={"name": "Changed", "phone": "3035550999", "postal_code": "80202"}).status_code == 200
     assert authorize(client, {**reviewed, "review_hash": "0" * 64}).status_code == 409
