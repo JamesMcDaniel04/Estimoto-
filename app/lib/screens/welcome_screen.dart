@@ -1,0 +1,192 @@
+import 'package:flutter/foundation.dart';
+import 'package:flutter/material.dart';
+import 'package:supabase_flutter/supabase_flutter.dart';
+import '../theme.dart';
+import '../widgets/common.dart';
+import '../widgets/vehicle_illustration.dart';
+
+class WelcomeScreen extends StatefulWidget {
+  const WelcomeScreen({
+    super.key,
+    required this.authAvailable,
+    required this.onDemo,
+    this.setupError,
+  });
+  final bool authAvailable;
+  final VoidCallback onDemo;
+  final String? setupError;
+  @override
+  State<WelcomeScreen> createState() => _WelcomeScreenState();
+}
+
+class _WelcomeScreenState extends State<WelcomeScreen> {
+  final email = TextEditingController();
+  final code = TextEditingController();
+  bool sent = false, busy = false;
+  String? error;
+  @override
+  void dispose() {
+    email.dispose();
+    code.dispose();
+    super.dispose();
+  }
+
+  Future<void> signIn() async {
+    if (!RegExp(r'^[^\s@]+@[^\s@]+\.[^\s@]+$').hasMatch(email.text.trim())) {
+      setState(() => error = 'Enter your email address.');
+      return;
+    }
+    setState(() {
+      busy = true;
+      error = null;
+    });
+    try {
+      final auth = Supabase.instance.client.auth;
+      if (!sent) {
+        await auth.signInWithOtp(
+          email: email.text.trim(),
+          emailRedirectTo: kIsWeb
+              ? Uri.base.origin
+              : 'io.estimoto.plus://login-callback/',
+        );
+        if (mounted) setState(() => sent = true);
+      } else {
+        await auth.verifyOTP(
+          email: email.text.trim(),
+          token: code.text.trim(),
+          type: OtpType.email,
+        );
+      }
+    } on AuthException {
+      if (mounted) {
+        setState(
+          () => error = sent
+              ? 'That code could not be verified. Check your email and try again.'
+              : 'Could not send a sign-in email. Please wait a moment and try again.',
+        );
+      }
+    } catch (_) {
+      if (mounted) {
+        setState(
+          () => error =
+              'Could not connect. Please check your connection and try again.',
+        );
+      }
+    } finally {
+      if (mounted) setState(() => busy = false);
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) => Scaffold(
+    body: SafeArea(
+      child: PageBody(
+        padding: const EdgeInsets.fromLTRB(28, 32, 28, 24),
+        children: [
+          const Text(
+            'Estimoto +',
+            style: TextStyle(
+              fontSize: 26,
+              fontWeight: FontWeight.w700,
+              letterSpacing: -.7,
+            ),
+          ),
+          const SizedBox(height: 42),
+          const Text(
+            'A better home\nfor your car care.',
+            style: TextStyle(
+              fontSize: 38,
+              height: 1.13,
+              fontWeight: FontWeight.w700,
+              letterSpacing: -1.3,
+            ),
+          ),
+          const SizedBox(height: 18),
+          const Text(
+            'Keep your vehicles together. Understand your repairs. Find the right person to help.',
+            style: TextStyle(
+              fontSize: 17,
+              height: 1.5,
+              color: PlusColors.muted,
+            ),
+          ),
+          const SizedBox(height: 28),
+          Container(
+            padding: const EdgeInsets.symmetric(horizontal: 18, vertical: 16),
+            decoration: BoxDecoration(
+              color: PlusColors.navy,
+              borderRadius: BorderRadius.circular(24),
+            ),
+            child: const VehicleIllustration(),
+          ),
+          const SizedBox(height: 28),
+          if (widget.authAvailable) ...[
+            TextField(
+              controller: email,
+              enabled: !busy && !sent,
+              keyboardType: TextInputType.emailAddress,
+              autofillHints: const [AutofillHints.email],
+              decoration: const InputDecoration(labelText: 'Email address'),
+            ),
+            if (sent) ...[
+              const SizedBox(height: 16),
+              const Text(
+                'Check your email. Open the sign-in link or enter the code below.',
+              ),
+              const SizedBox(height: 12),
+              TextField(
+                controller: code,
+                keyboardType: TextInputType.number,
+                autofillHints: const [AutofillHints.oneTimeCode],
+                decoration: const InputDecoration(labelText: 'Email code'),
+              ),
+            ],
+            const SizedBox(height: 16),
+            BusyButton(
+              busy: busy,
+              label: sent ? 'Verify & sign in' : 'Continue with email',
+              icon: Icons.mail_outline,
+              onPressed: signIn,
+            ),
+            if (sent)
+              TextButton(
+                onPressed: busy
+                    ? null
+                    : () => setState(() {
+                        sent = false;
+                        code.clear();
+                      }),
+                child: const Text('Use another email'),
+              ),
+          ] else
+            const Text(
+              'Early access is taking shape. Explore the customer experience with sample vehicles and providers.',
+              style: TextStyle(color: PlusColors.muted),
+            ),
+          if (error != null || widget.setupError != null)
+            Padding(
+              padding: const EdgeInsets.only(top: 14),
+              child: Text(
+                error ?? widget.setupError!,
+                style: TextStyle(color: Theme.of(context).colorScheme.error),
+              ),
+            ),
+          const SizedBox(height: 14),
+          SizedBox(
+            width: double.infinity,
+            child: OutlinedButton(
+              onPressed: busy ? null : widget.onDemo,
+              child: const Text('Explore demo'),
+            ),
+          ),
+          const SizedBox(height: 18),
+          const Text(
+            'Demo activity stays in the preview. No shops or technicians are contacted.',
+            textAlign: TextAlign.center,
+            style: TextStyle(fontSize: 12, color: PlusColors.muted),
+          ),
+        ],
+      ),
+    ),
+  );
+}

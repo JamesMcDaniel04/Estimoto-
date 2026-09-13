@@ -1,0 +1,26 @@
+name: estimoto_plus
+description: "Estimoto + customer garage, estimates, repairs and technician connections."
+publish_to: 'none'
+version: 0.1.0+1
+
+environment:
+  sdk: ^3.12.1
+
+dependencies:
+  cupertino_icons: 1.0.8
+  flutter:
+    sdk: flutter
+  flutter_secure_storage: 9.2.4
+  http: 1.6.0
+  http_parser: 4.1.2
+  image_picker: 1.2.2
+  supabase_flutter: 2.14.2
+  url_launcher: 6.3.2
+
+dev_dependencies:
+  flutter_test:
+    sdk: flutter
+  flutter_lints: ^6.0.0
+
+flutter:
+  uses-material-design: true

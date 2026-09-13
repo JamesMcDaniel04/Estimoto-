@@ -1,0 +1,6 @@
+{
+  "PLUS_API_URL": "https://customer-api.example.com",
+  "SUPABASE_URL": "https://your-project.supabase.co",
+  "SUPABASE_PUBLISHABLE_KEY": "your-publishable-key",
+  "PLUS_DEMO": "false"
+}

@@ -1,0 +1,208 @@
+typedef Json = Map<String, dynamic>;
+
+String textOf(Json data, String key, [String fallback = '']) =>
+    data[key]?.toString() ?? fallback;
+int intOf(Json data, String key, [int fallback = 0]) =>
+    (data[key] as num?)?.toInt() ?? fallback;
+List<Json> rowsOf(Json data, String key) => (data[key] as List? ?? [])
+    .map((row) => Map<String, dynamic>.from(row as Map))
+    .toList();
+String specialtyLabel(String value) => switch (value) {
+  'pdr' => 'PDR',
+  'collision' => 'Collision',
+  'maintenance' => 'Maintenance',
+  'mechanical' => 'Mechanical',
+  _ => value,
+};
+
+class CustomerProfile {
+  CustomerProfile.fromJson(this.json);
+  final Json json;
+  String get id => textOf(json, 'id');
+  String get name => textOf(json, 'name');
+  String get firstName =>
+      name.trim().isEmpty ? 'there' : name.trim().split(' ').first;
+  String get email => textOf(json, 'email');
+  String get phone => textOf(json, 'phone');
+  String get postalCode => textOf(json, 'postal_code');
+}
+
+class Vehicle {
+  Vehicle.fromJson(this.json);
+  final Json json;
+  String get id => textOf(json, 'id');
+  int get year => intOf(json, 'year');
+  String get make => textOf(json, 'make');
+  String get model => textOf(json, 'model');
+  String get nickname => textOf(json, 'nickname');
+  String get vin => textOf(json, 'vin');
+  int get mileage => intOf(json, 'mileage');
+  String get title => '$year $make $model';
+  String get displayName => nickname.isEmpty ? '$make $model' : nickname;
+}
+
+class ProviderProfile {
+  ProviderProfile.fromJson(this.json);
+  final Json json;
+  String get id => textOf(json, 'id');
+  String get name => textOf(json, 'name');
+  String get kind => textOf(json, 'kind', 'shop');
+  String get city => textOf(json, 'city');
+  String get address => textOf(json, 'address');
+  String get phone => textOf(json, 'phone');
+  String get description => textOf(json, 'description');
+  List<String> get specialties =>
+      (json['specialties'] as List? ?? []).cast<String>();
+  List<String> get postalCodes =>
+      (json['postal_codes'] as List? ?? []).cast<String>();
+  bool get mobileService => json['mobile_service'] == true;
+  bool get acceptingRequests => json['accepting_requests'] == true;
+  bool matches({
+    String? specialty,
+    String postalCode = '',
+    bool mobileOnly = false,
+  }) =>
+      acceptingRequests &&
+      (specialty == null || specialties.contains(specialty)) &&
+      (postalCode.isEmpty || postalCodes.contains(postalCode.trim())) &&
+      (!mobileOnly || mobileService);
+}
+
+class ServiceRequest {
+  ServiceRequest.fromJson(this.json);
+  final Json json;
+  String get id => textOf(json, 'id');
+  String get vehicleId => textOf(json, 'vehicle_id');
+  String get providerId => textOf(json, 'provider_id');
+  String get specialty => textOf(json, 'specialty', 'pdr');
+  String get description => textOf(json, 'description');
+  String get preferredTime => textOf(json, 'preferred_time');
+  String get status => textOf(json, 'status', 'requested');
+  String get deliveryStatus => textOf(json, 'delivery_status', 'queued');
+  List<Json> get events => rowsOf(json, 'events');
+  bool get canCancel => status == 'requested' || status == 'accepted';
+  String get statusLabel => switch (status) {
+    'requested' => 'Waiting for a response',
+    'accepted' => 'Request accepted',
+    'scheduled' => 'Scheduled',
+    'declined' => 'Provider unavailable',
+    'cancelled' => 'Cancelled',
+    'completed' => 'Completed',
+    _ => 'Status unavailable',
+  };
+  String get deliveryLabel => switch (deliveryStatus) {
+    'queued' => 'Waiting to send',
+    'delivered' => 'Delivered to provider',
+    'failed' => 'Could not deliver',
+    'local_preview' => 'Demo request · stays in this preview',
+    'cancelled' => 'Delivery cancelled',
+    _ => 'Delivery status unavailable',
+  };
+}
+
+class CustomerEstimate {
+  CustomerEstimate.fromJson(this.json);
+  final Json json;
+  String get id => textOf(json, 'id');
+  String get vehicleId => textOf(json, 'vehicle_id');
+  String get discipline => textOf(json, 'discipline', 'pdr');
+  String get status => textOf(json, 'status', 'draft');
+  String get description => textOf(json, 'description');
+  String get providerName => textOf(json, 'provider_name');
+  int? get amountCents => (json['amount_cents'] as num?)?.toInt();
+  List<Json> get photos => rowsOf(json, 'photos');
+  String get statusLabel => switch (status) {
+    'draft' => 'Draft',
+    'submitted' => 'Submitted',
+    'reviewing' => 'Being reviewed',
+    'ready' => 'Ready to review',
+    'approved' => 'Approved',
+    _ => 'Update pending',
+  };
+}
+
+class CustomerRepair {
+  CustomerRepair.fromJson(this.json);
+  final Json json;
+  String get id => textOf(json, 'id');
+  String get vehicleId => textOf(json, 'vehicle_id');
+  String get title => textOf(json, 'title', 'Your repair');
+  String get providerName => textOf(json, 'provider_name');
+  String get status => textOf(json, 'status');
+  String get updatedAt => textOf(json, 'updated_at');
+  String get estimatedCompletion => textOf(json, 'estimated_completion');
+  List<Json> get stages => rowsOf(json, 'stages');
+}
+
+class ServiceReminder {
+  ServiceReminder.fromJson(this.json);
+  final Json json;
+  String get id => textOf(json, 'id');
+  String get vehicleId => textOf(json, 'vehicle_id');
+  String get title => textOf(json, 'title');
+  String get dueDate => textOf(json, 'due_date');
+  int? get dueMileage => (json['due_mileage'] as num?)?.toInt();
+  bool get completed => json['completed'] == true;
+}
+
+class Capabilities {
+  Capabilities.fromJson(this.json);
+  final Json json;
+  bool get demo => json['demo'] == true;
+  bool get liveRequests => json['live_requests'] == true;
+  bool get liveEstimates => json['live_estimates'] == true;
+  bool get carfax => json['carfax'] == true;
+}
+
+class PlusSnapshot {
+  PlusSnapshot.fromJson(Json json)
+    : profile = CustomerProfile.fromJson(
+        Map<String, dynamic>.from(json['profile'] as Map? ?? {}),
+      ),
+      vehicles = rowsOf(json, 'vehicles').map(Vehicle.fromJson).toList(),
+      providers = rowsOf(
+        json,
+        'providers',
+      ).map(ProviderProfile.fromJson).toList(),
+      estimates = rowsOf(
+        json,
+        'estimates',
+      ).map(CustomerEstimate.fromJson).toList(),
+      repairs = rowsOf(json, 'repairs').map(CustomerRepair.fromJson).toList(),
+      requests = rowsOf(json, 'requests').map(ServiceRequest.fromJson).toList(),
+      reminders = rowsOf(
+        json,
+        'reminders',
+      ).map(ServiceReminder.fromJson).toList(),
+      capabilities = Capabilities.fromJson(
+        Map<String, dynamic>.from(json['capabilities'] as Map? ?? {}),
+      );
+  final CustomerProfile profile;
+  final List<Vehicle> vehicles;
+  final List<ProviderProfile> providers;
+  final List<CustomerEstimate> estimates;
+  final List<CustomerRepair> repairs;
+  final List<ServiceRequest> requests;
+  final List<ServiceReminder> reminders;
+  final Capabilities capabilities;
+  Vehicle? vehicle(String id) => vehicles.where((v) => v.id == id).firstOrNull;
+  ProviderProfile? provider(String id) =>
+      providers.where((p) => p.id == id).firstOrNull;
+}
+
+class AssistantAnswer {
+  AssistantAnswer.fromJson(Json json)
+    : reply = textOf(json, 'reply'),
+      intent = textOf(json, 'intent', 'advice'),
+      specialty = json['specialty'] as String?,
+      providers = rowsOf(
+        json,
+        'providers',
+      ).map(ProviderProfile.fromJson).toList(),
+      videos = rowsOf(json, 'videos');
+  final String reply;
+  final String intent;
+  final String? specialty;
+  final List<ProviderProfile> providers;
+  final List<Json> videos;
+}
