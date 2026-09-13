@@ -82,8 +82,12 @@ def verify_aab(aab: Path) -> None:
     with zipfile.ZipFile(aab) as archive:
         if "base/manifest/AndroidManifest.xml" not in archive.namelist():
             raise ValueError("AAB has no base Android manifest")
-    subprocess.run(["jarsigner", "-verify", "-strict", str(aab)],
-                   check=True, capture_output=True, text=True)
+    # Android release keys are self-signed. -strict additionally demands a
+    # public PKIX chain and a timestamp, so it rejects a valid release AAB.
+    verification = subprocess.run(["jarsigner", "-verify", str(aab)],
+                                  check=True, capture_output=True, text=True)
+    if "jar verified" not in verification.stdout.lower():
+        raise ValueError("AAB signature verification did not complete")
     cert = subprocess.run(["keytool", "-printcert", "-jarfile", str(aab)],
                           check=True, capture_output=True, text=True).stdout
     found = re.search(r"SHA256:\s*([0-9A-Fa-f:]{95})", cert)
