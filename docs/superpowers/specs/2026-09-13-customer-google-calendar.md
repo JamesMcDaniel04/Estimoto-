@@ -70,6 +70,13 @@ Extend outreach and directory request create bodies with optional
 `calendar_check` (default false), `duration_minutes` (default 60),
 `calendar_generation` (nullable), and (directory only) `proposed_slots` (0–3).
 Old-client omitted fields must not alter existing payload hashes on replay.
+Definitive calendar conflicts/stale generations use HTTP 422 after checking for
+already-accepted same-key replay. Directory rejection outcomes are persisted;
+provider outages remain 503 and must not clear uncertain operations.
+The server freezes `calendar_time_zone` from connection preferences and exposes
+it in source views. Availability time_zone must match those saved preferences.
+Use `Etc/UTC` as the default zone. Flutter uses pinned `timezone: 0.11.1` with
+embedded IANA data; add a shared formatting helper, never infer zone from an abbreviation.
 Server snapshots retain verified generation, selected IDs and duration; changing
 preferences or disconnecting invalidates pending checked authorizations.
 Outreach views expose these fields plus `calendar_sync_status` and

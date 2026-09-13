@@ -110,7 +110,7 @@ The report must name tests for forged attempt/connection, late response after di
 
 **Files:**
 - Create: `app/lib/screens/calendar_screen.dart`, `app/lib/widgets/calendar_slot_picker.dart`.
-- Modify: `app/lib/data/repository.dart`, `api_repository.dart`, `demo_repository.dart`, `app/lib/screens/garage_screen.dart`, `estibot_screen.dart`, `shop_outreach_screen.dart`, `request_sheet.dart`, `repairs_screen.dart`, `app/lib/services/customer_workspace.dart`.
+- Modify: `app/pubspec.yaml`, `app/pubspec.lock`, `app/lib/data/repository.dart`, `api_repository.dart`, `demo_repository.dart`, `app/lib/screens/garage_screen.dart`, `estibot_screen.dart`, `shop_outreach_screen.dart`, `request_sheet.dart`, `repairs_screen.dart`, `app/lib/services/customer_workspace.dart`.
 - Test: `app/test/calendar_screen_test.dart`, `app/test/calendar_scheduling_test.dart` and existing account-switch tests as needed.
 
 **Interfaces:**
@@ -128,7 +128,7 @@ testWidgets('calendar setup explains availability access', (tester) async {
 });
 ```
 
-Define `calendarTestApp` with current app test helpers and a fake repository that supplies disconnected status. Add account-switch tests that deliver a late reconcile/availability response after controller invalidation and verify no prior customer's labels/slots are shown.
+Define `calendarTestApp` with current app test helpers and a fake repository that supplies disconnected status. Use pinned `timezone: 0.11.1` with embedded IANA data and a central helper; default `Etc/UTC`. Add account-switch tests that deliver a late reconcile/availability response after controller invalidation and verify no prior customer's labels/slots are shown.
 
 - [ ] **Step 2: Implement connection, selection and sync preferences.**
 
