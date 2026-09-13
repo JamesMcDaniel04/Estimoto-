@@ -1,6 +1,7 @@
 import hashlib
 from io import BytesIO
 import json
+import os
 import re
 from datetime import datetime, timezone
 from pathlib import Path
@@ -15,12 +16,31 @@ from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
 
 from .auth import current_customer, db_session
-from .models import Customer, Estimate, Outbox, Photo, Provider, Reminder, Repair, RequestEvent, RequestRejection, ServiceRequest, Vehicle, now, uid
+from .assistant_model import enhance_advice
+from .models import Customer, Estimate, EstimateOutbox, Outbox, Photo, Provider, RateBucket, Reminder, Repair, RequestEvent, RequestRejection, ServiceRequest, Vehicle, now, uid
 from .postal import canonical_zip
-from .schemas import AssistantInput, EstimateCreate, ProfileWrite, ReminderCreate, RequestCreate, VehicleCreate, VehicleUpdate
+from .schemas import AssistantInput, EstimateCreate, EstimateSubmit, ProfileWrite, ReminderCreate, RequestCreate, VehicleCreate, VehicleUpdate
 from .workflow import creation_payload, payload_hash, queue_cancellation
 
 router = APIRouter(prefix="/v1")
+ESTIMATE_PHOTO_KEYS = ("odometer", "engine_bay", "interior", "tire_tread", "front", "driver", "rear", "passenger")
+PDR_PANEL_TYPES = ("hood", "fender_left", "front_door_left", "rear_door_left", "quarter_left", "trunk",
+                   "quarter_right", "rear_door_right", "front_door_right", "fender_right", "roof")
+MAX_PHOTOS_PER_ESTIMATE = 40
+MAX_CUSTOMER_PHOTO_BYTES = 250 * 1024 * 1024
+MAX_PHOTO_UPLOADS_PER_HOUR = 100
+MAX_ESTIMATE_SUBMITS_PER_HOUR = 20
+
+
+def consume_rate(db, customer_id, action, limit):
+    bucket = int(now().timestamp() // 3600)
+    row = db.get(RateBucket, (customer_id, action, bucket))
+    if row and row.count >= limit:
+        raise HTTPException(429, "Too many attempts. Please try again later.")
+    if row:
+        row.count += 1
+    else:
+        db.add(RateBucket(customer_id=customer_id, action=action, hour_bucket=bucket, count=1))
 
 
 def iso(value):
@@ -53,7 +73,9 @@ def estimate_view(db, e):
     photos = db.scalars(select(Photo).where(Photo.estimate_id == e.id)).all()
     return {"id": e.id, "vehicle_id": e.vehicle_id, "discipline": e.discipline, "description": e.description,
             "claim_number": e.claim_number, "date_of_loss": e.date_of_loss, "status": e.status,
-            "amount_cents": e.amount_cents, "provider_name": e.provider_name, "updated_at": iso(e.updated_at),
+            "amount_cents": e.amount_cents, "provider_name": e.provider_name, "provider_id": e.provider_id,
+            "delivery_status": e.delivery_status, "processing_state": e.processing_state,
+            "processing_error": e.processing_error, "updated_at": iso(e.updated_at),
             "photos": [{"id": p.id, "label": p.label} for p in photos]}
 
 
@@ -90,7 +112,10 @@ def bootstrap(request: Request, c: Customer = Depends(current_customer), db: Ses
             "requests": [request_view(db, r) for r in db.scalars(select(ServiceRequest).where(ServiceRequest.customer_id == ids)).all()],
             "reminders": [reminder_view(r) for r in db.scalars(select(Reminder).where(Reminder.customer_id == ids)).all()],
             "capabilities": {"live_requests": bool(request.app.state.settings.bridge_url and request.app.state.settings.bridge_key and not c.demo),
-                             "live_estimates": False, "carfax": False, "youtube_search": False, "demo": c.demo}}
+                             "live_estimates": bool(request.app.state.settings.estimate_bridge_url and request.app.state.settings.bridge_key and not c.demo),
+                             "required_estimate_photo_keys": list(ESTIMATE_PHOTO_KEYS),
+                             "pdr_damage_panel_types": list(PDR_PANEL_TYPES),
+                             "carfax": False, "youtube_search": False, "demo": c.demo}}
 
 
 @router.put("/profile")
@@ -243,9 +268,92 @@ def create_estimate(body: EstimateCreate, c: Customer = Depends(current_customer
 
 
 @router.post("/estimates/{estimate_id}/submit")
-def submit_estimate(estimate_id: str, c: Customer = Depends(current_customer), db: Session = Depends(db_session)):
+def submit_estimate(estimate_id: str, body: EstimateSubmit, request: Request,
+                    idempotency_key: str | None = Header(default=None),
+                    c: Customer = Depends(current_customer), db: Session = Depends(db_session)):
+    if not idempotency_key or len(idempotency_key) > 200:
+        raise HTTPException(422, "Idempotency-Key is required.")
+    input_hash = payload_hash(body.model_dump())
     owned(db, Estimate, estimate_id, c)
-    raise HTTPException(503, "Estimate submission is unavailable right now.")
+    db.execute(update(Customer).where(Customer.id == c.id).values(id=Customer.id))
+    db.refresh(c)
+    db.execute(update(Estimate).where(Estimate.id == estimate_id, Estimate.customer_id == c.id)
+               .values(updated_at=Estimate.updated_at).returning(Estimate.id))
+    db.expire_all()
+    e = owned(db, Estimate, estimate_id, c)
+    if e.status != "draft":
+        if e.submission_key == idempotency_key and e.submission_request_hash == input_hash:
+            return estimate_view(db, e)
+        raise HTTPException(409, "Estimate was already submitted with another operation.")
+    settings = request.app.state.settings
+    if c.demo or not (settings.estimate_bridge_url and settings.bridge_key):
+        raise HTTPException(503, "Estimate submission is unavailable right now.")
+    if (not c.name.strip() or not 3 <= len(c.email) <= 200 or not 7 <= len("".join(ch for ch in c.phone if ch.isdigit()))
+            or len(c.phone) > 40):
+        raise HTTPException(422, "Save your name and a reachable phone number before submitting.")
+    if len(e.description) > 2000 or len(e.claim_number) > 60:
+        raise HTTPException(422, "Estimate description or claim number is too long.")
+    service_zip = canonical_zip(c.postal_code)
+    if not service_zip:
+        raise HTTPException(422, "Save a valid ZIP code before submitting.")
+    v = owned(db, Vehicle, e.vehicle_id, c)
+    if (not 1950 <= v.year <= 2050 or not 1 <= len(v.make.strip()) <= 60 or
+            not 1 <= len(v.model.strip()) <= 60 or not 0 <= v.mileage <= 9_999_999 or
+            (v.vin and not re.fullmatch(r"[A-HJ-NPR-Z0-9]{17}", v.vin))):
+        raise HTTPException(422, "Review the vehicle year, make, model, mileage, and VIN before submitting.")
+    p = db.get(Provider, body.provider_id)
+    if not p or p.demo_only or not p.public_visible or not p.accepting_requests or p.kind != "shop" or e.discipline not in p.specialties or service_zip not in p.postal_codes:
+        raise HTTPException(409, "Provider is not accepting this estimate.")
+    photos = db.scalars(select(Photo).where(Photo.estimate_id == e.id).order_by(Photo.label, Photo.id)).all()
+    by_label = {photo.label: photo for photo in photos}
+    missing = [key for key in ESTIMATE_PHOTO_KEYS if key not in by_label]
+    if missing:
+        raise HTTPException(422, "Add required photos: " + ", ".join(missing) + ".")
+    if e.discipline == "pdr" and not any("panel_" + panel in by_label for panel in PDR_PANEL_TYPES):
+        raise HTTPException(422, "Add a damage photo for a selected PDR panel.")
+    if len(photos) > MAX_PHOTOS_PER_ESTIMATE or len(by_label) != len(photos):
+        raise HTTPException(422, "Resolve duplicate or excess photos before submitting.")
+    evidence = []
+    for label in (*ESTIMATE_PHOTO_KEYS, *sorted(set(by_label) - set(ESTIMATE_PHOTO_KEYS))):
+        photo = by_label[label]
+        permitted_extra = ({"panel_" + panel for panel in PDR_PANEL_TYPES} if e.discipline == "pdr" else
+                           {"damage_close", "damage_far"})
+        if photo.label not in ESTIMATE_PHOTO_KEYS and photo.label not in permitted_extra:
+            raise HTTPException(422, "Unsupported photo label: " + photo.label)
+        photo_path = Path(settings.photo_dir) / photo.storage_name
+        if not photo_path.is_file():
+            raise HTTPException(422, "A required photo is unavailable. Please contact support.")
+        digest = hashlib.sha256()
+        size = 0
+        with photo_path.open("rb") as stream:
+            for chunk in iter(lambda: stream.read(1024 * 1024), b""):
+                size += len(chunk)
+                digest.update(chunk)
+        if size == 0 or size > 10 * 1024 * 1024 or (photo.sha256 and photo.sha256 != digest.hexdigest()):
+            raise HTTPException(422, "A photo is unavailable or changed. Please contact support.")
+        photo.sha256 = digest.hexdigest()
+        photo.byte_size = size
+        evidence.append({"id": photo.id, "capture_key": photo.label, "sha256": photo.sha256})
+    payload = {"estimate_id": e.id, "customer_id": c.id, "vehicle_id": v.id,
+               "provider_source_id": p.source_id, "service_postal_code": service_zip,
+               "discipline": e.discipline, "description": e.description,
+               "claim_number": e.claim_number, "date_of_loss": e.date_of_loss,
+               "contact": {"name": c.name, "email": c.email, "phone": c.phone,
+                           "contact_preference": c.contact_preference},
+               "vehicle": {"year": v.year, "make": v.make, "model": v.model,
+                           "vin": v.vin, "mileage": v.mileage}, "photos": evidence}
+    e.provider_id = p.id
+    e.provider_name = p.name
+    e.status = "submitted"
+    e.delivery_status = "queued"
+    e.processing_state = "pending"
+    e.submission_key = idempotency_key
+    e.submission_request_hash = input_hash
+    e.updated_at = now()
+    consume_rate(db, c.id, "estimate_submit", MAX_ESTIMATE_SUBMITS_PER_HOUR)
+    db.add(EstimateOutbox(estimate_id=e.id, payload=payload, payload_hash=payload_hash(payload)))
+    db.commit()
+    return estimate_view(db, e)
 
 
 @router.post("/estimates/{estimate_id}/photos", status_code=201)
@@ -275,17 +383,51 @@ async def upload_photo(estimate_id: str, request: Request,
             image.load()
     except (UnidentifiedImageError, OSError, ValueError, Image.DecompressionBombError):
         raise HTTPException(422, "Upload a valid JPEG, PNG, or WebP image.")
+    db.execute(update(Customer).where(Customer.id == c.id).values(id=Customer.id))
+    db.execute(update(Estimate).where(Estimate.id == estimate_id, Estimate.customer_id == c.id)
+               .values(updated_at=Estimate.updated_at).returning(Estimate.id))
+    db.expire_all()
+    e = owned(db, Estimate, estimate_id, c)
+    if e.status != "draft":
+        raise HTTPException(409, "Photos can only be added to drafts.")
     path = Path(request.app.state.settings.photo_dir)
+    existing = db.scalars(select(Photo).where(Photo.estimate_id == e.id, Photo.label == label.strip())).all()
+    all_photos = db.scalars(select(Photo).join(Estimate, Photo.estimate_id == Estimate.id)
+                            .where(Estimate.customer_id == c.id)).all()
+    def stored_size(photo):
+        file = path / photo.storage_name
+        return photo.byte_size if photo.byte_size is not None else (file.stat().st_size if file.is_file() else 0)
+    total = sum(stored_size(photo) for photo in all_photos)
+    replacing = sum(stored_size(photo) for photo in existing)
+    if total - replacing + len(data) > MAX_CUSTOMER_PHOTO_BYTES:
+        raise HTTPException(413, "Photo storage limit reached. Contact support.")
+    estimate_count = sum(photo.estimate_id == e.id for photo in all_photos)
+    if estimate_count - len(existing) + 1 > MAX_PHOTOS_PER_ESTIMATE:
+        raise HTTPException(413, "Estimate photo limit reached.")
+    consume_rate(db, c.id, "photo_upload", MAX_PHOTO_UPLOADS_PER_HOUR)
     path.mkdir(parents=True, exist_ok=True)
     storage_name = uid()
     (path / storage_name).write_bytes(data)
-    p = Photo(estimate_id=e.id, label=label.strip(), mime_type=mime, storage_name=storage_name)
-    db.add(p)
+    old_paths = [path / photo.storage_name for photo in existing]
+    if existing:
+        p = existing[0]
+        for duplicate in existing[1:]:
+            db.delete(duplicate)
+        p.storage_name = storage_name
+        p.mime_type = mime
+        p.sha256 = hashlib.sha256(data).hexdigest()
+        p.byte_size = len(data)
+    else:
+        p = Photo(estimate_id=e.id, label=label.strip(), mime_type=mime, storage_name=storage_name,
+                  sha256=hashlib.sha256(data).hexdigest(), byte_size=len(data))
+        db.add(p)
     try:
         db.commit()
     except Exception:
         (path / storage_name).unlink(missing_ok=True)
         raise
+    for old_path in old_paths:
+        old_path.unlink(missing_ok=True)
     return {"id": p.id, "label": p.label}
 
 
@@ -320,7 +462,7 @@ def complete_reminder(reminder_id: str, c: Customer = Depends(current_customer),
 
 
 @router.post("/assistant")
-def assistant(body: AssistantInput, c: Customer = Depends(current_customer), db: Session = Depends(db_session)):
+def assistant(body: AssistantInput, request: Request, c: Customer = Depends(current_customer), db: Session = Depends(db_session)):
     car = owned(db, Vehicle, body.vehicle_id, c) if body.vehicle_id else None
     message = body.message.lower()
     specialty = body.specialty
@@ -365,5 +507,22 @@ def assistant(body: AssistantInput, c: Customer = Depends(current_customer), db:
         vehicle_title = f"{car.year} {car.make} {car.model}" if car else "car"
         search = quote(f"{vehicle_title} {topic}", safe="")
         videos = [{"title": "Search YouTube for this maintenance topic", "url": f"https://www.youtube.com/results?search_query={search}", "source": "YouTube search · review vehicle compatibility"}]
-    return {"reply": reply, "intent": intent, "specialty": specialty,
-            "providers": [provider(p) for p in matches], "videos": videos}
+    result = {"reply": reply, "intent": intent, "specialty": specialty,
+              "providers": [provider(p) for p in matches], "videos": videos}
+    if intent != "advice" or urgent or c.demo:
+        return result
+    if os.getenv("OPENAI_API_KEY") and os.getenv("ASSISTANT_ENABLED", "true").lower() == "true":
+        db.execute(update(Customer).where(Customer.id == c.id).values(id=Customer.id))
+        db.expire_all()
+        try:
+            consume_rate(db, c.id, "assistant_model", 30)
+            db.commit()
+        except HTTPException as exc:
+            db.rollback()
+            if exc.status_code == 429:
+                return result
+            raise
+    return enhance_advice(result, message=body.message,
+                          vehicle={k: getattr(car, k) for k in ("year", "make", "model", "mileage")} if car else None,
+                          settings=request.app.state.settings,
+                          transport=getattr(request.app.state, "assistant_transport", None))

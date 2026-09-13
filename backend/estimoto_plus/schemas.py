@@ -60,9 +60,14 @@ class VehicleUpdate(Strict):
 class EstimateCreate(Strict):
     vehicle_id: str = Field(max_length=36)
     discipline: Literal["pdr", "collision"]
-    description: str = Field(min_length=1, max_length=5000)
+    description: str = Field(min_length=1, max_length=2000)
     claim_number: str = Field(default="", max_length=100)
     date_of_loss: Date | None = None
+
+
+class EstimateSubmit(Strict):
+    provider_id: str = Field(min_length=1, max_length=36)
+    share_contact: Literal[True]
 
 
 class ReminderCreate(Strict):
@@ -149,6 +154,7 @@ class RequestInboundEvent(Strict):
 
 class EstimateSnapshot(Strict):
     source_id: str = Field(min_length=1, max_length=100)
+    estimate_id: str | None = Field(default=None, max_length=36)
     customer_id: str = Field(min_length=1, max_length=100)
     vehicle_id: str = Field(max_length=36)
     discipline: Literal["pdr", "collision"]
@@ -158,6 +164,9 @@ class EstimateSnapshot(Strict):
     status: Literal["submitted", "reviewing", "ready", "approved"]
     amount_cents: int | None = Field(default=None, ge=0, le=2_147_483_647)
     provider_name: str = Field(default="", max_length=200)
+    provider_source_id: str | None = Field(default=None, max_length=100)
+    processing_state: Literal["pending", "processing", "failed", "complete"] | None = None
+    processing_error: str | None = Field(default=None, max_length=500)
 
 
 class RepairStage(Strict):

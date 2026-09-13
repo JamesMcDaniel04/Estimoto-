@@ -6,10 +6,11 @@ from pathlib import Path
 import httpx
 import pytest
 from fastapi.testclient import TestClient
+from sqlalchemy import select
 
 from estimoto_plus.app import create_app
 from estimoto_plus.config import Settings
-from estimoto_plus.models import Base, Outbox, Provider, now
+from estimoto_plus.models import Base, Estimate, Outbox, Provider, now
 
 
 @pytest.fixture
@@ -120,7 +121,9 @@ def test_estimate_photo_validation_and_private_retrieval(clients):
 
 
 def test_missing_upstream_and_disabled_dev(tmp_path):
-    settings = Settings(database_url=f"sqlite:///{tmp_path / 'db.sqlite'}", environment="production", photo_dir=str(tmp_path / "photos"))
+    with pytest.raises(ValueError):
+        create_app(Settings(database_url=f"sqlite:///{tmp_path / 'prod.sqlite'}", environment="production", photo_dir=str(tmp_path / "photos")))
+    settings = Settings(database_url=f"sqlite:///{tmp_path / 'db.sqlite'}", environment="test", photo_dir=str(tmp_path / "photos"))
     app = create_app(settings, auth_verifier=lambda _: {"id": "a", "email": "a@test", "email_confirmed_at": "ok"})
     Base.metadata.create_all(app.state.engine)
     with TestClient(app) as client:
@@ -174,9 +177,10 @@ def test_demo_is_isolated_and_production_never_accepts_dev_token(tmp_path):
         assert response.json()["vehicles"][0]["make"] == "Demo"
     production = Settings(database_url=f"sqlite:///{tmp_path / 'dev.sqlite'}", environment="production",
                           dev_sessions_enabled=True, dev_token_secret="a" * 32, photo_dir=str(tmp_path / "photos"))
-    with TestClient(create_app(production)) as client:
-        assert client.post("/v1/dev/session").status_code == 404
-        assert client.get("/v1/bootstrap", headers=h(token)).status_code == 401
+    with pytest.raises(ValueError):
+        create_app(production)
+    from estimoto_plus.auth import verify_dev_token
+    assert verify_dev_token(production, token) is None
 
 
 def test_bridge_snapshot_binding_and_request_terminal_transition(clients):
@@ -188,6 +192,10 @@ def test_bridge_snapshot_binding_and_request_terminal_transition(clients):
                 "discipline": "collision", "description": "Bridge quote", "status": "ready", "amount_cents": 12345}
     assert client.post("/v1/bridge/estimates/snapshots", headers=bridge, json={**snapshot, "vehicle_id": b}).status_code == 404
     assert client.post("/v1/bridge/estimates/snapshots", headers=bridge, json=snapshot).status_code == 200
+    with client.app.state.session_factory() as session:
+        saved = session.scalar(select(Estimate).where(Estimate.source_id == "quote-1"))
+        assert saved.processing_state == "not_started"
+        assert saved.delivery_status == "draft"
     assert client.post("/v1/bridge/estimates/snapshots", headers=bridge, json={**snapshot, "customer_id": "bob-id", "vehicle_id": b}).status_code == 409
     assert client.get("/v1/bootstrap", headers=h("bob")).json()["estimates"] == []
     provider_id = publish(client)
@@ -398,3 +406,27 @@ def test_assistant_matches_without_creating_request(clients):
     assert answer.json()["videos"] == []  # Provider matching does not imply DIY guidance.
     assert client.get("/v1/requests", headers=h("alice")).json() == []
     assert client.post("/v1/assistant", headers=h("bob"), json=payload).status_code == 404
+
+
+def test_assistant_model_calls_use_persistent_customer_quota(clients, monkeypatch):
+    client, _ = clients
+    monkeypatch.setenv("OPENAI_API_KEY", "test-key")
+    calls = []
+
+    def model(request):
+        calls.append(request)
+        return httpx.Response(200, json={"status": "completed", "output": [{"type": "message", "role": "assistant",
+                "content": [{"type": "output_text", "text": "Check the manual, then inspect the filter when it is safe."}]}]})
+
+    client.app.state.assistant_transport = httpx.MockTransport(model)
+    for _ in range(30):
+        answer = client.post("/v1/assistant", headers=h("alice"), json={"message": "What is a cabin air filter?"})
+        assert answer.status_code == 200
+        assert answer.json()["answer_source"] == "AI guidance"
+    limited = client.post("/v1/assistant", headers=h("alice"), json={"message": "What is a cabin air filter?"})
+    assert limited.status_code == 200
+    assert "answer_source" not in limited.json()
+    assert len(calls) == 30
+    other = client.post("/v1/assistant", headers=h("bob"), json={"message": "What is a cabin air filter?"})
+    assert other.json()["answer_source"] == "AI guidance"
+    assert len(calls) == 31

@@ -1,14 +1,20 @@
+import hashlib
 from datetime import timezone
+from pathlib import Path
 
 from fastapi import APIRouter, Depends, HTTPException, Request
+from fastapi.responses import Response
 from sqlalchemy import select, update
 from sqlalchemy.orm import Session
 from sqlalchemy.exc import IntegrityError
 
 from .auth import bridge_authorized, db_session
+from .bridge_sync import sync_bridge
 from .customer_routes import estimate_view, provider, repair_view, request_view
 from .delivery import deliver_batch
-from .models import Customer, Estimate, Outbox, Provider, Repair, RequestEvent, ServiceRequest, Vehicle, now
+from .estimate_delivery import deliver_estimate_batch
+from .estimate_workflow import apply_submitted_snapshot
+from .models import Customer, Estimate, EstimateOutbox, Outbox, Photo, Provider, Repair, RequestEvent, ServiceRequest, Vehicle, now
 from .schemas import EstimateSnapshot, ProviderPublish, RepairSnapshot, RequestInboundEvent
 
 router = APIRouter(prefix="/v1/bridge", dependencies=[Depends(bridge_authorized)])
@@ -95,7 +101,19 @@ def deliver_outbox(request: Request):
     settings = request.app.state.settings
     if not settings.bridge_url or not settings.bridge_key:
         raise HTTPException(503, "Bridge is unavailable.")
-    return deliver_batch(settings, request.app.state.bridge_transport, request.app.state.session_factory)
+    results = deliver_batch(settings, request.app.state.bridge_transport, request.app.state.session_factory)
+    if settings.estimate_bridge_url:
+        estimates = deliver_estimate_batch(settings, request.app.state.bridge_transport, request.app.state.session_factory)
+        results = {key: results[key] + estimates[key] for key in results}
+    return results
+
+
+@router.post("/sync")
+def sync_from_bridge(request: Request):
+    settings = request.app.state.settings
+    if not settings.bridge_url or not settings.bridge_key:
+        raise HTTPException(503, "Bridge is unavailable.")
+    return sync_bridge(settings, request.app.state.bridge_transport, request.app.state.session_factory)
 
 
 def existing_binding(db, customer_id, vehicle_id):
@@ -108,6 +126,21 @@ def existing_binding(db, customer_id, vehicle_id):
 @router.post("/estimates/snapshots")
 def estimate_snapshot(body: EstimateSnapshot, db: Session = Depends(db_session)):
     existing_binding(db, body.customer_id, body.vehicle_id)
+    if body.estimate_id:
+        db.execute(update(Estimate).where(Estimate.id == body.estimate_id)
+                   .values(updated_at=Estimate.updated_at).returning(Estimate.id))
+        db.expire_all()
+        existing = db.get(Estimate, body.estimate_id)
+        outbox = db.scalar(select(EstimateOutbox).where(EstimateOutbox.estimate_id == body.estimate_id))
+        if not existing or not outbox or existing.customer_id != body.customer_id or existing.vehicle_id != body.vehicle_id:
+            raise HTTPException(404, "Estimate binding not found.")
+        try:
+            apply_submitted_snapshot(db, existing, body, outbox.payload)
+        except ValueError:
+            raise HTTPException(409, "Estimate snapshot conflicts with submitted estimate.")
+        existing.updated_at = now()
+        db.commit()
+        return estimate_view(db, existing)
     e = db.scalar(select(Estimate).where(Estimate.source_id == body.source_id))
     if e and (e.customer_id != body.customer_id or e.vehicle_id != body.vehicle_id):
         raise HTTPException(409, "Snapshot binding cannot change.")
@@ -119,6 +152,25 @@ def estimate_snapshot(body: EstimateSnapshot, db: Session = Depends(db_session))
     e.updated_at = now()
     db.commit()
     return estimate_view(db, e)
+
+
+@router.get("/estimates/{estimate_id}/photos/{photo_id}")
+def import_estimate_photo(estimate_id: str, photo_id: str, request: Request, db: Session = Depends(db_session)):
+    estimate = db.get(Estimate, estimate_id)
+    outbox = db.scalar(select(EstimateOutbox).where(EstimateOutbox.estimate_id == estimate_id))
+    photo = db.get(Photo, photo_id)
+    if (not estimate or estimate.status == "draft" or not outbox or not photo or photo.estimate_id != estimate_id or
+            not isinstance(outbox.payload, dict)):
+        raise HTTPException(404, "Photo not found.")
+    evidence = next((item for item in outbox.payload.get("photos", []) if isinstance(item, dict) and item.get("id") == photo_id), None)
+    path = Path(request.app.state.settings.photo_dir) / photo.storage_name
+    if not evidence or not path.is_file() or path.stat().st_size > 10 * 1024 * 1024:
+        raise HTTPException(404, "Photo not found.")
+    data = path.read_bytes()
+    if hashlib.sha256(data).hexdigest() != evidence.get("sha256"):
+        raise HTTPException(409, "Photo evidence changed.")
+    return Response(data, media_type=photo.mime_type,
+                    headers={"Cache-Control": "private, no-store", "X-Content-Type-Options": "nosniff"})
 
 
 @router.post("/repairs/snapshots")

@@ -1,5 +1,3 @@
-from urllib.parse import parse_qs, urlparse
-
 from fastapi.testclient import TestClient
 import pytest
 
@@ -36,13 +34,12 @@ def test_natural_language_mobile_matching_only_returns_available_mobile_provider
     assert client.get('/v1/requests').json() == []
 
 
-def test_common_care_prompt_answers_topic_and_links_compatible_search(customer):
+def test_common_care_prompt_answers_topic_and_links_verified_video(customer):
     client, vehicle = customer
     result = client.post('/v1/assistant', json={'message': 'How do I check tire pressure?', 'vehicle_id': vehicle}).json()
     assert 'placard' in result['reply'] and 'gauge' in result['reply']
-    search = parse_qs(urlparse(result['videos'][0]['url']).query)['search_query'][0]
-    assert 'tire pressure' in search and 'Toyota Camry' in search
-    assert result['videos'][0]['source'].startswith('YouTube search')
+    assert result['videos'][0]['url'] == 'https://www.youtube.com/watch?v=dn0ShsQRgho'
+    assert result['videos'][0]['source'].startswith('Michelin USA')
 
 
 @pytest.mark.parametrize('has_context', [True, False])

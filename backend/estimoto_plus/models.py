@@ -1,7 +1,7 @@
 from datetime import datetime, timezone
 from uuid import uuid4
 
-from sqlalchemy import Boolean, DateTime, ForeignKey, Integer, JSON, String, Text, UniqueConstraint
+from sqlalchemy import Boolean, DateTime, ForeignKey, Index, Integer, JSON, String, Text, UniqueConstraint
 from sqlalchemy.orm import DeclarativeBase, Mapped, mapped_column
 
 
@@ -26,6 +26,14 @@ class Customer(Base):
     postal_code: Mapped[str] = mapped_column(String(30), default="")
     contact_preference: Mapped[str] = mapped_column(String(10), default="email")
     demo: Mapped[bool] = mapped_column(Boolean, default=False)
+
+
+class RateBucket(Base):
+    __tablename__ = "rate_buckets"
+    customer_id: Mapped[str] = mapped_column(ForeignKey("customers.id"), primary_key=True)
+    action: Mapped[str] = mapped_column(String(30), primary_key=True)
+    hour_bucket: Mapped[int] = mapped_column(Integer, primary_key=True)
+    count: Mapped[int] = mapped_column(Integer, default=0)
 
 
 class Vehicle(Base):
@@ -78,6 +86,7 @@ class ServiceRequest(Base):
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=now)
     updated_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=now)
     scheduled_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+    last_status_poll_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
 
 
 class RequestRejection(Base):
@@ -123,6 +132,12 @@ class Estimate(Base):
     customer_id: Mapped[str] = mapped_column(ForeignKey("customers.id"), index=True)
     vehicle_id: Mapped[str] = mapped_column(ForeignKey("vehicles.id"))
     source_id: Mapped[str | None] = mapped_column(String(100), unique=True, nullable=True)
+    provider_id: Mapped[str | None] = mapped_column(ForeignKey("providers.id"), nullable=True)
+    submission_key: Mapped[str | None] = mapped_column(String(200), nullable=True)
+    submission_request_hash: Mapped[str | None] = mapped_column(String(64), nullable=True)
+    delivery_status: Mapped[str] = mapped_column(String(20), default="draft")
+    processing_state: Mapped[str] = mapped_column(String(20), default="not_started")
+    processing_error: Mapped[str | None] = mapped_column(String(500), nullable=True)
     discipline: Mapped[str] = mapped_column(String(20))
     description: Mapped[str] = mapped_column(Text)
     claim_number: Mapped[str] = mapped_column(String(100), default="")
@@ -140,6 +155,23 @@ class Photo(Base):
     label: Mapped[str] = mapped_column(String(100))
     mime_type: Mapped[str] = mapped_column(String(50))
     storage_name: Mapped[str] = mapped_column(String(36), unique=True)
+    sha256: Mapped[str | None] = mapped_column(String(64), nullable=True)
+    byte_size: Mapped[int | None] = mapped_column(Integer, nullable=True)
+
+
+class EstimateOutbox(Base):
+    __tablename__ = "estimate_outbox"
+    __table_args__ = (Index("ix_estimate_outbox_due", "next_attempt_at"),)
+    id: Mapped[str] = mapped_column(String(36), primary_key=True, default=uid)
+    estimate_id: Mapped[str] = mapped_column(ForeignKey("estimates.id"), unique=True)
+    payload: Mapped[dict] = mapped_column(JSON)
+    payload_hash: Mapped[str] = mapped_column(String(64))
+    attempts: Mapped[int] = mapped_column(Integer, default=0)
+    next_attempt_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=now)
+    claim_token: Mapped[str | None] = mapped_column(String(36), nullable=True)
+    lease_until: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+    receipt_id: Mapped[str | None] = mapped_column(String(200), nullable=True)
+    finished_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
 
 
 class Repair(Base):

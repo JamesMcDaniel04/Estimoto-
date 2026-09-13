@@ -1,15 +1,24 @@
+import asyncio
+import logging
+import os
+from contextlib import asynccontextmanager, suppress
+from pathlib import Path
 from fastapi import FastAPI, HTTPException
 from fastapi.exceptions import RequestValidationError
 from fastapi.responses import JSONResponse
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.staticfiles import StaticFiles
 from urllib.parse import urlparse
-from sqlalchemy import create_engine, event
+from sqlalchemy import create_engine, event, text as sql_text
 from sqlalchemy.orm import sessionmaker
 
 from .auth import dev_allowed, make_dev_token
 from .bridge import router as bridge_router
+from .bridge_sync import sync_providers, sync_request_statuses
 from .config import Settings
 from .customer_routes import router as customer_router
+from .delivery import deliver_batch
+from .estimate_delivery import deliver_estimate_batch
 from .models import Base, Customer, Provider, Vehicle
 from .upload_limit import PhotoBodyLimit
 
@@ -19,16 +28,55 @@ def create_app(settings: Settings | None = None, *, auth_verifier=None, auth_cli
     if not settings.database_url:
         raise ValueError("DATABASE_URL is required")
     if settings.environment == "production":
-        if settings.supabase_url and not settings.supabase_url.startswith("https://"):
-            raise ValueError("Production Supabase URL must use HTTPS")
-        if settings.bridge_url and not settings.bridge_url.startswith("https://"):
-            raise ValueError("Production bridge URL must use HTTPS")
+        required = (settings.supabase_url, settings.supabase_publishable_key, settings.bridge_url,
+                    settings.estimate_bridge_url, settings.bridge_key, settings.source_sha)
+        if not all(required) or not settings.database_url.startswith("postgresql+psycopg://"):
+            raise ValueError("Production database, Auth, bridge, and source revision configuration is required")
+        for url in (settings.supabase_url, settings.bridge_url, settings.estimate_bridge_url):
+            parsed = urlparse(url)
+            if parsed.scheme != "https" or not parsed.netloc or parsed.username or parsed.password or parsed.query or parsed.fragment:
+                raise ValueError("Production upstream URLs must be fixed HTTPS URLs")
+        if settings.dev_sessions_enabled or not Path(settings.photo_dir).is_absolute():
+            raise ValueError("Production demo sessions are disabled and PHOTO_DIR must be absolute")
+        photo_path = Path(settings.photo_dir)
+        if not (os.path.ismount(photo_path) or os.path.ismount(photo_path.parent)):
+            raise ValueError("Production photos require a mounted private volume")
+        photo_path.mkdir(parents=True, exist_ok=True)
+    if not 5 <= settings.worker_interval_seconds <= 300:
+        raise ValueError("WORKER_INTERVAL_SECONDS must be between 5 and 300")
     origins = [origin.strip() for origin in settings.cors_origins.split(",") if origin.strip()]
     for origin in origins:
         parsed = urlparse(origin)
         if origin == "*" or parsed.scheme not in {"http", "https"} or not parsed.netloc or parsed.path or parsed.query or parsed.fragment:
             raise ValueError("CORS_ORIGINS must contain explicit HTTP origins")
-    app = FastAPI(title="Estimoto + API", version="1.0")
+    @asynccontextmanager
+    async def lifespan(app):
+        async def run_worker():
+            provider_ticks = 300
+            while True:
+                await asyncio.sleep(settings.worker_interval_seconds)
+                try:
+                    provider_ticks += settings.worker_interval_seconds
+                    if provider_ticks >= 300:
+                        await asyncio.to_thread(sync_providers, settings, app.state.bridge_transport, app.state.session_factory)
+                        provider_ticks = 0
+                    await asyncio.to_thread(deliver_batch, settings, app.state.bridge_transport, app.state.session_factory)
+                    await asyncio.to_thread(sync_request_statuses, settings, app.state.bridge_transport, app.state.session_factory)
+                    if settings.estimate_bridge_url:
+                        await asyncio.to_thread(deliver_estimate_batch, settings, app.state.bridge_transport, app.state.session_factory)
+                except Exception:
+                    logging.getLogger(__name__).exception("Plus bridge worker cycle failed")
+        enabled = settings.worker_enabled if settings.worker_enabled is not None else settings.environment == "production"
+        task = asyncio.create_task(run_worker()) if enabled else None
+        try:
+            yield
+        finally:
+            if task:
+                task.cancel()
+                with suppress(asyncio.CancelledError):
+                    await task
+
+    app = FastAPI(title="Estimoto + API", version="1.0", lifespan=lifespan)
     app.add_middleware(PhotoBodyLimit)
     if origins:
         app.add_middleware(CORSMiddleware, allow_origins=origins, allow_credentials=False,
@@ -38,7 +86,11 @@ def create_app(settings: Settings | None = None, *, auth_verifier=None, auth_cli
     @app.exception_handler(RequestValidationError)
     def validation_error(_request, _exc):
         return JSONResponse(status_code=422, content={"detail": "Invalid request fields."})
-    engine = create_engine(settings.database_url, connect_args={"check_same_thread": False} if settings.database_url.startswith("sqlite") else {})
+    engine_kwargs = ({"connect_args": {"check_same_thread": False}} if settings.database_url.startswith("sqlite") else
+                     {"connect_args": {"sslmode": "require"} if settings.environment == "production" else {},
+                      "pool_pre_ping": True, "pool_size": 5, "max_overflow": 5,
+                      "pool_timeout": 10, "pool_recycle": 1800})
+    engine = create_engine(settings.database_url, **engine_kwargs)
     if settings.database_url.startswith("sqlite"):
         @event.listens_for(engine, "connect")
         def sqlite_pragmas(connection, _):
@@ -54,6 +106,29 @@ def create_app(settings: Settings | None = None, *, auth_verifier=None, auth_cli
     app.state.bridge_transport = bridge_transport
     app.include_router(customer_router)
     app.include_router(bridge_router)
+
+    @app.get("/health/live")
+    def health_live():
+        return {"status": "alive"}
+
+    @app.get("/version")
+    def version():
+        return {"source_sha": settings.source_sha or "unknown"}
+
+    @app.get("/ready")
+    def ready():
+        try:
+            with engine.connect() as connection:
+                revision = connection.scalar(sql_text("SELECT version_num FROM alembic_version"))
+                connection.execute(sql_text("SELECT 1"))
+            photo_path = Path(settings.photo_dir)
+            if revision != "b9102d7e4c6f" or not photo_path.is_dir() or not os.access(photo_path, os.W_OK):
+                raise RuntimeError("not ready")
+            if settings.environment == "production" and not (os.path.ismount(photo_path) or os.path.ismount(photo_path.parent)):
+                raise RuntimeError("not ready")
+        except Exception:
+            raise HTTPException(503, "Service is not ready.")
+        return {"status": "ready", "schema_revision": revision}
 
     @app.post("/v1/dev/session")
     def dev_session():
@@ -71,5 +146,8 @@ def create_app(settings: Settings | None = None, *, auth_verifier=None, auth_cli
                                 mobile_service=False, accepting_requests=True, public_visible=True, demo_only=True, description="Fictional demo provider"))
             db.commit()
         return {"access_token": make_dev_token(settings), "demo": True}
+
+    if settings.web_dir:
+        app.mount("/", StaticFiles(directory=settings.web_dir, html=True), name="web")
 
     return app
