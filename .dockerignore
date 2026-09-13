@@ -1,0 +1,16 @@
+**
+!backend/
+!backend/requirements.lock
+!backend/start_service.py
+!backend/estimoto_plus/
+!backend/estimoto_plus/**
+!backend/alembic/
+!backend/alembic/**
+!backend/alembic.ini
+!app/
+!app/build/
+!app/build/web/
+!app/build/web/**
+**/__pycache__
+**/*.pyc
+**/.env*
