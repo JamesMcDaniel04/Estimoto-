@@ -20,6 +20,9 @@ from .customer_routes import router as customer_router
 from .delivery import deliver_batch
 from .estimate_delivery import deliver_estimate_batch
 from .models import Base, Customer, Provider, Vehicle
+from . import shop_models  # register private saved-shop tables before test metadata creation
+from .saved_shops import router as saved_shops_router, deliver_shop_batch
+from .graph import router as graph_router
 from .upload_limit import PhotoBodyLimit
 
 
@@ -64,8 +67,10 @@ def create_app(settings: Settings | None = None, *, auth_verifier=None, auth_cli
                     await asyncio.to_thread(sync_request_statuses, settings, app.state.bridge_transport, app.state.session_factory)
                     if settings.estimate_bridge_url:
                         await asyncio.to_thread(deliver_estimate_batch, settings, app.state.bridge_transport, app.state.session_factory)
-                except Exception:
-                    logging.getLogger(__name__).exception("Plus bridge worker cycle failed")
+                    await asyncio.to_thread(deliver_shop_batch, app.state.session_factory,
+                                            getattr(app.state, "shop_mail_transport", None))
+                except Exception as exc:
+                    logging.getLogger(__name__).error("Plus background worker cycle failed: %s", type(exc).__name__)
         enabled = settings.worker_enabled if settings.worker_enabled is not None else settings.environment == "production"
         task = asyncio.create_task(run_worker()) if enabled else None
         try:
@@ -77,6 +82,15 @@ def create_app(settings: Settings | None = None, *, auth_verifier=None, auth_cli
                     await task
 
     app = FastAPI(title="Estimoto + API", version="1.0", lifespan=lifespan)
+    @app.middleware("http")
+    async def privacy_headers(request, call_next):
+        response = await call_next(request)
+        response.headers["Referrer-Policy"] = "no-referrer"
+        response.headers["X-Content-Type-Options"] = "nosniff"
+        if request.url.path.startswith("/v1/"):
+            response.headers["Cache-Control"] = "private, no-store"
+        return response
+
     app.add_middleware(PhotoBodyLimit)
     if origins:
         app.add_middleware(CORSMiddleware, allow_origins=origins, allow_credentials=False,
@@ -106,6 +120,8 @@ def create_app(settings: Settings | None = None, *, auth_verifier=None, auth_cli
     app.state.bridge_transport = bridge_transport
     app.include_router(customer_router)
     app.include_router(bridge_router)
+    app.include_router(saved_shops_router)
+    app.include_router(graph_router)
 
     @app.get("/health/live")
     def health_live():
@@ -122,7 +138,7 @@ def create_app(settings: Settings | None = None, *, auth_verifier=None, auth_cli
                 revision = connection.scalar(sql_text("SELECT version_num FROM alembic_version"))
                 connection.execute(sql_text("SELECT 1"))
             photo_path = Path(settings.photo_dir)
-            if revision != "b9102d7e4c6f" or not photo_path.is_dir() or not os.access(photo_path, os.W_OK):
+            if revision != "c54d09a2f173" or not photo_path.is_dir() or not os.access(photo_path, os.W_OK):
                 raise RuntimeError("not ready")
             if settings.environment == "production" and not (os.path.ismount(photo_path) or os.path.ismount(photo_path.parent)):
                 raise RuntimeError("not ready")

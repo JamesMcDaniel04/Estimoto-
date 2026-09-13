@@ -3,6 +3,8 @@ import os
 from alembic import context
 from sqlalchemy import create_engine, pool
 from estimoto_plus.models import Base
+from estimoto_plus import shop_models  # noqa: F401 - include saved-shop metadata
+from estimoto_plus import graph_models  # noqa: F401 - include graph metadata
 
 config = context.config
 if config.config_file_name:
