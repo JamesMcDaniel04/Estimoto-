@@ -4,4 +4,5 @@ set -eu
 PLUS_ROOT=$(CDPATH= cd -- "$(dirname -- "$0")/.." && pwd)
 cd "$PLUS_ROOT"
 export PYTHONPATH="$PLUS_ROOT/backend${PYTHONPATH:+:$PYTHONPATH}"
-exec "$PLUS_ROOT/backend/.venv/bin/python" "$PLUS_ROOT/backend/scripts/publish_android_release.py" "$@"
+PLUS_PYTHON=${PLUS_PYTHON:-$PLUS_ROOT/backend/.venv/bin/python}
+exec "$PLUS_PYTHON" "$PLUS_ROOT/backend/scripts/publish_android_release.py" "$@"
