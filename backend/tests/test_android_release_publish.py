@@ -4,6 +4,7 @@ from pathlib import Path
 from types import SimpleNamespace
 
 import pytest
+import httpx
 
 from scripts.publish_android_release import (
     asset_names, checksum_text, check_existing_assets, release_lock,
@@ -62,7 +63,7 @@ def test_signed_aab_manifest_must_match_signed_apk_before_release(
 
     def fake_run(command, **_kwargs):
         if command[0] == "jarsigner":
-            return SimpleNamespace(stdout="jar verified")
+            return SimpleNamespace(stdout="jar verified", stderr="")
         if command[0] == "keytool":
             pairs = ":".join(release.CERTIFICATE_SHA256[i:i + 2] for i in range(0, 64, 2))
             return SimpleNamespace(stdout=f"SHA256: {pairs}")
@@ -112,3 +113,37 @@ def test_build_receipt_refuses_source_change_before_recording_hashes(monkeypatch
     monkeypatch.setattr(writer.subprocess, "run", lambda *_args, **_kwargs: SimpleNamespace(stdout="b" * 40))
     with pytest.raises(ValueError, match="Source commit changed"):
         writer.make_receipt("a" * 40, apk, aab)
+
+
+def test_bundletool_fresh_cache_flushes_final_small_chunk_before_hash(monkeypatch, tmp_path):
+    import scripts.publish_android_release as release
+
+    payload = b"tiny final chunk"
+    monkeypatch.delenv("BUNDLETOOL_JAR", raising=False)
+    monkeypatch.setattr(Path, "home", lambda: tmp_path)
+    monkeypatch.setattr(release, "BUNDLETOOL_SIZE", len(payload))
+    monkeypatch.setattr(release, "BUNDLETOOL_SHA256", hashlib.sha256(payload).hexdigest())
+    real_client = httpx.Client
+    transport = httpx.MockTransport(lambda _request: httpx.Response(200, content=payload))
+    monkeypatch.setattr(release.httpx, "Client", lambda **_kwargs: real_client(transport=transport))
+
+    jar = release.bundletool_jar()
+    assert jar.read_bytes() == payload
+
+
+def test_aab_rejects_unsigned_entries_even_when_jarsigner_says_verified(monkeypatch, tmp_path):
+    import zipfile
+    import scripts.publish_android_release as release
+
+    aab = tmp_path / "unsigned-entry.aab"
+    with zipfile.ZipFile(aab, "w") as archive:
+        archive.writestr("base/manifest/AndroidManifest.xml", b"x" * 1_000_001)
+
+    def fake_run(command, **_kwargs):
+        if command[0] == "jarsigner":
+            return SimpleNamespace(stdout="jar verified.\nWarning: This jar contains unsigned entries.", stderr="")
+        raise AssertionError("Certificate or manifest inspection must not continue after unsigned entries")
+
+    monkeypatch.setattr(release.subprocess, "run", fake_run)
+    with pytest.raises(ValueError, match="unsigned entries"):
+        verify_aab(aab, {"package": "io.estimoto.plus", "version_code": 6, "version_name": "0.1.0"})

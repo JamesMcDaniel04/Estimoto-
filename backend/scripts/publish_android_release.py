@@ -106,6 +106,8 @@ def bundletool_jar() -> Path:
                             if size > BUNDLETOOL_SIZE:
                                 raise ValueError("bundletool download exceeds pinned size")
                             target.write(chunk)
+                target.flush()
+                os.fsync(target.fileno())
                 if size != BUNDLETOOL_SIZE or digest_file(temporary) != BUNDLETOOL_SHA256:
                     raise ValueError("bundletool download differs from pinned official release")
                 os.replace(temporary, jar)
@@ -126,7 +128,10 @@ def verify_aab(aab: Path, apk_manifest: dict) -> None:
     # public PKIX chain and a timestamp, so it rejects a valid release AAB.
     verification = subprocess.run(["jarsigner", "-verify", str(aab)],
                                   check=True, capture_output=True, text=True)
-    if "jar verified" not in verification.stdout.lower():
+    verification_output = f"{verification.stdout}\n{verification.stderr}".lower()
+    if "unsigned" in verification_output:
+        raise ValueError("AAB contains unsigned entries")
+    if "jar verified" not in verification_output:
         raise ValueError("AAB signature verification did not complete")
     cert = subprocess.run(["keytool", "-printcert", "-jarfile", str(aab)],
                           check=True, capture_output=True, text=True).stdout
