@@ -1,9 +1,12 @@
 import 'package:flutter/material.dart';
-import 'package:image_picker/image_picker.dart';
 import '../domain/models.dart';
 import '../state/plus_controller.dart';
-import '../theme.dart';
 import '../widgets/common.dart';
+import '../services/estimate_capture.dart';
+import '../services/estimate_capture_steps.dart';
+import '../widgets/estimate_capture_guide.dart';
+import '../widgets/estimate_submission_review.dart';
+import 'garage_forms.dart';
 
 Future<void> newEstimate(
   BuildContext context,
@@ -190,46 +193,32 @@ class EstimateDetailScreen extends StatefulWidget {
     super.key,
     required this.controller,
     required this.estimateId,
+    this.captureService,
   });
   final PlusController controller;
   final String estimateId;
+  final EstimateCaptureService? captureService;
   @override
   State<EstimateDetailScreen> createState() => _EstimateDetailScreenState();
 }
 
 class _EstimateDetailScreenState extends State<EstimateDetailScreen> {
   bool uploading = false;
-  String label = 'Damage detail';
-  Future<void> photo(ImageSource source) async {
-    setState(() => uploading = true);
-    try {
-      final file = await ImagePicker().pickImage(
-        source: source,
-        maxWidth: 2560,
-        maxHeight: 2560,
-        imageQuality: 90,
-      );
-      if (file != null) {
-        await widget.controller.repository.uploadPhoto(
-          widget.estimateId,
-          await file.readAsBytes(),
-          file.name,
-          label,
-        );
-        await widget.controller.refresh();
-        if (mounted) {
-          showMessage(
-            context,
-            widget.controller.isDemo
-                ? 'Photo added to the demo draft for this session.'
-                : 'Photo saved to your draft.',
-          );
-        }
-      }
-    } catch (e) {
-      if (mounted) showMessage(context, PlusController.readableError(e));
-    } finally {
-      if (mounted) setState(() => uploading = false);
+  Future<void> _review(CustomerEstimate estimate) async {
+    final edit = await showModalBottomSheet<bool>(
+      context: context,
+      isScrollControlled: true,
+      builder: (sheetContext) => EstimateSubmissionReview(
+        controller: widget.controller,
+        estimate: estimate,
+        onEditProfile: () => Navigator.pop(sheetContext, true),
+      ),
+    );
+    if (edit == true && mounted) {
+      final navigator = Navigator.of(context);
+      widget.controller.selectTab(0);
+      navigator.pop();
+      await editProfile(navigator.context, widget.controller);
     }
   }
 
@@ -237,12 +226,25 @@ class _EstimateDetailScreenState extends State<EstimateDetailScreen> {
   Widget build(BuildContext context) => ListenableBuilder(
     listenable: widget.controller,
     builder: (context, _) {
-      final estimate = widget.controller.snapshot?.estimates
+      final snapshot = widget.controller.snapshot;
+      final estimate = snapshot?.estimates
           .where((e) => e.id == widget.estimateId)
           .firstOrNull;
+      final pending = widget.controller.pendingEstimate(widget.estimateId);
       return Scaffold(
-        appBar: AppBar(title: const Text('Your estimate')),
-        body: estimate == null
+        appBar: AppBar(
+          title: const Text('Your estimate'),
+          actions: [
+            IconButton(
+              tooltip: 'Refresh estimate',
+              onPressed: widget.controller.loading
+                  ? null
+                  : () => widget.controller.refresh(),
+              icon: const Icon(Icons.refresh),
+            ),
+          ],
+        ),
+        body: estimate == null || snapshot == null
             ? const Center(child: Text('This estimate is no longer available.'))
             : PageBody(
                 children: [
@@ -253,9 +255,7 @@ class _EstimateDetailScreenState extends State<EstimateDetailScreen> {
                     ),
                   PageHeading(
                     specialtyLabel(estimate.discipline),
-                    widget.controller.snapshot!
-                            .vehicle(estimate.vehicleId)
-                            ?.title ??
+                    snapshot.vehicle(estimate.vehicleId)?.title ??
                         'Your vehicle',
                   ),
                   StatusPill(estimate.statusLabel),
@@ -287,109 +287,64 @@ class _EstimateDetailScreenState extends State<EstimateDetailScreen> {
                         ),
                       ),
                     ),
-                    const SectionHeading('Add clear photos'),
-                    const Text(
-                      'Start with the whole vehicle, then the damaged area. Use good light and capture a close view and a wider view.',
+                    EstimateCaptureGuide(
+                      key: ValueKey('${snapshot.profile.id}/${estimate.id}'),
+                      controller: widget.controller,
+                      estimate: estimate,
+                      captureService: widget.captureService,
+                      onBusyChanged: (value) {
+                        if (mounted) setState(() => uploading = value);
+                      },
                     ),
-                    const SizedBox(height: 18),
-                    DropdownButtonFormField<String>(
-                      initialValue: label,
-                      decoration: const InputDecoration(
-                        labelText: 'What does this photo show?',
-                      ),
-                      items:
-                          [
-                                'Damage detail',
-                                'Front of vehicle',
-                                'Rear of vehicle',
-                                'Driver side',
-                                'Passenger side',
-                                'Odometer',
-                                'Engine bay',
-                                'Tire tread',
-                                'VIN',
-                              ]
-                              .map(
-                                (s) =>
-                                    DropdownMenuItem(value: s, child: Text(s)),
-                              )
-                              .toList(),
-                      onChanged: (value) =>
-                          setState(() => label = value ?? label),
-                    ),
-                    const SizedBox(height: 16),
-                    Wrap(
-                      spacing: 10,
-                      runSpacing: 10,
-                      children: [
-                        FilledButton.icon(
-                          onPressed: uploading
-                              ? null
-                              : () => photo(ImageSource.camera),
-                          icon: const Icon(Icons.camera_alt_outlined),
-                          label: const Text('Take photo'),
-                        ),
-                        OutlinedButton.icon(
-                          onPressed: uploading
-                              ? null
-                              : () => photo(ImageSource.gallery),
-                          icon: const Icon(Icons.photo_library_outlined),
-                          label: const Text('Choose photo'),
-                        ),
-                      ],
-                    ),
-                    if (uploading)
-                      const Padding(
-                        padding: EdgeInsets.only(top: 16),
-                        child: LinearProgressIndicator(),
-                      ),
-                  ],
-                  SectionHeading('Photos (${estimate.photos.length})'),
-                  if (estimate.photos.isEmpty)
-                    const Text(
-                      'No photos attached yet.',
-                      style: TextStyle(color: PlusColors.muted),
-                    )
-                  else
-                    Wrap(
-                      spacing: 8,
-                      runSpacing: 8,
-                      children: [
-                        for (final photo in estimate.photos)
-                          Chip(
-                            avatar: const Icon(
-                              Icons.check_circle_outline,
-                              size: 18,
-                            ),
-                            label: Text(textOf(photo, 'label')),
-                          ),
-                      ],
-                    ),
-                  if (estimate.status == 'draft') ...[
                     const SizedBox(height: 26),
-                    if (!widget.controller.snapshot!.capabilities.liveEstimates)
-                      const Text(
-                        'Your draft is saved. Submission will open when the estimating service is connected.',
-                        style: TextStyle(color: PlusColors.muted),
+                    if (!estimatePhotosReady(snapshot, estimate))
+                      Text(
+                        estimate.discipline == 'pdr'
+                            ? 'Save the eight vehicle views and at least one damaged-panel photo before submitting.'
+                            : 'Save all eight vehicle views before submitting.',
+                      ),
+                    if (!snapshot.capabilities.liveEstimates)
+                      const Padding(
+                        padding: EdgeInsets.only(top: 12),
+                        child: Text(
+                          'Your draft is saved. Submission is currently unavailable.',
+                        ),
                       ),
                     const SizedBox(height: 12),
                     BusyButton(
+                      key: const Key('estimate-review'),
                       busy: uploading,
-                      label: 'Submit for review',
-                      onPressed:
-                          widget.controller.snapshot!.capabilities.liveEstimates
-                          ? () => runAction(
-                              context,
-                              widget.controller,
-                              () async {
-                                await widget.controller.repository
-                                    .submitEstimate(estimate.id);
-                              },
-                              success: 'Estimate submitted for review.',
-                            )
-                          : null,
+                      label: pending != null
+                          ? 'Check saved submission'
+                          : 'Choose shop & review sharing',
+                      onPressed: uploading ? null : () => _review(estimate),
                     ),
+                  ] else ...[
+                    const SizedBox(height: 20),
+                    EstimateProgress(estimate: estimate),
+                    EstimatePhotoGallery(
+                      controller: widget.controller,
+                      estimate: estimate,
+                    ),
+                    if (pending != null)
+                      Padding(
+                        padding: const EdgeInsets.only(top: 20),
+                        child: FilledButton(
+                          onPressed: () => _review(estimate),
+                          child: const Text('Check saved submission'),
+                        ),
+                      ),
                   ],
+                  if (widget.controller.error != null)
+                    Padding(
+                      padding: const EdgeInsets.only(top: 16),
+                      child: Text(
+                        widget.controller.error!,
+                        style: TextStyle(
+                          color: Theme.of(context).colorScheme.error,
+                        ),
+                      ),
+                    ),
                 ],
               ),
       );
