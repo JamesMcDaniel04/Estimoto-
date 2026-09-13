@@ -70,4 +70,4 @@ assert any(row['id'] == vehicle['id'] for row in client.get('/v1/bootstrap').jso
 ```
 - [x] Exercise owned-vehicle request creation, idempotency, cancellation and photo ownership through the socket; verify a fictional bridge receiver separately.
 - [x] Review API/UI contract and cross-customer security, fix findings and run required checks.
-- [ ] Publish verified source to the supplied repository and show the app preview. Release-status documentation is prepared; delivery follows final review.
+- [x] Publish verified source to the supplied repository and show the app preview. Initial `main` publication verified at `9d08a44`; local demo served at port 4318. Final review approved the first runnable milestone, with production integrations separately documented.

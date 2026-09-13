@@ -2,17 +2,23 @@
 
 This is the first runnable Estimoto + app/API milestone. Source is independent of the Estimoto staff app. It is not a production customer launch.
 
+## Source delivery and review
+
+The reviewed source is published to [JamesMcDaniel04/Estimoto-](https://github.com/JamesMcDaniel04/Estimoto-) on `main`. The local demo is served at `http://127.0.0.1:4318/`; it runs only while the preview server is active.
+
+The whole-branch review and bounded follow-ups closed all blocking findings for this milestone. Fixes cover customer/session isolation, request replay and cancellation races, immutable delivery payloads, upload limits, migration compatibility, provider rejection recovery, mobile matching and urgent/common-care guidance. Final approval reviewed backend `9d08a44` and retained the Flutter review at `ed6ae73`. This source-publication approval does not imply production or store readiness.
+
 ## Verification
 
-The app source was built at `a6f8d85`; the subsequent backend cancellation fix is `929eded`. Documentation and test-runner changes follow these commits. Migration head: `d752dbef8104`.
+The final Flutter source was verified at `ed6ae73`; the final backend rejection/replay fix is `9d08a44`. Documentation-only delivery updates follow these commits. Migration head: `79ae381cd042`.
 
 | Evidence | Result |
 | --- | --- |
 | Flutter static analysis | Passed, no issues |
-| Flutter tests | 16 passed: customer journeys, transport, consent/cancel, uncertain-send recovery, account changes and refresh ordering |
-| API tests | 55 passed: customer isolation, auth, private uploads, bridge state transitions/replay, races/leases, cancellations and migrations |
+| Flutter tests | 19 passed: customer journeys, transport, consent/cancel, uncertain-send and definitive-rejection recovery, account changes, refresh ordering and assistant guidance |
+| API tests | 64 passed: customer isolation, auth, private uploads, bridge state transitions/replay, races/leases, terminal rejection outcomes, cancellations, migrations, mobile matching and urgent/common-care assistant prompts |
 | Fresh migration + schema comparison | Passed on SQLite, including a populated legacy cancellation upgrade |
-| Python/Dart socket smoke | Passed against a migrated API and fictional local auth/provider receiver; private photos, two-customer isolation, durable requests and restart persistence |
+| Python/Dart socket smoke | Passed against a migrated API and fictional local auth/provider receiver; private photos, two-customer isolation, definitive provider rejection, durable requests and restart persistence |
 | Web release build | Passed; rendered at 390×844 and 1280×900; navigation, matching, consent review and sample request status inspected |
 | iOS simulator build | Passed with `io.estimoto.plus`; installed, launched and screenshot inspected |
 | Native bundle identity test | `RunnerTests.testCustomerBundleIdentity` passed through xcodebuild on iOS 26.5 simulator |
@@ -28,7 +34,9 @@ Current toolchain warnings: the pinned secure-storage plugin uses CocoaPods and 
 
 Saved profile/vehicle/insurance fields, PDR/Collision drafts and private photo uploads, reminders, provider filtering and map links for published addresses, authenticated estimate/repair snapshots and an assistant-guided service-request workflow. The assistant currently uses deterministic guidance and structured matching, with clearly labeled YouTube search links.
 
-The app handles offline auth stream errors, replaces data on account changes, rejects stale refresh completions and keeps an interrupted request's approved body/key in account-scoped encrypted storage. Repairs provides recovery for that unresolved send; restoring it does not automatically send. The server snapshots approved contact/vehicle/ZIP data, retries under a database lease and only marks delivery after a durable receipt. Cancellation events can safely precede a delayed creation when the receiver honors the documented tombstone contract.
+The app handles offline auth stream errors, replaces data on account changes, rejects stale refresh completions and keeps an interrupted request's approved body/key in account-scoped encrypted storage. Repairs provides recovery for that unresolved send; restoring it does not automatically send. A definitive provider rejection clears that pending operation so the customer can choose another provider. The server persists the terminal rejection and serializes outcome decisions, so delayed retries cannot create an operation previously reported as rejected. An ambiguous response or idempotency conflict retains the original key. The server snapshots approved contact/vehicle/ZIP data, retries under a database lease and only marks delivery after a durable receipt. Cancellation events can safely precede a delayed creation when the receiver honors the documented tombstone contract.
+
+API and demo assistant paths interpret mobile-service requests, provide deterministic common-care guidance and retain professional safety guidance while matching or requesting missing details for recognized urgent concerns. YouTube links search by vehicle and maintenance topic; they are not individual vetted videos.
 
 ## Remaining launch work
 
