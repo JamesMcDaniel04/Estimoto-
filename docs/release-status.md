@@ -23,6 +23,7 @@ The final Flutter source was verified at `ed6ae73`; the final backend rejection/
 | iOS simulator build | Passed with `io.estimoto.plus`; installed, launched and screenshot inspected |
 | Native bundle identity test | `RunnerTests.testCustomerBundleIdentity` passed through xcodebuild on iOS 26.5 simulator |
 | Android debug APK | Passed on final app source; no Android device install claimed |
+| GitHub Actions | Blocked before any job steps ran: GitHub reports the account is locked due to a billing issue. [Observed run at delivery commit 8a3dfaf](https://github.com/JamesMcDaniel04/Estimoto-/actions/runs/34777973917). Local results above are separate evidence; no passing CI run is claimed. |
 | Live Supabase, Estimoto receiver and customer sends | Not performed |
 | Store distribution / physical devices | Not performed |
 
