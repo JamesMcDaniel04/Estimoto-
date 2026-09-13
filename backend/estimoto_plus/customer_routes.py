@@ -32,6 +32,7 @@ MAX_PHOTOS_PER_ESTIMATE = 40
 MAX_CUSTOMER_PHOTO_BYTES = 250 * 1024 * 1024
 MAX_PHOTO_UPLOADS_PER_HOUR = 100
 MAX_ESTIMATE_SUBMITS_PER_HOUR = 20
+MAX_SERVICE_REQUESTS_PER_HOUR = 20
 
 
 def consume_rate(db, customer_id, action, limit):
@@ -217,6 +218,7 @@ def create_request(body: RequestCreate, request: Request, idempotency_key: str |
             bridge_details(c, v)
         except ValueError as exc:
             return reject(422, str(exc))
+        consume_rate(db, c.id, "service_request", MAX_SERVICE_REQUESTS_PER_HOUR)
     status = "local_preview" if c.demo else "queued"
     r = ServiceRequest(id=uid(), customer_id=c.id, vehicle_id=body.vehicle_id, provider_id=body.provider_id,
                        specialty=body.specialty, description=body.description.strip(), preferred_time=body.preferred_time.strip(),

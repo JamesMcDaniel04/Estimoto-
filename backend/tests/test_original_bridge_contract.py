@@ -140,3 +140,19 @@ def test_collision_unsupported_extra_stays_editable(plus):
     with app.state.session_factory() as db:
         assert db.get(Estimate, estimate_id).status == "draft"
         assert db.query(EstimateOutbox).count() == 0
+
+
+def test_service_request_quota_persists_and_replays_do_not_consume(plus):
+    client, app, _, _ = plus
+    vehicle_id, provider_id, _ = setup_draft(client)
+    body = {"vehicle_id":vehicle_id, "provider_id":provider_id, "specialty":"pdr",
+            "description":"Please help", "share_contact":True}
+    for index in range(20):
+        headers = {**auth(), "Idempotency-Key":f"quota-{index}"}
+        created = client.post("/v1/requests", headers=headers, json=body)
+        assert created.status_code == 201
+        assert client.post("/v1/requests", headers=headers, json=body).json()["id"] == created.json()["id"]
+    app.state.engine.dispose()
+    assert client.post("/v1/requests", headers={**auth(), "Idempotency-Key":"quota-21"}, json=body).status_code == 429
+    assert len(client.get("/v1/requests", headers=auth()).json()) == 20
+    assert client.post("/v1/requests", headers={**auth(), "Idempotency-Key":"quota-0"}, json=body).status_code == 201
