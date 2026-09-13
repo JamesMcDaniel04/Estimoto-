@@ -110,7 +110,7 @@ The report must name tests for forged attempt/connection, late response after di
 
 **Files:**
 - Create: `app/lib/screens/calendar_screen.dart`, `app/lib/widgets/calendar_slot_picker.dart`.
-- Modify: `app/pubspec.yaml`, `app/pubspec.lock`, `app/lib/data/repository.dart`, `api_repository.dart`, `demo_repository.dart`, `app/lib/screens/garage_screen.dart`, `estibot_screen.dart`, `shop_outreach_screen.dart`, `request_sheet.dart`, `repairs_screen.dart`, `app/lib/services/customer_workspace.dart`.
+- Modify: `app/pubspec.yaml`, `app/pubspec.lock`, `app/lib/data/repository.dart`, `api_repository.dart`, `demo_repository.dart`, `app/lib/screens/garage_screen.dart`, `estibot_screen.dart`, `shop_outreach_screen.dart`, `request_sheet.dart`, `repairs_screen.dart`, `app/lib/services/customer_workspace.dart`, `app/lib/state/plus_controller.dart`, `app/lib/data/pending_request_store.dart`.
 - Test: `app/test/calendar_screen_test.dart`, `app/test/calendar_scheduling_test.dart` and existing account-switch tests as needed.
 
 **Interfaces:**
@@ -148,7 +148,7 @@ final body = <String, dynamic>{
 };
 ```
 
-Keep selected state and pending request retries frozen. Manual offers remain available without Google, but must not be labeled calendar-checked. Show duration and sync status on review/Repairs. Estibot has a clear Schedule around my calendar action into the same saved-shop/provider request flow, retaining customer review and shop confirmation wording.
+Keep selected state and pending request retries deep-frozen, including nested slot arrays. Recheck current customer after every pending-storage await in PlusController.sendRequest; do not attach new optional defaults to restored older bodies. Manual offers remain available without Google, but must not be labeled calendar-checked. Show duration and sync status on review/Repairs. Estibot has a clear Schedule around my calendar action into the same saved-shop/provider request flow, retaining customer review and shop confirmation wording.
 
 - [ ] **Step 4: Validate and commit.**
 
