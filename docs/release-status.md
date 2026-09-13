@@ -6,14 +6,14 @@ Estimoto + is deployed at https://estimoto-plus-api.fly.dev with dedicated custo
 
 | Surface | Verified state |
 | --- | --- |
-| Customer web/API | Live source `ec2dafffbd62b424ddd1b6928268b6ecce547365`; `/ready` 200, PostgreSQL schema `e21870f6a94b` |
+| Customer web/API | Live source `1a69205e80a4658a15e3fe31f402f0a2354bc7f1`; `/ready` 200, PostgreSQL schema `e21870f6a94b` |
 | Original Estimoto API | Live source `4f12933c241018f201f1f8f847f200619a5e03d3`; `/ready` 200; migration `0212_estimoto_plus_bridge` |
 | Staff dashboard | https://www.estimoto.io; asset source `906ccdf11f08f362dad41b89a854a579067bae51`; Plus inbox, opt-in listing and owner-only contributed insights |
 | Android customer app | Signed 0.1.0 (5), CarsXE/private photos and rounded/adaptive icon; public APK and AAB hashes verified; installed and launched in Android emulator |
 | iOS customer app | Separate App Store Connect app 6811678079; 0.1.0 (5) processed VALID, notes and both tester groups attached; first external review for build 2 pending |
 | Original Estimoto mobile | Estibot presets plus CRM-entitled texting in 1.1.12 (231), source `b3e4a5241d0be49377aa7700b133a10d22f0a831`; TestFlight VALID and external beta approved; Android served hashes verified |
 
-[Download Android](https://github.com/JamesMcDaniel04/Estimoto-/releases/tag/v0.1.0-beta.5) · [Mobile delivery details](mobile-release.md)
+[Download latest Android](https://estimoto-plus-api.fly.dev/android/download) · [Mobile delivery details](mobile-release.md)
 
 ## Implemented customer workflows
 
@@ -37,7 +37,9 @@ Production synthetic checks established authenticated customer isolation, missin
 
 Synthetic customer records and their private photo files were removed after verification. No real shop contact was made.
 
-The user-requested Android build-4 invite was accepted by Resend and its provider event became `delivered`; build 5 is now available at the updated release link. This proves that invite's delivery, not delivery of every future authentication or scheduling email.
+The requested replacement Android invite was delivered to `j.mcdan@anonymousventures.org` with the permanent `/android/download` URL. This public URL resolves a freshly read release pointer to the verified versioned APK; `/android/current` exposes its version and digest. Downloading through the permanent URL returned the exact signed build-5 bytes. Future release publishing advances the pointer without changing the emailed URL or redeploying the API. Installation remains customer initiated; this is not an automatic in-app updater.
+
+The user-requested `hello@estimoto.io` account exists as a normal live customer (`demo=false`) with no fabricated vehicles or jobs. Its normal Supabase confirmation email was delivered through the configured sender. Email verification/sign-in still requires the customer's code; no confirmation bypass or session impersonation was performed. This persistent customer account is not part of the cleaned synthetic QA fixtures.
 
 Original Estimoto now requires CRM entitlement for platform texting, provisioning, queues and voice. Assigned technicians connected to an eligible CRM shop retain its delivery path; others prepare customer links and open the native phone messenger. The live audit found four active number leases and zero ineligible shops. No real SMS/calls were sent, and physical composer behavior remains unverified.
 
@@ -45,6 +47,6 @@ Original Estimoto now requires CRM entitlement for platform texting, provisionin
 
 Demolition Dent is published and accepting PDR/collision in its saved ZIP **80221**, with its existing business address and phone. Production bridge sync and actual customer matching both passed. PDR LINX is authorized as the second participant, but its account has no address/service ZIP and its phone did not match the official public contact page; its location routing awaits the user's ZIP information. No unrelated shops or technicians were opted in.
 
-Remaining: physical iOS/Android sign-in and camera/recovery QA; first real customer-to-shop handoff and shop acceptance; actual authentication-email inbox verification; Apple external beta approval. Google Play listing/publication is not performed. CARFAX, push reminder delivery, automated phone/SMS booking and corpus-wide model training are not connected. YouTube links are labeled searches, not individually vetted videos.
+Remaining: physical iOS/Android sign-in and camera/recovery QA; first real customer-to-shop handoff and shop acceptance; customer confirmation-code entry; Apple external beta approval. Authentication-email provider delivery is verified, but the customer's reading/sign-in is separate. Google Play listing/publication is not performed. CARFAX, push reminder delivery, automated phone/SMS booking and corpus-wide model training are not connected.
 
 The target customer sharing time is September 14, 2026, at 2 p.m. America/Denver. Apple review timing is external to this deployment.
