@@ -1,5 +1,6 @@
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import '../theme.dart';
 import '../widgets/common.dart';
@@ -22,7 +23,7 @@ class WelcomeScreen extends StatefulWidget {
 class _WelcomeScreenState extends State<WelcomeScreen> {
   final email = TextEditingController();
   final code = TextEditingController();
-  bool sent = false, busy = false;
+  bool sent = false, existingCode = false, busy = false;
   String? error;
   @override
   void dispose() {
@@ -34,6 +35,10 @@ class _WelcomeScreenState extends State<WelcomeScreen> {
   Future<void> signIn() async {
     if (!RegExp(r'^[^\s@]+@[^\s@]+\.[^\s@]+$').hasMatch(email.text.trim())) {
       setState(() => error = 'Enter your email address.');
+      return;
+    }
+    if (sent && !RegExp(r'^[0-9]{8}$').hasMatch(code.text.trim())) {
+      setState(() => error = 'Enter the 8-digit code from your email.');
       return;
     }
     setState(() {
@@ -49,7 +54,12 @@ class _WelcomeScreenState extends State<WelcomeScreen> {
               ? Uri.base.origin
               : 'io.estimoto.plus://login-callback/',
         );
-        if (mounted) setState(() => sent = true);
+        if (mounted) {
+          setState(() {
+            sent = true;
+            existingCode = false;
+          });
+        }
       } else {
         await auth.verifyOTP(
           email: email.text.trim(),
@@ -61,7 +71,7 @@ class _WelcomeScreenState extends State<WelcomeScreen> {
       if (mounted) {
         setState(
           () => error = sent
-              ? 'That code could not be verified. Check your email and try again.'
+              ? 'That code could not be verified. Check the code and try again.'
               : 'Could not send a sign-in email. Please wait a moment and try again.',
         );
       }
@@ -136,20 +146,27 @@ class _WelcomeScreenState extends State<WelcomeScreen> {
           if (widget.authAvailable) ...[
             TextField(
               controller: email,
-              enabled: !busy && !sent,
+              enabled: !busy && (!sent || existingCode),
               keyboardType: TextInputType.emailAddress,
               autofillHints: const [AutofillHints.email],
               decoration: const InputDecoration(labelText: 'Email address'),
             ),
             if (sent) ...[
               const SizedBox(height: 16),
-              const Text(
-                'Check your email. Open the sign-in link or enter the code below.',
+              Text(
+                existingCode
+                    ? 'Enter the 8-digit code you already received.'
+                    : 'Check your email. Open the sign-in link or enter the code below.',
               ),
               const SizedBox(height: 12),
               TextField(
                 controller: code,
+                enabled: !busy,
                 keyboardType: TextInputType.number,
+                inputFormatters: [
+                  FilteringTextInputFormatter.digitsOnly,
+                  LengthLimitingTextInputFormatter(8),
+                ],
                 autofillHints: const [AutofillHints.oneTimeCode],
                 decoration: const InputDecoration(labelText: 'Email code'),
               ),
@@ -161,13 +178,26 @@ class _WelcomeScreenState extends State<WelcomeScreen> {
               icon: Icons.mail_outline,
               onPressed: signIn,
             ),
+            if (!sent)
+              TextButton(
+                onPressed: busy
+                    ? null
+                    : () => setState(() {
+                        sent = true;
+                        existingCode = true;
+                        error = null;
+                      }),
+                child: const Text('I already have a code'),
+              ),
             if (sent)
               TextButton(
                 onPressed: busy
                     ? null
                     : () => setState(() {
                         sent = false;
+                        existingCode = false;
                         code.clear();
+                        error = null;
                       }),
                 child: const Text('Use another email'),
               ),
