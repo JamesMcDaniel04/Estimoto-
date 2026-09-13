@@ -107,7 +107,10 @@ Future<void> main() async {
       'Bootstrap lost reminder completion.',
     );
     try {
-      await api.submitEstimate(draft['id'] as String);
+      await api.submitEstimate(draft['id'] as String, {
+        'provider_id': answer.providers.first.id,
+        'share_contact': true,
+      }, 'estimate:${draft['id']}');
       throw StateError('Unconnected estimator accepted submission.');
     } on PlusApiException catch (error) {
       check(

@@ -18,6 +18,13 @@ class PlusController extends ChangeNotifier {
     : pendingStore = pendingStore ?? MemoryPendingRequestStore();
   final PendingRequestStore pendingStore;
   PendingRequest? pendingRequest;
+  final _pendingEstimates = <String, PendingRequest>{};
+  final _sendingEstimates = <String>{};
+  PendingRequest? pendingEstimate(String id) => _pendingEstimates[id];
+  bool isCurrentCustomer(String id) =>
+      !_disposed && _sessionActive && snapshot?.profile.id == id;
+  String _estimateStorageKey(String customerId, String id) =>
+      'estimate:$customerId:$id';
   int _refreshGeneration = 0;
   bool _sendingRequest = false;
   final PlusRepository repository;
@@ -30,6 +37,7 @@ class PlusController extends ChangeNotifier {
   String discipline = 'pdr';
   final List<ChatEntry> messages = [];
   bool _disposed = false;
+  bool _sessionActive = true;
   Vehicle? get selectedVehicle =>
       snapshot?.vehicle(selectedVehicleId ?? '') ??
       snapshot?.vehicles.firstOrNull;
@@ -53,17 +61,27 @@ class PlusController extends ChangeNotifier {
     _notify();
   }
 
-  Future<void> refresh() async {
+  Future<void> refresh({bool quiet = false}) async {
     final generation = ++_refreshGeneration;
-    loading = true;
+    loading = !quiet;
     error = null;
     _notify();
     try {
       final next = await repository.bootstrap();
       final pending = await pendingStore.read(next.profile.id);
+      final estimates = <String, PendingRequest>{};
+      for (final estimate in next.estimates) {
+        final saved = await pendingStore.read(
+          _estimateStorageKey(next.profile.id, estimate.id),
+        );
+        if (saved != null) estimates[estimate.id] = saved;
+      }
       if (_disposed || generation != _refreshGeneration) return;
       snapshot = next;
       pendingRequest = pending;
+      _pendingEstimates
+        ..clear()
+        ..addAll(estimates);
       if (!snapshot!.vehicles.any((v) => v.id == selectedVehicleId)) {
         selectedVehicleId = snapshot!.vehicles.firstOrNull?.id;
       }
@@ -77,6 +95,12 @@ class PlusController extends ChangeNotifier {
         _notify();
       }
     }
+  }
+
+  /// Revoke callback authority immediately, before Flutter disposes the old tree.
+  void invalidateSession() {
+    _sessionActive = false;
+    ++_refreshGeneration;
   }
 
   void reportSessionError() {
@@ -134,6 +158,73 @@ class PlusController extends ChangeNotifier {
     selectedVehicleId = result['id'] as String;
     await refresh();
     return result;
+  }
+
+  Future<Json> submitEstimate(
+    String id,
+    Json body,
+    ProviderProfile provider,
+  ) async {
+    final customerId = snapshot?.profile.id;
+    if (customerId == null || !isCurrentCustomer(customerId)) {
+      throw const PlusApiException('Please sign in again to continue.', 401);
+    }
+    if (!_sendingEstimates.add(id)) {
+      throw const PlusApiException('This estimate is already being submitted.');
+    }
+    final storageKey = _estimateStorageKey(customerId, id);
+    ++_refreshGeneration;
+    loading = false;
+    try {
+      final saved =
+          _pendingEstimates[id] ?? await pendingStore.read(storageKey);
+      if (saved != null && !mapEquals(saved.body, body)) {
+        _pendingEstimates[id] = saved;
+        throw const PlusApiException(
+          'Confirm your previous submission before choosing another shop.',
+        );
+      }
+      final attempt =
+          saved ??
+          PendingRequest(
+            body: Map<String, dynamic>.from(body),
+            key: 'estimate:$id',
+            provider: provider,
+          );
+      if (attempt.body['share_contact'] != true ||
+          attempt.body['provider_id'] != provider.id) {
+        throw const PlusApiException(
+          'Review your shop and sharing choice before submitting.',
+          422,
+        );
+      }
+      await pendingStore.write(storageKey, attempt);
+      _pendingEstimates[id] = attempt;
+      _notify();
+      if (!isCurrentCustomer(customerId)) {
+        throw const PlusApiException(
+          'Your account changed. Please sign in again.',
+          401,
+        );
+      }
+      final result = await repository.submitEstimate(
+        id,
+        attempt.body,
+        attempt.key,
+      );
+      await pendingStore.clear(storageKey);
+      _pendingEstimates.remove(id);
+      return result;
+    } on PlusApiException catch (error) {
+      if ([400, 403, 404, 422].contains(error.statusCode)) {
+        await pendingStore.clear(storageKey);
+        _pendingEstimates.remove(id);
+      }
+      rethrow;
+    } finally {
+      _sendingEstimates.remove(id);
+      _notify();
+    }
   }
 
   Future<void> ask(String message) async {

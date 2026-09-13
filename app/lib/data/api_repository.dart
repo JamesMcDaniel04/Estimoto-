@@ -162,8 +162,54 @@ class ApiPlusRepository extends PlusRepository {
   Future<Json> createEstimate(Json body) =>
       _send('POST', '/v1/estimates', body: body);
   @override
-  Future<Json> submitEstimate(String id) =>
-      _send('POST', '/v1/estimates/${Uri.encodeComponent(id)}/submit');
+  Future<Json> submitEstimate(String id, Json body, String idempotencyKey) =>
+      _send(
+        'POST',
+        '/v1/estimates/${Uri.encodeComponent(id)}/submit',
+        body: body,
+        idempotencyKey: idempotencyKey,
+      );
+
+  @override
+  Future<Uint8List> getPhoto(String estimateId, String photoId) async {
+    final request = http.Request(
+      'GET',
+      baseUri.resolve(
+        '/v1/estimates/${Uri.encodeComponent(estimateId)}/photos/${Uri.encodeComponent(photoId)}',
+      ),
+    );
+    request.headers.addAll(await _headers());
+    request.followRedirects = false;
+    try {
+      final response = await _client
+          .send(request)
+          .timeout(const Duration(seconds: 20));
+      if (response.statusCode != 200) {
+        final body = await http.ByteStream(
+          response.stream.take(1),
+        ).toBytes().timeout(const Duration(seconds: 5));
+        _decode(http.Response.bytes(body, response.statusCode));
+        throw const PlusApiException('This photo could not be loaded.');
+      }
+      final result = BytesBuilder(copy: false);
+      await for (final bytes in response.stream.timeout(
+        const Duration(seconds: 20),
+      )) {
+        if (result.length + bytes.length > 10 * 1024 * 1024) {
+          throw const PlusApiException('This photo is too large to display.');
+        }
+        result.add(bytes);
+      }
+      return result.takeBytes();
+    } on TimeoutException {
+      throw const PlusApiException('Photo loading timed out. Try again.');
+    } on http.ClientException {
+      throw const PlusApiException(
+        'Could not load the photo. Check your connection.',
+      );
+    }
+  }
+
   @override
   Future<Json> createRequest(Json body, String idempotencyKey) =>
       _send('POST', '/v1/requests', body: body, idempotencyKey: idempotencyKey);

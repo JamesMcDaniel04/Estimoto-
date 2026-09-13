@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'package:flutter/material.dart';
 import 'screens/garage_screen.dart';
 import 'screens/estimates_screen.dart';
@@ -8,6 +9,7 @@ import 'state/plus_controller.dart';
 import 'theme.dart';
 import 'widgets/common.dart';
 import 'widgets/customer_navigation.dart';
+import 'widgets/pending_capture_notice.dart';
 
 class EstimotoPlusApp extends StatelessWidget {
   const EstimotoPlusApp({super.key, required this.controller, this.onExit});
@@ -30,11 +32,39 @@ class _HomeShell extends StatefulWidget {
   State<_HomeShell> createState() => _HomeShellState();
 }
 
-class _HomeShellState extends State<_HomeShell> {
+class _HomeShellState extends State<_HomeShell> with WidgetsBindingObserver {
+  Timer? _updates;
+  bool _foreground = true;
   @override
   void initState() {
     super.initState();
+    WidgetsBinding.instance.addObserver(this);
+    _updates = Timer.periodic(
+      const Duration(seconds: 30),
+      (_) => _refreshStatus(),
+    );
     if (widget.controller.snapshot == null) widget.controller.refresh();
+  }
+
+  void _refreshStatus() {
+    if (_foreground &&
+        !widget.controller.isDemo &&
+        !widget.controller.loading) {
+      widget.controller.refresh(quiet: true);
+    }
+  }
+
+  @override
+  void didChangeAppLifecycleState(AppLifecycleState state) {
+    _foreground = state == AppLifecycleState.resumed;
+    if (_foreground) _refreshStatus();
+  }
+
+  @override
+  void dispose() {
+    _updates?.cancel();
+    WidgetsBinding.instance.removeObserver(this);
+    super.dispose();
   }
 
   @override
@@ -118,6 +148,11 @@ class _HomeShellState extends State<_HomeShell> {
                 ),
               if (c.loading && c.snapshot != null)
                 const LinearProgressIndicator(minHeight: 2),
+              if (c.snapshot != null)
+                PendingCaptureNotice(
+                  key: ValueKey(c.snapshot!.profile.id),
+                  controller: c,
+                ),
               if (c.error != null && c.snapshot != null)
                 MaterialBanner(
                   content: Text(c.error!),

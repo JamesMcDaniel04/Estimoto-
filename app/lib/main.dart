@@ -123,6 +123,7 @@ class _PlusLauncherState extends State<PlusLauncher> {
 
   void _openLive(String userId) {
     final previous = controller;
+    previous?.invalidateSession();
     // Drop all previous customer data before exposing another customer's token.
     setState(() {
       controller = null;
@@ -169,6 +170,7 @@ class _PlusLauncherState extends State<PlusLauncher> {
 
   void _clearController() {
     final previous = controller;
+    previous?.invalidateSession();
     if (mounted) {
       setState(() {
         controller = null;

@@ -23,7 +23,8 @@ abstract class PlusRepository {
     String filename,
     String label,
   );
-  Future<Json> submitEstimate(String id);
+  Future<Uint8List> getPhoto(String estimateId, String photoId);
+  Future<Json> submitEstimate(String id, Json body, String idempotencyKey);
   Future<Json> createRequest(Json body, String idempotencyKey);
   Future<Json> cancelRequest(String id);
   Future<Json> addReminder(Json body);

@@ -10,6 +10,7 @@ class DemoPlusRepository extends PlusRepository {
   DemoPlusRepository() : _state = jsonDecode(jsonEncode(demoSeed())) as Json;
   final Json _state;
   final Map<String, (String, String)> _requestsByKey = {};
+  final _photoBytes = <String, Uint8List>{};
   final Random _random = Random.secure();
   @override
   bool get isDemo => true;
@@ -90,12 +91,22 @@ class DemoPlusRepository extends PlusRepository {
       throw const PlusApiException('Choose a photo smaller than 10 MB.');
     }
     final photo = <String, dynamic>{'id': _id(), 'label': label};
+    _photoBytes['$estimateId/${photo['id']}'] = Uint8List.fromList(bytes);
     (estimate['photos'] as List).add(photo);
     return photo;
   }
 
   @override
-  Future<Json> submitEstimate(String id) async => throw const PlusApiException(
+  Future<Uint8List> getPhoto(String estimateId, String photoId) async =>
+      _photoBytes['$estimateId/$photoId'] ??
+      (throw const PlusApiException('This sample photo is unavailable.', 404));
+
+  @override
+  Future<Json> submitEstimate(
+    String id,
+    Json body,
+    String idempotencyKey,
+  ) async => throw const PlusApiException(
     'Your demo draft is saved. Live estimating will be available when your shop connects.',
     503,
   );
