@@ -81,13 +81,25 @@ def current_customer(request: Request, authorization: str | None = Header(defaul
         identity = verifier(token) if verifier else verify_supabase(settings, token, request.app.state.auth_client)
     if not isinstance(identity, dict) or not identity.get("id") or not identity.get("email") or not (identity.get("email_confirmed_at") or identity.get("confirmed_at")) or identity.get("is_anonymous"):
         raise HTTPException(401, "Sign in to continue.")
-    customer = db.get(Customer, str(identity["id"]))
+    customer_id, email = str(identity["id"]), str(identity["email"])
+    if len(customer_id) > 100 or len(email) > 320:
+        raise HTTPException(401, "Sign in to continue.")
+    customer = db.get(Customer, customer_id)
     if customer is None:
-        customer = Customer(id=str(identity["id"]), email=str(identity["email"]), demo=bool(identity.get("_demo")))
-        db.add(customer)
-    else:
-        customer.email = str(identity["email"])
-    db.commit()
+        # Concurrent first API calls must converge on one account without
+        # overwriting profile fields that another request has already saved.
+        if db.get_bind().dialect.name == "postgresql":
+            from sqlalchemy.dialects.postgresql import insert
+        else:
+            from sqlalchemy.dialects.sqlite import insert
+        db.execute(insert(Customer).values(id=customer_id, email=email,
+                                           demo=bool(identity.get("_demo")))
+                   .on_conflict_do_nothing(index_elements=[Customer.id]))
+        db.commit()
+        customer = db.get(Customer, customer_id)
+    if customer.email != email:
+        customer.email = email
+        db.commit()
     return customer
 
 

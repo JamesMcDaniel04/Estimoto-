@@ -1,0 +1,286 @@
+"""Source-linked graph retrieval, with tenant isolation before retrieval.
+
+Operational records remain the source of truth. This is a typed automotive
+graph and local GraphRAG implementation, not a claim that a model is trained
+on customer data or that a cross-industry corpus already exists.
+"""
+import hashlib
+import json
+import re
+from collections import defaultdict
+from datetime import date, datetime, timedelta, timezone
+from typing import Literal
+
+from fastapi import APIRouter, Depends, Header, HTTPException
+from pydantic import BaseModel, ConfigDict, Field, field_validator
+from sqlalchemy import delete, func, or_, select, update
+from sqlalchemy.orm import Session
+
+from .auth import bridge_authorized, current_customer, db_session
+from .models import Customer, ServiceRequest, Vehicle, now, uid
+from .graph_models import GraphEdge, GraphEntity, KnowledgePreference, KnowledgeRecord, KnowledgeDeletion, KnowledgeConsentEvent
+
+router = APIRouter()
+POLICY_VERSION = "2026-09-13"
+MIN_CONTRIBUTORS = 10
+ServiceType = Literal["oil_change", "tires", "brakes", "battery", "maintenance", "diagnostics", "collision", "pdr", "other"]
+
+
+class RecordInput(BaseModel):
+    model_config = ConfigDict(extra="forbid", str_strip_whitespace=True)
+    vehicle_id: str = Field(min_length=1, max_length=36)
+    service_type: ServiceType
+    service_date: str
+    mileage: int | None = Field(default=None, ge=0, le=9999999, strict=True)
+    shop_name: str = Field(default="", max_length=200)
+    parts_source: str = Field(default="", max_length=200)
+    parts_description: str = Field(default="", max_length=200)
+    notes: str = Field(default="", max_length=1000)
+
+    @field_validator("service_date")
+    @classmethod
+    def past_date(cls, value):
+        parsed = date.fromisoformat(value)
+        # UTC+14 gives the latest possible local date without trusting a client
+        # timezone. A scheduled future appointment is not a repair-history fact.
+        latest_today = (datetime.now(timezone.utc) + timedelta(hours=14)).date()
+        if parsed < date(1950, 1, 1) or parsed > latest_today:
+            raise ValueError("Enter a past or current service date")
+        return parsed.isoformat()
+
+
+class PreferenceInput(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+    share_aggregate_insights: bool = Field(strict=True)
+
+
+def record_view(record):
+    result = {k: getattr(record, k) for k in (
+        "id", "vehicle_id", "service_type", "service_date", "mileage", "shop_name",
+        "parts_source", "parts_description", "notes", "source")}
+    result["created_at"] = record.created_at.isoformat()
+    return result
+
+
+def lock_customer(db, customer_id):
+    # Protect writes and deletion against concurrent replay on PostgreSQL and
+    # the SQLite local harness, using the same discipline as service requests.
+    db.execute(update(Customer).where(Customer.id == customer_id).values(id=Customer.id))
+
+
+@router.get("/v1/knowledge")
+def knowledge(c: Customer = Depends(current_customer), db: Session = Depends(db_session)):
+    records = db.scalars(select(KnowledgeRecord).where(KnowledgeRecord.customer_id == c.id)
+                         .order_by(KnowledgeRecord.service_date.desc(), KnowledgeRecord.created_at.desc()).limit(1000)).all()
+    preference = db.get(KnowledgePreference, c.id)
+    return {"records": [record_view(r) for r in records],
+            "preferences": {"share_aggregate_insights": bool(preference and preference.share_aggregate_insights)},
+            "policy_version": POLICY_VERSION}
+
+
+@router.put("/v1/knowledge/preferences")
+def save_preference(body: PreferenceInput, c: Customer = Depends(current_customer), db: Session = Depends(db_session)):
+    lock_customer(db, c.id)
+    preference = db.get(KnowledgePreference, c.id)
+    changed = preference is None or preference.share_aggregate_insights != body.share_aggregate_insights
+    if preference is None:
+        preference = KnowledgePreference(customer_id=c.id)
+        db.add(preference)
+    preference.share_aggregate_insights = body.share_aggregate_insights
+    preference.policy_version = POLICY_VERSION
+    preference.updated_at = now()
+    if changed:
+        db.add(KnowledgeConsentEvent(customer_id=c.id, share_aggregate_insights=body.share_aggregate_insights,
+                                     policy_version=POLICY_VERSION))
+    db.commit()
+    return {"share_aggregate_insights": preference.share_aggregate_insights, "policy_version": POLICY_VERSION}
+
+
+def graph_entity(db, customer_id, kind, source_key, label, attributes=None):
+    row = db.scalar(select(GraphEntity).where(GraphEntity.customer_id == customer_id,
+                                             GraphEntity.kind == kind, GraphEntity.source_key == source_key))
+    if row is None:
+        row = GraphEntity(id=uid(), customer_id=customer_id, kind=kind, source_key=source_key,
+                          label=label[:200], attributes=attributes or {})
+        db.add(row)
+        db.flush()
+    return row
+
+
+def project_record(db, record, vehicle):
+    car = graph_entity(db, record.customer_id, "vehicle", vehicle.id,
+                       f"{vehicle.year} {vehicle.make} {vehicle.model}")
+    service = graph_entity(db, record.customer_id, "service", record.id,
+                           record.service_type.replace("_", " "),
+                           {"service_date": record.service_date, "mileage": record.mileage})
+
+    def edge(origin, relation, target):
+        db.add(GraphEdge(customer_id=record.customer_id, record_id=record.id,
+                         from_id=origin.id, to_id=target.id, relation=relation))
+
+    edge(car, "HAS_REPORTED_SERVICE", service)
+    for kind, label, relation in (("shop", record.shop_name, "REPORTED_PERFORMED_AT"),
+                                   ("parts_supplier", record.parts_source, "REPORTED_PARTS_FROM"),
+                                   ("part", record.parts_description, "REPORTED_USED_PART")):
+        if label:
+            key = hashlib.sha256(label.casefold().strip().encode()).hexdigest()
+            target = graph_entity(db, record.customer_id, kind, key, label)
+            edge(service, relation, target)
+
+
+@router.post("/v1/knowledge/records", status_code=201)
+def create_record(body: RecordInput, idempotency_key: str | None = Header(default=None),
+                  c: Customer = Depends(current_customer), db: Session = Depends(db_session)):
+    if not idempotency_key or len(idempotency_key) > 200:
+        raise HTTPException(422, "Idempotency-Key is required.")
+    digest = hashlib.sha256(json.dumps(body.model_dump(), sort_keys=True).encode()).hexdigest()
+    lock_customer(db, c.id)
+    if db.get(KnowledgeDeletion, (c.id, idempotency_key)):
+        raise HTTPException(410, "This history entry was deleted. Start a new entry to save it again.")
+    existing = db.scalar(select(KnowledgeRecord).where(KnowledgeRecord.customer_id == c.id,
+                                                       KnowledgeRecord.idempotency_key == idempotency_key))
+    if existing:
+        if existing.payload_hash != digest:
+            raise HTTPException(409, "This save was already used for different history.")
+        return record_view(existing)
+    vehicle = db.get(Vehicle, body.vehicle_id)
+    if vehicle is None or vehicle.customer_id != c.id:
+        raise HTTPException(404, "Vehicle not found.")
+    if db.scalar(select(func.count()).select_from(KnowledgeRecord).where(KnowledgeRecord.customer_id == c.id)) >= 1000:
+        raise HTTPException(409, "Your saved history is full. Remove an entry before adding another.")
+    record = KnowledgeRecord(id=uid(), customer_id=c.id, idempotency_key=idempotency_key,
+                             payload_hash=digest, **body.model_dump())
+    db.add(record)
+    db.flush()
+    project_record(db, record, vehicle)
+    db.commit()
+    return record_view(record)
+
+
+@router.delete("/v1/knowledge/records/{record_id}", status_code=204)
+def delete_record(record_id: str, c: Customer = Depends(current_customer), db: Session = Depends(db_session)):
+    lock_customer(db, c.id)
+    record = db.get(KnowledgeRecord, record_id)
+    if record is None or record.customer_id != c.id:
+        raise HTTPException(404, "History not found.")
+    db.execute(delete(GraphEdge).where(GraphEdge.customer_id == c.id, GraphEdge.record_id == record.id))
+    db.add(KnowledgeDeletion(customer_id=c.id, idempotency_key=record.idempotency_key))
+    db.delete(record)
+    db.flush()
+    # Erase the derived graph together with the source. Shared nodes remain
+    # only while another retained record still points to them.
+    linked = select(GraphEdge.id).where(GraphEdge.customer_id == c.id,
+                                      or_(GraphEdge.from_id == GraphEntity.id, GraphEdge.to_id == GraphEntity.id)).exists()
+    db.execute(delete(GraphEntity).where(GraphEntity.customer_id == c.id, ~linked))
+    db.commit()
+
+
+@router.get("/v1/knowledge/graph")
+def own_graph(c: Customer = Depends(current_customer), db: Session = Depends(db_session)):
+    entities = db.scalars(select(GraphEntity).where(GraphEntity.customer_id == c.id)).all()
+    relationships = db.scalars(select(GraphEdge).where(GraphEdge.customer_id == c.id)).all()
+    return {"entities": [{"id": e.id, "kind": e.kind, "title": e.label, "attributes": e.attributes} for e in entities],
+            "relationships": [{"id": e.id, "source": e.from_id, "target": e.to_id,
+                               "relation": e.relation, "record_id": e.record_id,
+                               "evidence_type": e.source, "observed_at": e.observed_at.isoformat()} for e in relationships]}
+
+
+def retrieve_history(db, customer_id, vehicle_id, question, limit=6):
+    """Traverse vehicle -> services -> shop/part/supplier, then rank evidence.
+
+    Filtering occurs at every graph hop, never after a global semantic query.
+    Free-text notes, VIN, contact and insurance never enter model context.
+    """
+    if not vehicle_id:
+        return []
+    root = db.scalar(select(GraphEntity).where(GraphEntity.customer_id == customer_id,
+                                              GraphEntity.kind == "vehicle", GraphEntity.source_key == vehicle_id))
+    if root is None:
+        return []
+    record_ids = select(GraphEdge.record_id).where(GraphEdge.customer_id == customer_id,
+                                                  GraphEdge.from_id == root.id,
+                                                  GraphEdge.relation == "HAS_REPORTED_SERVICE")
+    records = db.scalars(select(KnowledgeRecord).where(KnowledgeRecord.customer_id == customer_id,
+                                                      KnowledgeRecord.vehicle_id == vehicle_id,
+                                                      KnowledgeRecord.id.in_(record_ids))
+                         .order_by(KnowledgeRecord.service_date.desc(), KnowledgeRecord.created_at.desc()).limit(1000)).all()
+    tokens = set(re.findall(r"[a-z0-9]{3,}", question.casefold())) - {"the", "car", "what", "where", "when", "have", "was", "did", "from", "history"}
+    wanted_type = {"oil": "oil_change", "tire": "tires", "tyre": "tires", "brake": "brakes",
+                   "battery": "battery", "dent": "pdr", "collision": "collision"}
+    types = {kind for keyword, kind in wanted_type.items() if keyword in question.casefold()}
+    if types:
+        records = [r for r in records if r.service_type in types]
+    def score(record):
+        text = " ".join((record.service_type.replace("_", " "), record.shop_name,
+                          record.parts_source, record.parts_description)).casefold()
+        return len(tokens & set(re.findall(r"[a-z0-9]{3,}", text)))
+    records.sort(key=score, reverse=True)  # stable ties retain most recent first
+    evidence = []
+    for record in records[:limit]:
+        links = db.execute(select(GraphEdge.relation, GraphEntity.label).join(GraphEntity, GraphEdge.to_id == GraphEntity.id)
+                           .where(GraphEdge.customer_id == customer_id, GraphEntity.customer_id == customer_id,
+                                  GraphEdge.record_id == record.id)).all()
+        evidence.append({"source_id": record.id, "source": record.source,
+                         "service_type": record.service_type, "service_date": record.service_date,
+                         "mileage": record.mileage, "relations": [{"relation": rel, "value": label} for rel, label in links]})
+    return evidence
+
+
+def history_question(message):
+    text = message.casefold()
+    return bool(re.search(r"\b(my|our|i|me)\b", text) and re.search(
+        r"history|last |previous|used to|usually|normally|where.*(?:parts|repair|service)|which.*shop|what.*shop|who.*(?:repair|service)|sourc.*parts", text))
+
+
+def history_answer(evidence):
+    if not evidence:
+        return "I don't have a matching service record for this vehicle yet. Add a past repair in Garage → Service history so I can use your saved details."
+    lines = ["From your saved history (reported by you):"]
+    for item in evidence[:4]:
+        relations = {r["relation"]: r["value"] for r in item["relations"]}
+        text = f"{item['service_date']}: {item['service_type'].replace('_', ' ')}"
+        if item["mileage"] is not None:
+            text += f" at {item['mileage']:,} miles"
+        if relations.get("REPORTED_PERFORMED_AT"):
+            text += f" at {relations['REPORTED_PERFORMED_AT']}"
+        if relations.get("REPORTED_PARTS_FROM"):
+            text += f"; parts from {relations['REPORTED_PARTS_FROM']}"
+        if relations.get("REPORTED_USED_PART"):
+            text += f" ({relations['REPORTED_USED_PART']})"
+        lines.append(text + ".")
+    return "\n".join(lines)
+
+
+def aggregate_insights(db):
+    # Only enumerated/coarse dimensions leave the customer context. Arbitrary
+    # shop/supplier names and notes can contain PII and stay private.
+    rows = db.execute(select(KnowledgeRecord.customer_id, KnowledgeRecord.service_type, KnowledgeRecord.parts_source)
+                      .join(KnowledgePreference, KnowledgePreference.customer_id == KnowledgeRecord.customer_id)
+                      .join(Customer, Customer.id == KnowledgeRecord.customer_id)
+                      .where(KnowledgePreference.share_aggregate_insights.is_(True), Customer.demo.is_(False))).all()
+    services, suppliers, requests = defaultdict(set), defaultdict(set), defaultdict(set)
+    known_sources = {"autozone": "AutoZone", "napa": "NAPA", "napa auto parts": "NAPA",
+                     "o'reilly": "O'Reilly Auto Parts", "o'reilly auto parts": "O'Reilly Auto Parts",
+                     "rockauto": "RockAuto", "advance auto parts": "Advance Auto Parts", "dealer": "Dealer"}
+    for customer_id, service, source in rows:
+        services[service].add(customer_id)
+        if source:
+            suppliers[known_sources.get(source.casefold().strip(), "Other supplier")].add(customer_id)
+    request_rows = db.execute(select(ServiceRequest.customer_id, ServiceRequest.specialty)
+                              .join(KnowledgePreference, KnowledgePreference.customer_id == ServiceRequest.customer_id)
+                              .join(Customer, Customer.id == ServiceRequest.customer_id)
+                              .where(KnowledgePreference.share_aggregate_insights.is_(True), Customer.demo.is_(False))).all()
+    for customer_id, specialty in request_rows:
+        if specialty in {"pdr", "collision", "maintenance", "mechanical"}:
+            requests[specialty].add(customer_id)
+    def counts(groups):
+        return [{"category": key, "contributors_rounded": len(people) // 5 * 5}
+                for key, people in sorted(groups.items()) if len(people) >= MIN_CONTRIBUTORS]
+    return {"service_types": counts(services), "parts_sources": counts(suppliers), "request_types": counts(requests),
+            "minimum_contributors": MIN_CONTRIBUTORS, "source": "opted_in_customer_reports",
+            "counts_rounded_to": 5, "includes_contacts": False}
+
+
+@router.get("/v1/bridge/knowledge/insights", dependencies=[Depends(bridge_authorized)])
+def insights(db: Session = Depends(db_session)):
+    return aggregate_insights(db)
