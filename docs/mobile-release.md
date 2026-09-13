@@ -63,13 +63,14 @@ checks, hashes and provider states.
 
 `sh scripts/build_live.sh all` requires a clean checkout and ignored
 `app/config/local.json` containing only the four supported public live fields. The
-script refuses demo mode or server credentials. CarsXE credentials stay on the
-backend. Record exact source, signatures and served hashes before distribution.
+script refuses demo mode or server credentials. Its mobile build writes an ignored
+receipt containing the clean source SHA and exact APK/AAB hashes. CarsXE credentials
+stay on the backend. Record exact source, signatures and served hashes before distribution.
 
 **Required for every Android release:** run
 `scripts/publish_android.sh --notes docs/releases/<release-notes>.md` after the
 signed APK and AAB are built. The command publishes the exact versioned GitHub
-assets, verifies their signatures and public hashes, and automatically advances
+assets, verifies the receipt, both signed package versions and public hashes, and automatically advances
 the stable-link pointer last. It refuses conflicting existing assets and
 overlapping local publishers. Follow the permanent URL and compare the downloaded
 hash before sending an invite. See

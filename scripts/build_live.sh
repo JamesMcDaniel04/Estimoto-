@@ -34,8 +34,11 @@ if [ "$PLUS_TARGET" = web ] || [ "$PLUS_TARGET" = all ]; then
 fi
 if [ "$PLUS_TARGET" = mobile ] || [ "$PLUS_TARGET" = all ]; then
   test -f android/key.properties || { echo 'Configure owner-controlled Android release signing first.' >&2; exit 1; }
+  rm -f "$PLUS_ROOT/app/build/android-build-receipt.json"
   flutter build ipa --release --no-pub --export-options-plist=ios/ExportOptions.plist --dart-define-from-file=config/local.json --dart-define=SOURCE_SHA="$PLUS_SHA"
   flutter build apk --release --no-pub --dart-define-from-file=config/local.json --dart-define=SOURCE_SHA="$PLUS_SHA"
   flutter build appbundle --release --no-pub --dart-define-from-file=config/local.json --dart-define=SOURCE_SHA="$PLUS_SHA"
+  cd "$PLUS_ROOT"
+  python3 backend/scripts/write_android_build_receipt.py --source-sha "$PLUS_SHA"
 fi
 printf 'Live %s artifacts built from %s. Verify identities, signatures and served hashes before distribution.\n' "$PLUS_TARGET" "$PLUS_SHA"
