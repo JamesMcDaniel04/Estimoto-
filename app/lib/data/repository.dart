@@ -2,9 +2,10 @@ import 'dart:typed_data';
 import '../domain/models.dart';
 
 class PlusApiException implements Exception {
-  const PlusApiException(this.message, [this.statusCode]);
+  const PlusApiException(this.message, [this.statusCode, this.code]);
   final String message;
   final int? statusCode;
+  final String? code;
   @override
   String toString() => message;
 }

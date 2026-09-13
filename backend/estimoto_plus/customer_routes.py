@@ -1,13 +1,14 @@
 import hashlib
 from io import BytesIO
 import json
+import re
 from datetime import datetime, timezone
 from pathlib import Path
 from urllib.parse import quote
 
 from fastapi import APIRouter, Depends, Header, HTTPException, Request
 from starlette.datastructures import UploadFile
-from fastapi.responses import Response
+from fastapi.responses import Response, JSONResponse
 from PIL import Image, UnidentifiedImageError
 from sqlalchemy import select, update
 from sqlalchemy.exc import IntegrityError
@@ -158,7 +159,9 @@ def create_request(body: RequestCreate, request: Request, idempotency_key: str |
         raise HTTPException(422, "Save a valid ZIP code before requesting service.")
     p = db.get(Provider, body.provider_id)
     if not p or not p.public_visible or p.demo_only != c.demo or not p.accepting_requests or body.specialty not in p.specialties or service_zip not in p.postal_codes:
-        raise HTTPException(409, "Provider is not accepting this request.")
+        return JSONResponse(status_code=409, content={
+            "detail": "Provider is not accepting this request.", "code": "request_not_created",
+        })
     if not c.demo and not (request.app.state.settings.bridge_url and request.app.state.settings.bridge_key):
         raise HTTPException(503, "Requests are unavailable right now. Please try again later.")
     status = "local_preview" if c.demo else "queued"
@@ -299,33 +302,49 @@ def complete_reminder(reminder_id: str, c: Customer = Depends(current_customer),
 
 @router.post("/assistant")
 def assistant(body: AssistantInput, c: Customer = Depends(current_customer), db: Session = Depends(db_session)):
-    if body.vehicle_id:
-        owned(db, Vehicle, body.vehicle_id, c)
+    car = owned(db, Vehicle, body.vehicle_id, c) if body.vehicle_id else None
     message = body.message.lower()
     specialty = body.specialty
     if specialty is None:
-        if any(word in message for word in ("hail", "dent", "ding")):
-            specialty = "pdr"
-        elif any(word in message for word in ("crash", "collision", "accident", "body damage")):
-            specialty = "collision"
-        elif any(word in message for word in ("oil", "tire", "brake", "service")):
-            specialty = "maintenance"
-        elif any(word in message for word in ("engine", "won't start", "mechanical")):
-            specialty = "mechanical"
+        for category, pattern in (
+            ("pdr", r"\b(hail|dents?|dings?|pdr)\b"),
+            ("collision", r"\b(crash|collision|accident|bumper|bodywork|paint)\b|body damage"),
+            ("mechanical", r"\b(brakes?|engine|mechanic|mechanical|battery|noise)\b|won.t start|warning light"),
+            ("maintenance", r"\b(oil|tires?|tyres?|pressure|filter|maintenance|service)\b"),
+        ):
+            if re.search(pattern, message):
+                specialty = category
+                break
     postal = canonical_zip(body.postal_code or c.postal_code)
-    wants_provider = any(word in message for word in ("find", "shop", "technician", "repair", "help", "book"))
-    intent = "find_provider" if wants_provider and specialty and postal and body.vehicle_id else ("clarify" if wants_provider else "advice")
-    matches = matching_providers(db, specialty, postal, body.mobile_only, c.demo) if intent == "find_provider" else []
+    wants_provider = bool(re.search(r"\b(find|connect|someone|technician|tech|shop|book|request|repair|fix)\b|come to", message))
+    mobile = body.mobile_only or bool(re.search(r"\bmobile\b|at (my )?(home|house|work)|driveway|come to", message))
+    urgent = bool(re.search(r"brakes? (fail(ed|ure)?|not working)|smoke|overheat|fuel leak|burning smell|airbag|high voltage|unsafe|oil pressure", message))
+    intent = "find_provider" if wants_provider and specialty and postal and car else ("clarify" if wants_provider else "advice")
+    matches = [p for p in matching_providers(db, specialty, postal, mobile, c.demo) if p.accepting_requests] if intent == "find_provider" else []
     if intent == "clarify":
-        missing = [name for name, value in (("repair type", specialty), ("vehicle", body.vehicle_id), ("postal code", postal)) if not value]
+        missing = [name for name, value in (("repair type", specialty), ("vehicle", car), ("postal code", postal)) if not value]
         reply = "To find a provider, please share your " + " and ".join(missing or ["repair details"]) + "."
     elif intent == "find_provider":
-        reply = "Here are providers that list this service area and specialty." if matches else "I couldn't find an opted-in provider matching those details."
-    elif any(word in message for word in ("brake failure", "smoke", "fuel leak", "unsafe")):
-        reply = "Avoid driving if the vehicle may be unsafe. Contact a qualified professional or emergency service as appropriate."
+        reply = (f"These {'mobile ' if mobile else ''}providers list your service area and specialty. Choose one to review your request; they will confirm availability and pricing."
+                 if matches else "I couldn't find an opted-in provider matching those details. Try another service or a shop instead of mobile help.")
+    elif re.search(r"tire|tyre|pressure", message):
+        reply = "Use the cold tire pressure on the driver-door placard or in your owner's manual. Check with a gauge when the tires are cold. If a tire keeps losing pressure or has visible damage, have a technician inspect it."
+    elif "oil" in message:
+        reply = "Your owner's manual gives the correct oil specification and service interval for your engine. Check the date and mileage of your last service, then save a reminder in your garage."
+    elif re.search(r"estimate|cost|price", message):
+        reply = "An estimate separates the work, parts and labor needed for your repair. Your Estimates tab holds the shop's figures and review status. I can help you find a PDR technician or collision shop for a specific concern."
+    elif "filter" in message:
+        reply = "Your owner's manual identifies the correct filter and replacement interval. Cabin and engine air filters serve different purposes; check the procedure for your vehicle before replacing either. A technician can help if access requires removing other components."
     else:
-        reply = "I can help organize the repair details and find a provider. A professional should inspect the vehicle for a diagnosis."
-    search = quote(f"{specialty or 'car repair'} advice", safe="")
+        reply = "I can help you understand an estimate, plan routine maintenance, or find a technician. Try 'Find mobile dent repair' or 'How do I check tire pressure?'"
+    if urgent:
+        # Safety guidance precedes matching, even when the user requests a shop.
+        reply = "Avoid driving if the vehicle may be unsafe. Stop somewhere safe and arrange professional help; contact emergency services when appropriate. " + (reply if wants_provider else "I can help you find a qualified repair provider.")
+    videos = []
+    if not urgent and not wants_provider and re.search(r"how|video|tutorial", message) and re.search(r"oil|tire|tyre|pressure|filter", message):
+        topic = "check tire pressure" if re.search(r"tire|tyre|pressure", message) else ("oil service" if "oil" in message else "air filter replacement")
+        vehicle_title = f"{car.year} {car.make} {car.model}" if car else "car"
+        search = quote(f"{vehicle_title} {topic}", safe="")
+        videos = [{"title": "Search YouTube for this maintenance topic", "url": f"https://www.youtube.com/results?search_query={search}", "source": "YouTube search · review vehicle compatibility"}]
     return {"reply": reply, "intent": intent, "specialty": specialty,
-            "providers": [provider(p) for p in matches],
-            "videos": [{"title": "YouTube search results", "url": f"https://www.youtube.com/results?search_query={search}", "source": "YouTube search"}]}
+            "providers": [provider(p) for p in matches], "videos": videos}

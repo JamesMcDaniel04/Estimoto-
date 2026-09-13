@@ -30,6 +30,20 @@ class LostResponseRepository extends DemoPlusRepository {
   }
 }
 
+class RejectedProviderRepository extends DemoPlusRepository {
+  @override
+  Future<Json> createRequest(Json body, String key) async {
+    if (body['provider_id'] == (await bootstrap()).providers.first.id) {
+      throw const PlusApiException(
+        'Provider rejected this request.',
+        409,
+        'request_not_created',
+      );
+    }
+    return super.createRequest(body, key);
+  }
+}
+
 class FakeAuth extends CustomerAuth {
   FakeAuth(this.userId);
   @override
@@ -132,6 +146,41 @@ void main() {
       reopened.dispose();
     },
   );
+  test(
+    'definitive provider rejection permits choosing another provider after reopening',
+    () async {
+      final repo = RejectedProviderRepository();
+      final store = MemoryPendingRequestStore();
+      final controller = PlusController(repo, pendingStore: store);
+      await controller.refresh();
+      final providers = controller.snapshot!.providers;
+      final body = <String, dynamic>{
+        'vehicle_id': controller.selectedVehicle!.id,
+        'provider_id': providers.first.id,
+        'specialty': 'pdr',
+        'description': 'Door damage.',
+        'share_contact': true,
+      };
+      await expectLater(
+        controller.sendRequest(body, providers.first),
+        throwsA(isA<PlusApiException>()),
+      );
+      expect(controller.pendingRequest, isNull);
+      controller.dispose();
+      final reopened = PlusController(repo, pendingStore: store);
+      await reopened.refresh();
+      expect(reopened.pendingRequest, isNull);
+      final replacement = await reopened.sendRequest({
+        ...body,
+        'provider_id': providers[1].id,
+        'specialty': 'collision',
+      }, providers[1]);
+      expect(replacement['status'], 'requested');
+      expect((await repo.bootstrap()).requests, hasLength(1));
+      reopened.dispose();
+    },
+  );
+
   testWidgets('dismissing and reopening restores an uncertain request', (
     tester,
   ) async {

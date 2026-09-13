@@ -1,6 +1,6 @@
 # Estimoto + API v1
 
-All customer routes require `Authorization: Bearer <Supabase access token>`. JSON uses snake_case. Unknown fields are rejected on writes. Errors use `{"detail":"customer-safe explanation"}`. All IDs are opaque strings and every private lookup enforces authenticated ownership.
+All customer routes require `Authorization: Bearer <Supabase access token>`. JSON uses snake_case. Unknown fields are rejected on writes. Errors use `{"detail":"customer-safe explanation"}`. A definitive provider rejection before request creation adds `"code":"request_not_created"` with HTTP409; clients may clear that rejected operation. An unclassified409/idempotency conflict or transport failure must retain its pending retry identity. All IDs are opaque strings and every private lookup enforces authenticated ownership.
 
 `GET /v1/bootstrap` returns an object with `profile`, `vehicles`, `providers`, `estimates`, `repairs`, `requests`, `reminders`, and `capabilities`. Each collection is an array. Capabilities includes `live_requests`, `live_estimates`, `carfax`, `youtube_search`, `demo` booleans. The client must not infer live capabilities from the presence of sample rows.
 

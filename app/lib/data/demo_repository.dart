@@ -202,7 +202,7 @@ class DemoPlusRepository extends PlusRepository {
     final vehicleId = body['vehicle_id'] as String?;
     if (vehicleId != null) _find('vehicles', vehicleId);
     final urgent = RegExp(
-      r'brakes? (failed|not working)|smoke|overheat|fuel leak|burning smell|airbag|high voltage',
+      r'brakes? (fail(ed|ure)?|not working)|smoke|overheat|fuel leak|burning smell|airbag|high voltage|unsafe|oil pressure',
     ).hasMatch(message);
     if (urgent) {
       return AssistantAnswer.fromJson({
@@ -289,7 +289,11 @@ class DemoPlusRepository extends PlusRepository {
               'title': 'Search YouTube for this maintenance topic',
               'url': Uri.https('www.youtube.com', '/results', {
                 'search_query':
-                    '${vehicleId == null ? '' : Vehicle.fromJson(_find('vehicles', vehicleId)).title} ${body['message']}',
+                    '${vehicleId == null ? '' : Vehicle.fromJson(_find('vehicles', vehicleId)).title} ${RegExp(r'tire|tyre|pressure').hasMatch(message)
+                        ? 'check tire pressure'
+                        : message.contains('oil')
+                        ? 'oil service'
+                        : 'air filter replacement'}',
               }).toString(),
               'source': 'YouTube search · review vehicle compatibility',
             },

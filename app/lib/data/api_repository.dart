@@ -96,6 +96,17 @@ class ApiPlusRepository extends PlusRepository {
       );
     }
     if (response.statusCode >= 300) {
+      String? code;
+      if (response.statusCode == 409) {
+        try {
+          final error = jsonDecode(response.body);
+          if (error is Map && error['code'] == 'request_not_created') {
+            code = 'request_not_created';
+          }
+        } on FormatException {
+          // An unrecognized conflict remains unresolved; never guess it was rejected.
+        }
+      }
       const errors = {
         403: 'This action is not available for your account.',
         404: 'This item is no longer available.',
@@ -108,9 +119,12 @@ class ApiPlusRepository extends PlusRepository {
             'This service is not connected yet. Your saved drafts are still available.',
       };
       throw PlusApiException(
-        errors[response.statusCode] ??
-            'We could not complete that action. Please try again.',
+        code == 'request_not_created'
+            ? 'That provider is no longer available for this request. Choose another provider.'
+            : errors[response.statusCode] ??
+                  'We could not complete that action. Please try again.',
         response.statusCode,
+        code,
       );
     }
     if (response.body.isEmpty) return {};

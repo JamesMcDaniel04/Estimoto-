@@ -64,6 +64,18 @@ Future<void> main() async {
       'share_contact': true,
     };
     final key = 'flutter-socket-${DateTime.now().microsecondsSinceEpoch}';
+    try {
+      await api.createRequest({
+        ...body,
+        'provider_id': 'missing-provider',
+      }, '$key-rejected');
+      throw StateError('Unknown provider accepted a request.');
+    } on PlusApiException catch (error) {
+      check(
+        error.statusCode == 409 && error.code == 'request_not_created',
+        'Definitive rejection lost its recovery code.',
+      );
+    }
     final request = await api.createRequest(body, key);
     final replay = await api.createRequest(body, key);
     check(request['id'] == replay['id'], 'Request replay created a duplicate.');

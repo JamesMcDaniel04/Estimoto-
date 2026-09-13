@@ -117,7 +117,8 @@ class PlusController extends ChangeNotifier {
       return result;
     } on PlusApiException catch (error) {
       // These responses definitively reject creation. Uncertain delivery keeps its identity.
-      if ([400, 403, 404, 422].contains(error.statusCode)) {
+      if ([400, 403, 404, 422].contains(error.statusCode) ||
+          (error.statusCode == 409 && error.code == 'request_not_created')) {
         await pendingStore.clear(customerId);
         pendingRequest = null;
       }

@@ -395,6 +395,6 @@ def test_assistant_matches_without_creating_request(clients):
     assert answer.json()["intent"] == "find_provider"
     assert answer.json()["specialty"] == "pdr"
     assert len(answer.json()["providers"]) == 1
-    assert answer.json()["videos"][0]["source"] == "YouTube search"
+    assert answer.json()["videos"] == []  # Provider matching does not imply DIY guidance.
     assert client.get("/v1/requests", headers=h("alice")).json() == []
     assert client.post("/v1/assistant", headers=h("bob"), json=payload).status_code == 404

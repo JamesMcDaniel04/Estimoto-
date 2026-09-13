@@ -86,4 +86,48 @@ void main() {
     await repository.completeReminder(reminder['id'] as String);
     expect((await repository.bootstrap()).reminders.last.completed, isTrue);
   });
+  test('only explicit request rejection decodes as safe to replace', () async {
+    for (final code in [null, 'request_not_created']) {
+      final api = ApiPlusRepository(
+        baseUrl: 'https://plus.example.com',
+        token: () async => 'token',
+        client: MockClient(
+          (_) async => http.Response(
+            jsonEncode({'detail': 'Conflict', 'code': code}),
+            409,
+          ),
+        ),
+      );
+      await expectLater(
+        api.createRequest({'share_contact': true}, 'one'),
+        throwsA(isA<PlusApiException>().having((e) => e.code, 'code', code)),
+      );
+      api.close();
+    }
+  });
+  test(
+    'demo quick prompts include common care and urgent repair guidance',
+    () async {
+      final repo = DemoPlusRepository();
+      final vehicleId = (await repo.bootstrap()).vehicles.first.id;
+      final care = await repo.askAssistant({
+        'message': 'How do I check tire pressure?',
+        'vehicle_id': vehicleId,
+      });
+      expect(care.reply, contains('placard'));
+      expect(care.reply, contains('gauge'));
+      for (final phrase in [
+        'Find repair for brake failure',
+        'Find repair because my brakes failed',
+      ]) {
+        final urgent = await repo.askAssistant({
+          'message': phrase,
+          'vehicle_id': vehicleId,
+          'postal_code': '80202',
+        });
+        expect(urgent.reply, contains('professional'));
+        expect(urgent.videos, isEmpty);
+      }
+    },
+  );
 }
