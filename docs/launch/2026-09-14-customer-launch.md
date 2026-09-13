@@ -30,8 +30,14 @@ Backend migration e21870f6a94b and private upload/CarsXE routes passed 168 tests
 including actual original-source contracts and isolated PostgreSQL. Flutter photo
 flows passed 68 tests and clean analysis, including narrow/large-text layouts,
 late account/vehicle responses and Android recovery destination separation.
-Build 5 is the vehicle-photo candidate; deployment and installed-device proof
-must be added to release status after they complete.
+Build 5 is deployed to the web/API and published as a signed Android download.
+The iOS build is VALID, with notes and both tester groups attached; external
+submission waits behind build 2. Android emulator camera and system gallery
+uploads, private readback, replacement and removal passed against the live API.
+A second authenticated customer was denied read/write/delete access. Android
+process-death recovery returned the saved photo to its original vehicle and
+required explicit retry. See the
+release record for exact source, hashes and device evidence.
 
 ## Customer rollout checks still distinct
 

@@ -1,0 +1,74 @@
+{
+  "checks": {
+    "exact_live_source": true,
+    "migration_ready": true,
+    "create_owned_vehicle": true,
+    "carsxe_live_stock": true,
+    "private_cache_headers": true,
+    "unsigned_denied": true,
+    "upload_saved": true,
+    "personal_upload_priority": true,
+    "upload_digest_matches": true,
+    "canonical_private_webp": true,
+    "bootstrap_upload_version": true,
+    "remove_upload": true,
+    "repeat_removal_safe": true,
+    "stock_fallback_after_removal": true,
+    "cached_stock_stable": true,
+    "native_camera_upload": true,
+    "native_gallery_replacement": true,
+    "second_customer_read_write_delete_denied": true,
+    "unknown_vehicle_denied": true,
+    "native_remove_restored_stock": true,
+    "native_process_death_recovers_original_vehicle": true,
+    "recovered_capture_requires_explicit_retry": true
+  },
+  "source_sha": "ec2dafffbd62b424ddd1b6928268b6ecce547365",
+  "stock_sha256": "b6267d197c304253edc7449a47e93bdaa47c768a201ff132476f991ba17b9e40",
+  "status": "passed",
+  "native": "Android emulator, signed io.estimoto.plus 0.1.0 (5), actual camera and system photo picker",
+  "synthetic_cleanup": "complete including private estimate and vehicle photo files",
+  "app_version": "0.1.0+5",
+  "backend_tests": {
+    "passed": 168,
+    "skipped": 0
+  },
+  "flutter_tests": {
+    "passed": 68,
+    "analysis": "clean"
+  },
+  "android": {
+    "package": "io.estimoto.plus",
+    "apk_sha256": "fcdccd1ac2ca87a31b63f6716058378b94dbecb9e367eaac0a1eeb56ee643934",
+    "aab_sha256": "ba98f731d15e064f77ff633771e2131419ad0a2d9cd516c3fd5da70aa5a26d1c",
+    "certificate_sha256": "e6d106fccc6c0e77e04a46c64f8edffdafb11b502d4857e51606c725086581dd",
+    "served_hashes_match": true,
+    "release_url": "https://github.com/JamesMcDaniel04/Estimoto-/releases/tag/v0.1.0-beta.5"
+  },
+  "ios": {
+    "id": "e25901e4-98c1-4c73-b22f-de3cfd407a11",
+    "version": "5",
+    "processing": "VALID",
+    "groups": [
+      {
+        "id": "802bde7a-afd5-476f-8fd3-bb9fb054bf8b",
+        "name": "Internal Testers"
+      },
+      {
+        "id": "07b3da65-a780-43e3-a089-2597051912af",
+        "name": "Customer Preview"
+      }
+    ],
+    "notes_chars": 939,
+    "beta": {
+      "autoNotifyEnabled": true,
+      "internalBuildState": "IN_BETA_TESTING",
+      "externalBuildState": "READY_FOR_BETA_SUBMISSION"
+    },
+    "ipa_sha256": "307d223f9c4d3ab5fc323b8840bdfc247670dd38f9383aa1078ff5de68203c04",
+    "external_submission": "Blocked by first build 2 review; kept that submission queued"
+  },
+  "schema_revision": "e21870f6a94b",
+  "physical_device_verified": false,
+  "real_shop_contact": false
+}
