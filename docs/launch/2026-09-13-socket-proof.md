@@ -7,6 +7,7 @@ Passed at **14:57:48 America/Denver**. This is local integration evidence, not p
 - Original Estimoto checkout: `/Users/jamesmcdaniel/Estimoto/.worktrees/plus-launch-integration-20260913`, HEAD `5c5cfaaf4dcb5211a4f52e1160139586d4fe63cc`. The bridge implementation is `baefb2f02f97abc469757da883cf76dfa2f66c77` (cherry-picked from `3bf25216e5426fbe2342d4198482a5451253a0b8`). The checkout also contained the parent's uncommitted owner-insights route; that route was not part of this socket scenario.
 - Customer checkout: `/Users/jamesmcdaniel/Estimoto-`, HEAD `904af4d8dcd9f9fb518457d5822868641b582083` at server start. This includes bridge contract fix `f1cdf18` and persistent service-request quota `c24efaff99d2f4710ba062892dd94ba462536d49`. Parent GraphRAG/assistant edits were also present; this scenario exercised requests, photos, estimates and status, not the assistant.
 - Later mail hardening `1c36e015e5d35b031c190f252ae7276a1c21ba30` and the current GraphRAG working changes were covered by the subsequent full customer backend suite: **131 passed, 1 skipped in 14.10 seconds**. The skipped check requires `PLUS_TEST_POSTGRES_URL`; all actual-source bridge contract tests ran.
+- Final suite on customer HEAD `e4d1bfb64cb60a52758a9c4594086bc97eb92ce3` (including GraphRAG `51b401b`), with original source HEAD `906ccdf11f08f362dad41b89a854a579067bae51`: **135 passed, zero skipped in 14.58 seconds**. Both actual-source bridge contract tests and real PostgreSQL first-sign-in concurrency ran. Backend tracked files were clean at this verification; other agents' Flutter work remained in progress.
 
 These were shared integration checkouts with the explicitly identified working changes, not clean immutable release builds. Release provenance must be verified separately after final commits and deployment.
 
@@ -46,7 +47,10 @@ Vision/quality providers and authentication identities were synthetic. The actua
 cd /Users/jamesmcdaniel/Estimoto-/backend
 ESTIMOTO_BRIDGE_BACKEND=/Users/jamesmcdaniel/Estimoto/.worktrees/plus-launch-integration-20260913/backend \
 ESTIMOTO_BRIDGE_PYTHON=/Users/jamesmcdaniel/Estimoto/backend/.venv/bin/python \
+PLUS_TEST_POSTGRES_URL='postgresql+psycopg://plus_test@127.0.0.1:55439/estimoto_scope_test_plus?client_encoding=utf8' \
 .venv/bin/python -m pytest -q --tb=short
 ```
 
 `tests/test_original_bridge_contract.py` passes real Plus-produced payloads into the original backend's actual Pydantic schemas and passes the actual original `estimate_view` output back into Plus validation and ownership/status application. It also checks maximum provider publication bounds, request preflight failures, and the persistent 20/hour request quota with replay exemption.
+
+The PostgreSQL test used a fresh randomized schema and removed only that schema afterward. `client_encoding=utf8` is needed for this disposable cluster's SQL_ASCII database; an initial attempt without it failed during dialect initialization before any application assertions. The local PostgreSQL server on port 55439 remains available to the parent release task. Both socket-proof uvicorn servers were stopped after their logs were saved.
