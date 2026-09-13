@@ -397,7 +397,9 @@ def test_saved_zip_clearing_and_empty_provider_areas_fail_closed(make):
     assert create_request(client, body, "no-area").status_code == 409
 
 
-def test_migrated_legacy_queue_without_reviewed_zip_or_payload_fails_closed(tmp_path, monkeypatch):
+@pytest.mark.parametrize("kind,attempts", [("create", 0), ("cancel", 0), ("cancel", 2)],
+                         ids=["unreviewed-create", "queued-cancel", "retrying-cancel"])
+def test_migrated_legacy_queue_preserves_pending_cancellation(tmp_path, monkeypatch, kind, attempts):
     database = tmp_path / "legacy.sqlite"
     monkeypatch.setenv("DATABASE_URL", f"sqlite:///{database}")
     alembic = Config(str(Path(__file__).resolve().parents[1] / "alembic.ini"))
@@ -417,12 +419,17 @@ def test_migrated_legacy_queue_without_reviewed_zip_or_payload_fails_closed(tmp_
                              "demo_only": 0, "description": ""})
         insert("service_requests", {"id": "request", "customer_id": "alice", "vehicle_id": "vehicle",
                                     "provider_id": "provider", "specialty": "pdr", "description": "Dent",
-                                    "preferred_time": "", "status": "requested", "delivery_status": "queued",
+                                    "preferred_time": "", "status": "cancelled" if kind == "cancel" else "requested",
+                                    "delivery_status": "delivered" if kind == "cancel" else "queued",
                                     "idempotency_key": "legacy", "payload_hash": "old",
                                     "created_at": "2026-09-13 00:00:00", "updated_at": "2026-09-13 00:00:00",
                                     "scheduled_at": None})
-        insert("outbox", {"id": "outbox", "request_id": "request", "kind": "create", "attempts": 0,
-                          "next_attempt_at": "2026-09-13 00:00:00", "receipt_id": None})
+        insert("outbox", {"id": "created", "request_id": "request", "kind": "create", "attempts": 0,
+                          "next_attempt_at": "2026-09-13 00:00:00",
+                          "receipt_id": "upstream-committed" if kind == "cancel" else None})
+        if kind == "cancel":
+            insert("outbox", {"id": "cancel", "request_id": "request", "kind": "cancel", "attempts": attempts,
+                              "next_attempt_at": "2026-09-13 00:00:00", "receipt_id": None})
     command.upgrade(alembic, "head")
     sent = []
     def transport(req):
@@ -432,11 +439,22 @@ def test_migrated_legacy_queue_without_reviewed_zip_or_payload_fails_closed(tmp_
                         bridge_url="https://fixture.invalid/requests", bridge_key="secret",
                         photo_dir=str(tmp_path / "photos"))
     with TestClient(create_app(settings, bridge_transport=httpx.MockTransport(transport))) as client:
-        assert deliver(client).json() == {"delivered": 0, "failed": 1}
-    assert sent == []
+        assert deliver(client).json() == ({"delivered": 1, "failed": 0} if kind == "cancel" else
+                                          {"delivered": 0, "failed": 1})
+        assert deliver(client).json() == {"delivered": 0, "failed": 0}
+    assert len(sent) == (1 if kind == "cancel" else 0)
+    if kind == "cancel":
+        assert sent[0].headers["Idempotency-Key"] == "cancel:request"
+        assert json.loads(sent[0].content) == {"event": "cancelled", "request_id": "request", "provider_source_id": "shop"}
     with sqlite3.connect(database) as db:
         assert db.execute("SELECT service_postal_code FROM service_requests").fetchone() == ("",)
-        assert db.execute("SELECT payload, suppressed FROM outbox").fetchone() == (None, 1)
+        if kind == "cancel":
+            payload, digest, suppressed, receipt, final_attempts = db.execute(
+                "SELECT payload, payload_hash, suppressed, receipt_id, attempts FROM outbox WHERE id='cancel'").fetchone()
+            assert json.loads(payload) == {"event": "cancelled", "request_id": "request", "provider_source_id": "shop"}
+            assert len(digest) == 64 and suppressed == 0 and receipt == "bad" and final_attempts == attempts + 1
+        else:
+            assert db.execute("SELECT payload, suppressed FROM outbox WHERE id='created'").fetchone() == (None, 1)
 
 
 def test_numeric_boundaries_and_naive_schedule_are_validated(make):
