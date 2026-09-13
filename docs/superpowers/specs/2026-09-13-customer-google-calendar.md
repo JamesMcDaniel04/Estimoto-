@@ -81,6 +81,9 @@ Server snapshots retain verified generation, selected IDs and duration; changing
 preferences or disconnecting invalidates pending checked authorizations.
 Outreach views expose these fields plus `calendar_sync_status` and
 `calendar_sync_message`. Directory request views expose the same status fields.
+Sync statuses are `not_enabled`, `pending`, `synced`, `conflict`,
+`reconnect_required`, `attention_needed`, and `removed`; sync messages are safe
+customer-facing text or null. Source booking status remains authoritative.
 
 ## Persistence and provider adapter
 
