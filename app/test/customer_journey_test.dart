@@ -160,6 +160,7 @@ void main() {
     tester,
   ) async {
     final controller = await launch(tester);
+    await tester.ensureVisible(find.text('Get an estimate'));
     await tester.tap(find.text('Get an estimate'));
     await tester.pumpAndSettle();
     await tester.enterText(

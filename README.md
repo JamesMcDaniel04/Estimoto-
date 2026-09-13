@@ -2,9 +2,9 @@
 
 The customer companion to Estimoto. A separate mobile app for a saved garage, PDR/Collision estimates, repair updates and finding the right shop or technician.
 
-This repository contains the first working app and customer API milestone. It is not connected to the production Estimoto database or published to the app stores. See [release status](docs/release-status.md) for verified behavior and remaining integration work.
+Estimoto + now has a live customer API, dedicated Supabase Auth/PostgreSQL storage, and a production bridge to Estimoto shops. See [release status](docs/release-status.md) for the exact verified scope and remaining launch checks.
 
-[Download the signed Android demo beta](https://github.com/JamesMcDaniel04/Estimoto-/releases/download/v0.1.0-beta.1/estimoto-plus-0.1.0-1.apk) · [Mobile/TestFlight setup status](docs/mobile-release.md)
+[Open Estimoto +](https://estimoto-plus-api.fly.dev/) · [Download Android](https://github.com/JamesMcDaniel04/Estimoto-/releases/download/v0.1.0-beta.4/estimoto-plus-0.1.0-4.apk) · [TestFlight status](docs/mobile-release.md)
 
 <img src="docs/screenshots/garage-ios.png" alt="Estimoto Plus garage on an iOS simulator with clearly labeled demo data" width="300">
 
@@ -32,11 +32,13 @@ Open `http://127.0.0.1:4318`. Production customer sessions use the dedicated aut
 
 | Area | Implemented |
 | --- | --- |
-| Garage | Saved contact details, multiple vehicles, mileage and optional insurance; date/mileage reminders |
-| Estimates | PDR/Collision tabs, draft creation using a saved car, private photo upload and trusted estimate history |
+| Garage | Saved contact details, multiple vehicles, mileage and optional insurance; date/mileage reminders; representative CarsXE photos or private camera/gallery uploads |
+| Estimates | PDR/Collision tabs, guided required-photo capture, private readback, durable handoff to a selected Estimoto shop and reviewed estimate status |
 | Repairs | Shop-supplied timelines and update dates, request delivery/response status, cancellation |
 | Find Help | Opt-in shops and technicians filtered by service ZIP, specialty and mobile service; maps for published addresses |
-| Estibot | Common-care guidance, structured matching, missing-detail prompts, a reviewed request flow and labeled YouTube search links |
+| Estibot | Bounded AI guidance, technician matching, saved-shop scheduling, private GraphRAG over service history, and labeled YouTube search links |
+| My shops | Private shop contacts, reviewed customer-authorized scheduling requests and explicit shop acceptance |
+| Service history | Customer-reported service, shop and parts-source records; optional aggregated contributions |
 | Foundation | Separate `io.estimoto.plus` iOS/Android app, Supabase Auth client, customer ownership checks, migrations, durable request outbox and bridge contract |
 
 Submitting a service request is not an appointment. A provider must confirm acceptance and schedule. Estibot presents a review screen before sharing contact and vehicle details.
@@ -63,8 +65,10 @@ backend/.venv/bin/python scripts/smoke_api.py --flutter-client
 
 The socket smoke creates a temporary migrated database and a local fictional identity/provider server, exercises customer isolation and the Dart HTTP client, then restarts the API to verify persistence. It cleans up its temporary files and makes no production calls.
 
-## Next integration work
+## Customer launch
 
-Connect opted-in Estimoto providers and customer-linked estimate/repair records through the [bridge contract](docs/api-contract.md), finish native guided capture and estimator submission, enable verified sign-in/push, and add model-backed Estibot and verified video retrieval. CARFAX is an optional separate partner integration; this milestone does not invent service history or advertise it as connected. Store branding, signing and distribution follow device validation.
+Demolition Dent is connected for PDR and collision in its saved ZIP 80221. PDR LINX is the second authorized participant; its account has no saved service ZIP, so its location routing awaits that information. The [launch record](docs/launch/2026-09-14-customer-launch.md) separates source tests, live API/browser checks, device proof and Apple review.
+
+Physical-device capture, actual shop scheduling delivery and Apple external beta approval remain separate launch checks. CARFAX, push reminder delivery, automated phone/SMS booking and Google Play publication are not connected. Customer-reported records are not verified repair invoices. See the [automotive knowledge architecture](docs/automotive-knowledge.md) for the current graph, source attribution and optional aggregate sharing.
 
 [Product design](docs/superpowers/specs/2026-09-13-estimoto-plus-design.md) · [Implementation plan](docs/superpowers/plans/2026-09-13-estimoto-plus-foundation.md)

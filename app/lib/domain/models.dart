@@ -1,4 +1,14 @@
+import 'dart:typed_data';
+
 typedef Json = Map<String, dynamic>;
+
+class VehiclePhoto {
+  const VehiclePhoto(this.bytes, {required this.source});
+  final Uint8List bytes;
+  final String source;
+  bool get isUpload => source == 'upload';
+  String get label => isUpload ? 'Your photo' : 'Representative image';
+}
 
 String textOf(Json data, String key, [String fallback = '']) =>
     data[key]?.toString() ?? fallback;
@@ -39,6 +49,7 @@ class Vehicle {
   int get mileage => intOf(json, 'mileage');
   String get title => '$year $make $model';
   String get displayName => nickname.isEmpty ? '$make $model' : nickname;
+  String get imageVersion => textOf(json, 'image_version');
 }
 
 class ProviderProfile {

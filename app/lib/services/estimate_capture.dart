@@ -16,6 +16,7 @@ class PendingEstimateCapture {
     required this.customerId,
     required this.estimateId,
     required this.captureKey,
+    this.targetKind = 'estimate',
     this.localPath,
   });
 
@@ -24,16 +25,22 @@ class PendingEstimateCapture {
     customerId: data['customer_id'] as String,
     estimateId: data['estimate_id'] as String,
     captureKey: data['capture_key'] as String,
+    targetKind: switch (data['target_kind']) {
+      null || 'estimate' => 'estimate',
+      'vehicle' => 'vehicle',
+      _ => throw const FormatException('Unknown photo destination'),
+    },
     localPath: data['local_path'] as String?,
   );
 
-  final String id, customerId, estimateId, captureKey;
+  final String id, customerId, estimateId, captureKey, targetKind;
   final String? localPath;
   PendingEstimateCapture withFile(XFile file) => PendingEstimateCapture(
     id: id,
     customerId: customerId,
     estimateId: estimateId,
     captureKey: captureKey,
+    targetKind: targetKind,
     localPath: file.path,
   );
   Json toJson() => {
@@ -41,6 +48,7 @@ class PendingEstimateCapture {
     'customer_id': customerId,
     'estimate_id': estimateId,
     'capture_key': captureKey,
+    if (targetKind != 'estimate') 'target_kind': targetKind,
     if (localPath != null) 'local_path': localPath,
   };
 }
@@ -108,6 +116,7 @@ class NativeEstimatePhotoPicker implements EstimatePhotoPicker {
         maxWidth: 2560,
         maxHeight: 2560,
         imageQuality: 90,
+        requestFullMetadata: false,
       );
     } on PlatformException catch (error) {
       if (error.code.contains('access_denied') ||
@@ -190,6 +199,7 @@ class EstimateCaptureService {
     required ImageSource source,
     required bool Function() isCurrent,
     required UploadEstimatePhoto upload,
+    String targetKind = 'estimate',
   }) => _exclusive(() async {
     _requireCurrent(isCurrent);
     if (await store.read() != null) {
@@ -203,6 +213,7 @@ class EstimateCaptureService {
       customerId: customerId,
       estimateId: estimateId,
       captureKey: captureKey,
+      targetKind: targetKind,
     );
     await store.write(pending);
     _requireCurrent(isCurrent);
@@ -222,12 +233,14 @@ class EstimateCaptureService {
     required String customerId,
     required String estimateId,
     required bool Function() isCurrent,
+    String targetKind = 'estimate',
   }) => _exclusive(() async {
     _requireCurrent(isCurrent);
     final pending = await store.read();
     if (pending == null ||
         pending.customerId != customerId ||
-        pending.estimateId != estimateId) {
+        pending.estimateId != estimateId ||
+        pending.targetKind != targetKind) {
       return null;
     }
     _requireCurrent(isCurrent);
@@ -246,11 +259,15 @@ class EstimateCaptureService {
   Future<Json> retry({
     required PendingEstimateCapture pending,
     required bool Function() isCurrent,
+    String targetKind = 'estimate',
     required UploadEstimatePhoto upload,
   }) => _exclusive(() async {
     _requireCurrent(isCurrent);
     final saved = await store.read();
-    if (saved?.id != pending.id || saved?.localPath == null) {
+    if (saved?.id != pending.id ||
+        saved?.localPath == null ||
+        saved?.targetKind != targetKind ||
+        pending.targetKind != targetKind) {
       throw const PlusApiException(
         'This photo is no longer available. Retake this view.',
       );
@@ -293,11 +310,14 @@ class EstimateCaptureService {
     required String customerId,
     required String estimateId,
     required bool Function() isCurrent,
+    String targetKind = 'estimate',
   }) => _exclusive(() async {
     _requireCurrent(isCurrent);
     final saved = await store.read();
     if (saved == null) return;
-    if (saved.customerId == customerId && saved.estimateId == estimateId) {
+    if (saved.customerId == customerId &&
+        saved.estimateId == estimateId &&
+        saved.targetKind == targetKind) {
       throw const PlusApiException(
         'Finish or retake the saved photo for this estimate.',
       );

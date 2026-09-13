@@ -2,7 +2,8 @@ import 'package:flutter/material.dart';
 import '../state/plus_controller.dart';
 import '../theme.dart';
 import '../widgets/common.dart';
-import '../widgets/vehicle_illustration.dart';
+import '../widgets/vehicle_photo.dart';
+import 'vehicle_photo_screen.dart';
 import 'garage_forms.dart';
 import 'estimate_forms.dart';
 import 'my_shops_screen.dart';
@@ -97,7 +98,13 @@ class GarageScreen extends StatelessWidget {
                     fontSize: 16,
                   ),
                 ),
-                const VehicleIllustration(),
+                VehiclePhotoPanel(
+                  key: ValueKey('${data.profile.id}:${vehicle.id}'),
+                  controller: controller,
+                  vehicle: vehicle,
+                  onEdit: () =>
+                      openVehiclePhoto(context, controller, vehicle.id),
+                ),
                 Row(
                   children: [
                     const Icon(

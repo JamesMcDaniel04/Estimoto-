@@ -16,6 +16,14 @@ abstract class PlusRepository {
   Future<Json> saveProfile(Json body);
   Future<Json> saveVehicle(Json body, {String? id});
   Future<void> deleteVehicle(String id);
+  Future<VehiclePhoto?> getVehicleImage(String id) async => null;
+  Future<Json> uploadVehicleImage(
+    String id,
+    Uint8List bytes,
+    String filename,
+  ) => throw const PlusApiException('Vehicle photos are not available yet.');
+  Future<void> deleteVehicleImage(String id) =>
+      throw const PlusApiException('Vehicle photos are not available yet.');
   Future<Json> createEstimate(Json body);
   Future<Json> uploadPhoto(
     String estimateId,

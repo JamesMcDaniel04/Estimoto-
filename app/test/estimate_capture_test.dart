@@ -38,6 +38,88 @@ const _pending = PendingEstimateCapture(
 );
 void main() {
   test(
+    'vehicle recovery never consumes or retries estimate evidence',
+    () async {
+      final store = MemoryEstimateCaptureStore()..value = _pending;
+      final picker = _Picker()..lost = XFile('/private/recovered.jpg');
+      final service = EstimateCaptureService(store: store, picker: picker);
+      expect(
+        await service.recover(
+          customerId: 'customer-1',
+          estimateId: 'estimate-1',
+          targetKind: 'vehicle',
+          isCurrent: () => true,
+        ),
+        isNull,
+      );
+      expect(picker.recoveries, 0);
+      final saved = _pending.withFile(XFile('/private/recovered.jpg'));
+      store.value = saved;
+      await expectLater(
+        service.retry(
+          pending: saved,
+          targetKind: 'vehicle',
+          isCurrent: () => true,
+          upload: (_, _, _, _) async => throw StateError('must not upload'),
+        ),
+        throwsA(isA<PlusApiException>()),
+      );
+      expect(store.value, same(saved));
+    },
+  );
+  test(
+    'vehicle photo scope survives persistence and lost Android recovery',
+    () async {
+      final original = PendingEstimateCapture(
+        id: 'v-photo',
+        customerId: 'c',
+        estimateId: 'v',
+        captureKey: 'vehicle_photo',
+        targetKind: 'vehicle',
+      );
+      final saved = PendingEstimateCapture.fromJson(original.toJson());
+      expect(saved.targetKind, 'vehicle');
+      expect(
+        PendingEstimateCapture.fromJson(_pending.toJson()).targetKind,
+        'estimate',
+      );
+      final store = MemoryEstimateCaptureStore()..value = saved;
+      final picker = _Picker()..lost = XFile('/private/vehicle.jpg');
+      final service = EstimateCaptureService(
+        store: store,
+        picker: picker,
+        readBytes: (_) async => Uint8List.fromList([1]),
+      );
+      expect(
+        await service.recover(
+          customerId: 'c',
+          estimateId: 'v',
+          isCurrent: () => true,
+        ),
+        isNull,
+      );
+      expect(picker.recoveries, 0);
+      final recovered = await service.recover(
+        customerId: 'c',
+        estimateId: 'v',
+        targetKind: 'vehicle',
+        isCurrent: () => true,
+      );
+      expect(recovered!.targetKind, 'vehicle');
+      await service.retry(
+        pending: recovered,
+        targetKind: 'vehicle',
+        isCurrent: () => true,
+        upload: (id, _, _, key) async {
+          expect(id, 'v');
+          expect(key, 'vehicle_photo');
+          return {'source': 'upload'};
+        },
+      );
+      expect(store.value, isNull);
+    },
+  );
+  test(
     'ownership and exact view are persisted before opening the camera',
     () async {
       final store = MemoryEstimateCaptureStore();

@@ -1,56 +1,46 @@
-# Foundation release status — 2026-09-13
+# Live customer preview — September 13, 2026
 
-This is the first runnable Estimoto + app/API milestone. Source is independent of the Estimoto staff app. It is not a production customer launch.
+Estimoto + is deployed at https://estimoto-plus-api.fly.dev with dedicated customer authentication/storage and a production bridge to Estimoto. It is a live customer preview; the remaining checks below prevent a blanket production-readiness claim.
 
-Subsequent mobile beta work added the requested E-plus branding, registered the separate Apple bundle ID, built signed iOS/Android artifacts and published a direct Android demo prerelease. See [current mobile delivery status](mobile-release.md); TestFlight app-record creation/upload still awaits website sign-in.
+## Delivered surfaces
 
-## Source delivery and review
-
-The reviewed source is published to [JamesMcDaniel04/Estimoto-](https://github.com/JamesMcDaniel04/Estimoto-) on `main`. The local demo is served at `http://127.0.0.1:4318/`; it runs only while the preview server is active.
-
-The whole-branch review and bounded follow-ups closed all blocking findings for this milestone. Fixes cover customer/session isolation, request replay and cancellation races, immutable delivery payloads, upload limits, migration compatibility, provider rejection recovery, mobile matching and urgent/common-care guidance. Final approval reviewed backend `9d08a44` and retained the Flutter review at `ed6ae73`. This source-publication approval does not imply production or store readiness.
-
-## Verification
-
-The final Flutter source was verified at `ed6ae73`; the final backend rejection/replay fix is `9d08a44`. Documentation-only delivery updates follow these commits. Migration head: `79ae381cd042`.
-
-| Evidence | Result |
+| Surface | Verified state |
 | --- | --- |
-| Flutter static analysis | Passed, no issues |
-| Flutter tests | 19 passed: customer journeys, transport, consent/cancel, uncertain-send and definitive-rejection recovery, account changes, refresh ordering and assistant guidance |
-| API tests | 64 passed: customer isolation, auth, private uploads, bridge state transitions/replay, races/leases, terminal rejection outcomes, cancellations, migrations, mobile matching and urgent/common-care assistant prompts |
-| Fresh migration + schema comparison | Passed on SQLite, including a populated legacy cancellation upgrade |
-| Python/Dart socket smoke | Passed against a migrated API and fictional local auth/provider receiver; private photos, two-customer isolation, definitive provider rejection, durable requests and restart persistence |
-| Web release build | Passed; rendered at 390×844 and 1280×900; navigation, matching, consent review and sample request status inspected |
-| iOS simulator build | Passed with `io.estimoto.plus`; installed, launched and screenshot inspected |
-| Native bundle identity test | `RunnerTests.testCustomerBundleIdentity` passed through xcodebuild on iOS 26.5 simulator |
-| Android debug APK | Passed on final app source; no Android device install claimed |
-| GitHub Actions | Blocked before any job steps ran: GitHub reports the account is locked due to a billing issue. [Observed run at delivery commit 8a3dfaf](https://github.com/JamesMcDaniel04/Estimoto-/actions/runs/34777973917). Local results above are separate evidence; no passing CI run is claimed. |
-| Live Supabase, Estimoto receiver and customer sends | Not performed |
-| Store distribution / physical devices | Not performed |
+| Customer web/API | Live source `a5403daf8f71f5820671388f049588a84b840196`; `/ready` 200, PostgreSQL schema `c54d09a2f173` |
+| Original Estimoto API | Live source `906ccdf11f08f362dad41b89a854a579067bae51`; `/ready` 200; migration `0212_estimoto_plus_bridge` |
+| Staff dashboard | https://www.estimoto.io; asset source `906ccdf11f08f362dad41b89a854a579067bae51`; Plus inbox, opt-in listing and owner-only contributed insights |
+| Android customer app | Signed 0.1.0 (4), rounded/adaptive icon; public APK and AAB hashes verified; installed and launched in Android emulator |
+| iOS customer app | Separate App Store Connect app 6811678079; 0.1.0 (3) processed VALID, notes and both tester groups attached; first external review for build 2 pending |
+| Original Estimoto mobile | Estibot preset UI update in 1.1.12 (230), TestFlight VALID and external beta approved; Android served hashes verified |
 
-The browser preview explicitly labels fictional sample records. The API smoke uses actual sockets but only a local identity fixture and fictional provider receiver; it is not evidence of production delivery. SQLite concurrency checks do not establish PostgreSQL production behavior. The native identity test verifies the app identity, not camera, authentication or secure-storage behavior.
+[Download Android](https://github.com/JamesMcDaniel04/Estimoto-/releases/tag/v0.1.0-beta.4) · [Mobile delivery details](mobile-release.md)
 
-Current toolchain warnings: the pinned secure-storage plugin uses CocoaPods and does not support WebAssembly; the JavaScript web build and iOS build succeed. Xcode emits dependency deployment-target/stale-product warnings during the native test. The API test dependency emits a Starlette/AnyIO deprecation warning. These are recorded rather than represented as warning-free native/backend runs.
+## Implemented customer workflows
 
-## Implemented behavior
+- Confirmed-email sign-in with native encrypted session storage and memory-only web authentication. Existing email codes can be entered on another device without requesting another email.
+- Saved contact, vehicle and optional insurance details; date/mileage reminders.
+- PDR/Collision guided required-photo capture, private byte readback, interrupted-picker recovery and durable handoff to a selected shop. Existing billable-link and review/evidence requirements remain authoritative; customer screens do not invent estimate prices.
+- Opt-in shop/technician directory, explicit customer requests, durable delivery/status sync, cancellation, and staff acceptance/scheduling/completion.
+- Private My shops contacts; immutable scheduling drafts; exact-message/contact/time review; authorization before email dispatch; shop acceptance of an offered time before appointment confirmation. Phone-only entries provide a call action. Provider acceptance is distinct from inbox delivery.
+- Customer-reported service/parts/shop history, a typed private GraphRAG projection with source references, and bounded Estibot retrieval/advice. Customer data is not turned into verified repair outcomes by inference.
+- Optional contributed insights default off and can be revoked. Only coarse categories with at least ten consenting contributors are exposed; counts round down to multiples of five. Raw records, contacts and free-text supplier/shop names are not exposed to other shops.
 
-Saved profile/vehicle/insurance fields, PDR/Collision drafts and private photo uploads, reminders, provider filtering and map links for published addresses, authenticated estimate/repair snapshots and an assistant-guided service-request workflow. The assistant currently uses deterministic guidance and structured matching, with clearly labeled YouTube search links.
+See [automotive knowledge architecture](automotive-knowledge.md) for exact graph and sharing boundaries.
 
-The app handles offline auth stream errors, replaces data on account changes, rejects stale refresh completions and keeps an interrupted request's approved body/key in account-scoped encrypted storage. Repairs provides recovery for that unresolved send; restoring it does not automatically send. A definitive provider rejection clears that pending operation so the customer can choose another provider. The server persists the terminal rejection and serializes outcome decisions, so delayed retries cannot create an operation previously reported as rejected. An ambiguous response or idempotency conflict retains the original key. The server snapshots approved contact/vehicle/ZIP data, retries under a database lease and only marks delivery after a durable receipt. Cancellation events can safely precede a delayed creation when the receiver honors the documented tombstone contract.
+## Verification evidence
 
-API and demo assistant paths interpret mobile-service requests, provide deterministic common-care guidance and retain professional safety guidance while matching or requesting missing details for recognized urgent concerns. YouTube links search by vehicle and maintenance topic; they are not individual vetted videos.
+The final backend suite passed **135 tests with zero skipped**, including actual original-source bridge contracts and PostgreSQL first-sign-in concurrency. The final Flutter sign-in update passed **60 tests** and clean analysis. The icon update additionally passed native AAPT compile/link/resource checks; no Dart behavior changed in that update.
 
-## Remaining launch work
+Real local sockets connected the customer API to the actual Estimoto receiver and PostgreSQL, exercising request replay, cancellation, staff status return and required photo packages. The reviewed amount fixture in that scenario was synthetic, not a generated production estimate. See [socket proof](launch/2026-09-13-socket-proof.md).
 
-1. Provision a private PostgreSQL database and persistent photo storage, deploy the customer service, configure its Supabase Auth project/redirects and prove email sign-in, deep links, logout/session expiry and encrypted storage on physical devices.
-2. Implement and deploy the Estimoto-side receiver and opt-in provider publishing. Explicitly link consumer records to estimate/repair histories, drive authoritative updates, and verify delivery/cancellation under PostgreSQL and real provider workflows.
-3. Finish guided native capture, Android interrupted-picker recovery, thumbnail/readback UX and PDR/Collision estimator submission. Draft creation currently does not submit to the production estimator or generate a price.
-4. Add push notifications and date/mileage reminder delivery. Current reminders persist and display in-app; they do not yet send alerts or read a vehicle's odometer automatically.
-5. Add model-backed Estibot and retrieved/curated video results, with evaluations for common repair questions and technician matching. Current search links are not verified individual videos.
-6. Confirm CARFAX partner access, data rights, coverage and mapping before implementing service-history ingestion and automatic maintenance alerts. No CARFAX integration is claimed.
-7. Finish store assets, accessibility/device QA, privacy disclosures and store distribution. The E-plus icons and initial release signing are now implemented; subsequent beta delivery is tracked in the mobile release document above.
+Production synthetic checks established authenticated customer isolation, missing/invalid token denial, private photo exact-byte readback, cross-account photo denial, anon Data API denial and RLS/restricted-role configuration. Live browser checks at 390×844 signed in through the email-code form, created a private shop and unsent scheduling draft, recorded service/parts history, retrieved the exact recorded parts source through Estibot, and found Demolition Dent in ZIP 80221. These did not contact a shop or create a production CRM job.
 
-## Reproduce
+The user-requested Android invite was accepted by Resend and its provider event became `delivered`. This proves that invite's delivery, not delivery of every future authentication or scheduling email.
 
-See [README](../README.md), [app instructions](../app/README.md), [backend instructions](../backend/README.md), and `scripts/smoke_api.py --flutter-client`. CI runs analysis, tests, the web build and isolated socket checks; CI runner execution is separate from local checks.
+## Participants and remaining launch checks
+
+Demolition Dent is published and accepting PDR/collision in its saved ZIP **80221**, with its existing business address and phone. Production bridge sync and actual customer matching both passed. PDR LINX is authorized as the second participant, but its account has no address/service ZIP and its phone did not match the official public contact page; its location routing awaits the user's ZIP information. No unrelated shops or technicians were opted in.
+
+Remaining: physical iOS/Android sign-in and camera/recovery QA; first real customer-to-shop handoff and shop acceptance; actual authentication-email inbox verification; Apple external beta approval. Google Play listing/publication is not performed. CARFAX, push reminder delivery, automated phone/SMS booking and corpus-wide model training are not connected. YouTube links are labeled searches, not individually vetted videos.
+
+The target customer sharing time is September 14, 2026, at 2 p.m. America/Denver. Apple review timing is external to this deployment.

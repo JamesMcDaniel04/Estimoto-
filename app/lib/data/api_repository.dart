@@ -163,6 +163,115 @@ class ApiPlusRepository extends PlusRepository {
   }
 
   @override
+  Future<VehiclePhoto?> getVehicleImage(String id) async {
+    final request = http.Request(
+      'GET',
+      baseUri.resolve('/v1/vehicles/${Uri.encodeComponent(id)}/image'),
+    );
+    request.headers.addAll(await _headers());
+    request.headers['Accept'] = 'image/webp';
+    request.followRedirects = false;
+    try {
+      final response = await _client
+          .send(request)
+          .timeout(const Duration(seconds: 25));
+      if (response.statusCode == 204) {
+        await response.stream.listen(null).cancel();
+        return null;
+      }
+      if (response.statusCode != 200) {
+        final body = await http.ByteStream(
+          response.stream.take(1),
+        ).toBytes().timeout(const Duration(seconds: 5));
+        _decode(http.Response.bytes(body, response.statusCode));
+      }
+      final source = response.headers['x-vehicle-image-source'];
+      if (response.headers['content-type']?.split(';').first.trim() !=
+              'image/webp' ||
+          !const ['upload', 'carsxe'].contains(source)) {
+        await response.stream.listen(null).cancel();
+        throw const PlusApiException(
+          'This vehicle photo could not be displayed.',
+        );
+      }
+      final bytes = BytesBuilder(copy: false);
+      await for (final chunk in response.stream.timeout(
+        const Duration(seconds: 20),
+      )) {
+        if (bytes.length + chunk.length > 10 * 1024 * 1024) {
+          throw const PlusApiException(
+            'This vehicle photo is too large to display.',
+          );
+        }
+        bytes.add(chunk);
+      }
+      return VehiclePhoto(bytes.takeBytes(), source: source!);
+    } on TimeoutException {
+      throw const PlusApiException(
+        'Vehicle photo loading timed out. Try again.',
+      );
+    } on http.ClientException {
+      throw const PlusApiException(
+        'Could not load the vehicle photo. Check your connection.',
+      );
+    }
+  }
+
+  @override
+  Future<Json> uploadVehicleImage(
+    String id,
+    Uint8List bytes,
+    String filename,
+  ) async {
+    final subtype = switch (filename.split('.').last.toLowerCase()) {
+      'jpg' || 'jpeg' => 'jpeg',
+      'png' => 'png',
+      'webp' => 'webp',
+      _ => null,
+    };
+    if (subtype == null) {
+      throw const PlusApiException('Choose a JPEG, PNG or WebP photo.');
+    }
+    if (bytes.isEmpty || bytes.length > 10 * 1024 * 1024) {
+      throw const PlusApiException('Choose a photo smaller than 10 MB.');
+    }
+    final request = http.MultipartRequest(
+      'POST',
+      baseUri.resolve('/v1/vehicles/${Uri.encodeComponent(id)}/image'),
+    );
+    request.followRedirects = false;
+    request.headers.addAll(await _headers());
+    request.files.add(
+      http.MultipartFile.fromBytes(
+        'file',
+        bytes,
+        filename: filename,
+        contentType: MediaType('image', subtype),
+      ),
+    );
+    try {
+      return _decode(
+        await http.Response.fromStream(
+          await _client.send(request).timeout(const Duration(seconds: 45)),
+        ).timeout(const Duration(seconds: 45)),
+      );
+    } on TimeoutException {
+      throw const PlusApiException(
+        'Photo upload timed out. Refresh to check your saved photo before retrying.',
+      );
+    } on http.ClientException {
+      throw const PlusApiException(
+        'Photo upload failed. Check your connection and try again.',
+      );
+    }
+  }
+
+  @override
+  Future<void> deleteVehicleImage(String id) async {
+    await _send('DELETE', '/v1/vehicles/${Uri.encodeComponent(id)}/image');
+  }
+
+  @override
   Future<Json> createEstimate(Json body) =>
       _send('POST', '/v1/estimates', body: body);
   @override

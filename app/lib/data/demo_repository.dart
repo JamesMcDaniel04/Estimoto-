@@ -1,6 +1,6 @@
 import 'dart:convert';
 import 'dart:math';
-import 'dart:typed_data';
+import 'package:flutter/services.dart';
 import '../domain/models.dart';
 import 'demo_seed.dart';
 import 'repository.dart';
@@ -12,6 +12,47 @@ class DemoPlusRepository extends PlusRepository {
   final _shops = <Json>[];
   final _outreach = <Json>[];
   final _history = <Json>[];
+  final _vehicleImages = <String, VehiclePhoto>{};
+
+  @override
+  Future<VehiclePhoto?> getVehicleImage(String id) async {
+    final vehicle = Vehicle.fromJson(_find('vehicles', id));
+    final own = _vehicleImages[id];
+    if (own != null) return own;
+    final asset = switch ('${vehicle.year} ${vehicle.make} ${vehicle.model}') {
+      '2021 Toyota Tacoma' => '2021-toyota-tacoma',
+      '2022 Audi Q5' => '2022-audi-q5',
+      _ => null,
+    };
+    if (asset == null) return null;
+    final data = await rootBundle.load('assets/vehicles/$asset.webp');
+    return VehiclePhoto(
+      data.buffer.asUint8List(data.offsetInBytes, data.lengthInBytes),
+      source: 'carsxe',
+    );
+  }
+
+  @override
+  Future<Json> uploadVehicleImage(
+    String id,
+    Uint8List bytes,
+    String filename,
+  ) async {
+    final vehicle = _find('vehicles', id);
+    _vehicleImages[id] = VehiclePhoto(
+      Uint8List.fromList(bytes),
+      source: 'upload',
+    );
+    vehicle['image_version'] = _id();
+    return {'source': 'upload', 'image_version': vehicle['image_version']};
+  }
+
+  @override
+  Future<void> deleteVehicleImage(String id) async {
+    _find('vehicles', id)['image_version'] = null;
+    _vehicleImages.remove(id);
+  }
+
   final _workspaceKeys = <String, (String, Json)>{};
   bool _shareInsights = false;
   Json _copy(Json value) => jsonDecode(jsonEncode(value)) as Json;

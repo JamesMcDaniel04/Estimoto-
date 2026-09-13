@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import '../screens/estimate_forms.dart';
+import '../screens/vehicle_photo_screen.dart';
 import '../services/estimate_capture.dart';
 import '../state/plus_controller.dart';
 
@@ -43,10 +44,15 @@ class _PendingCaptureNoticeState extends State<PendingCaptureNotice> {
             if (!widget.controller.isCurrentCustomer(saved.customerId)) return;
             await Navigator.of(context).push(
               MaterialPageRoute<void>(
-                builder: (_) => EstimateDetailScreen(
-                  controller: widget.controller,
-                  estimateId: saved.estimateId,
-                ),
+                builder: (_) => saved.targetKind == 'vehicle'
+                    ? VehiclePhotoScreen(
+                        controller: widget.controller,
+                        vehicleId: saved.estimateId,
+                      )
+                    : EstimateDetailScreen(
+                        controller: widget.controller,
+                        estimateId: saved.estimateId,
+                      ),
               ),
             );
             if (mounted) await _load();

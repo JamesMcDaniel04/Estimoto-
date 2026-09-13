@@ -1,26 +1,34 @@
-# Mobile beta release
+# Mobile customer preview
 
-Estimoto + has the separate iOS/Android identity `io.estimoto.plus`, display name `Estimoto +`, and a customer-specific E-plus icon. Build 0.1.0 (1) is an explicitly labeled demo beta; it is not a live customer rollout.
+Estimoto + uses the separate iOS/Android identity `io.estimoto.plus`, display name `Estimoto +`, and E-plus branding. Live builds connect to https://estimoto-plus-api.fly.dev. Explicit demo mode remains available and does not send requests.
 
-## Current delivery — 2026-09-13
+## Android 0.1.0 (4)
 
-- Source/build commit: `558c35606bc29dac507e454fa264aa47a286eeef`. Flutter analysis and all 19 tests passed. Release IPA, release APK, signed AAB, web and iOS simulator builds passed. The branded simulator app was installed, launched and visually inspected.
-- Android: [direct APK prerelease](https://github.com/JamesMcDaniel04/Estimoto-/releases/tag/v0.1.0-beta.1) published. The APK and AAB signatures match the existing owner-controlled Estimoto release certificate. Both public downloads were downloaded anonymously and their SHA-256 hashes matched the local artifacts. No Android device was connected, so physical installation is not claimed. Google Play listing/internal-track publication is not performed.
-- iOS: bundle ID registered and distribution profile `82QT2M2C8V` active. The exported IPA passed signature verification and contains bundle `io.estimoto.plus`, display name `Estimoto +`, version `0.1.0`, build `1`. The profile disallows release debugging.
-- TestFlight: app record creation and upload are pending App Store Connect website sign-in. Both available browser sessions were signed out. Apple requires [new app records to be created on the website](https://developer.apple.com/documentation/appstoreconnectapi/apps); the existing API key is available for subsequent uploads and tester setup. No upload, processing or tester availability is claimed yet.
+[Download APK](https://github.com/JamesMcDaniel04/Estimoto-/releases/download/v0.1.0-beta.4/estimoto-plus-0.1.0-4.apk) · [Release assets](https://github.com/JamesMcDaniel04/Estimoto-/releases/tag/v0.1.0-beta.4)
 
-Artifact identities, checksums and delivery status are recorded in [mobile-beta-1.json](releases/2026-09-13-mobile-beta-1.json). The local IPA is `app/build/ios/ipa/Estimoto +.ipa`; do not rebuild or change its build number merely because website sign-in is pending.
+Source `24703ecf783029e186a782651698d54eabcf2cb3`. Rounded vector fallback, Android adaptive icon resources and `roundIcon` preserve the E+ geometry. The master PNG and iOS icon assets are unchanged; iOS applies its own icon mask.
 
-## Build
+- APK SHA-256: `97dc353597893ef495715d2c5288f1606a9ce7f41e007d6e1f086bd9da3fcb52`
+- AAB SHA-256: `a9b79a377bf7a12c00db857456e6b5c2d9912de575f4cf08b8d4b42f16860636`
+- Signing certificate SHA-256: `e6d106fccc6c0e77e04a46c64f8edffdafb11b502d4857e51606c725086581dd`
+- Min SDK 24; target SDK 36; package/version verified from the built APK.
+- Public APK/AAB bytes were downloaded and matched the local SHA-256 values. APK installed and launched in Android emulator; launcher rounding was visually verified.
+- The user-requested invite email containing this APK link was delivered through Resend. Google Play publication and physical-device installation are separate checks.
 
-Use `sh scripts/build_beta.sh` on a clean committed checkout. This creates the App Store Connect IPA, release APK, Android App Bundle and web preview with `PLUS_DEMO=true`. Read the [beta notes](releases/0.1.0-1-beta-notes.md) before distribution.
+## iOS 0.1.0 (3)
 
-iOS uses Apple team `J9HNN7TB36`, bundle registration `SFACWALLYZ` and the `Estimoto Plus App Store` provisioning profile. Its App Store Connect app record must be created on Apple's website; the bundle registration and signing profile are separate from that record. The release export preserves the build number. Check the IPA's embedded bundle ID, version, build and signature before upload, then confirm processing and tester attachment separately.
+[App Store Connect](https://appstoreconnect.apple.com/apps/6811678079/testflight) · [Customer Preview public link](https://testflight.apple.com/join/RZCXF6vx)
 
-Android uses an owner-controlled release keystore configured locally in ignored `app/android/key.properties`. It can use the existing Estimoto release signing identity while keeping its own package name and update history. Release builds refuse to fall back to debug signing. Keep the keystore and its backup outside this public repository.
+The public link remains gated by Apple's external beta review. An upload or a group attachment does not establish that an external tester can install it.
 
-The Android APK can be distributed as a prerelease asset in this repository. The AAB is for a separately configured Google Play listing; building an AAB does not create or publish that listing. Neither artifact replaces the staff app's downloads.
+Source `a5403daf8f71f5820671388f049588a84b840196`. IPA SHA-256 `6ed5e737e2862d142a212026b9872171cae6d3d33d17fcd2c409b423015fa450`. Embedded bundle, version, build and encryption declaration verified. App Store Connect build `96257072-1dd2-4b84-a511-442736aacc77` processed **VALID**, What to Test set, and Internal Testers/Customer Preview attached. James's account-holder identity is assigned to Internal Testers.
 
-## Brand assets
+Build 2 (`71673590-792c-4fcd-828b-c30cc92d2255`) is the first submitted external beta review. Submitting build 3 returned `ANOTHER_BUILD_IN_REVIEW`; keep the first review queued, then submit build 3 once it completes. The newest source change in build 3 adds existing-code entry; normal email sign-in already exists in build 2. Internal build state is `IN_BETA_TESTING`; external availability and physical-device installation must be verified separately.
 
-The source image is [estimoto-plus-icon.png](../app/assets/brand/estimoto-plus-icon.png). The built-in image edit tool added a white plus inside Estimoto's teal dot. [Asset notes](../app/assets/brand/README.md) preserve the prompt, and `scripts/sync_app_icons.py` packages the artwork into native/web sizes using macOS `sips`.
+Apple team `J9HNN7TB36`; bundle registration `SFACWALLYZ`; App Store distribution profile `82QT2M2C8V`. Signed artifacts and provisioning material are kept outside version control. Building an AAB does not publish a Play listing, and building an IPA does not distribute it to testers.
+
+## Reproduce
+
+`sh scripts/build_live.sh all` requires a clean checkout and ignored `app/config/local.json` containing only the four supported public live fields. The script refuses demo mode or server credentials. For an Android-only icon change, build APK/AAB with the same live config and record the exact source SHA; leave already uploaded iOS artifacts intact.
+
+The old `build_beta.sh` command intentionally produces a labeled demo; it is not the live release command. See [current release status](release-status.md) and the original beta-1 JSON under `releases/` for historical artifacts.
