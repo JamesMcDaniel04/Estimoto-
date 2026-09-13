@@ -5,6 +5,8 @@ import '../widgets/common.dart';
 import '../widgets/vehicle_illustration.dart';
 import 'garage_forms.dart';
 import 'estimate_forms.dart';
+import 'my_shops_screen.dart';
+import 'history_screen.dart';
 
 class GarageScreen extends StatelessWidget {
   const GarageScreen({super.key, required this.controller});
@@ -276,25 +278,35 @@ class GarageScreen extends StatelessWidget {
               ),
             ),
           ),
-        const SizedBox(height: 22),
-        Row(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            const Icon(
-              Icons.history_outlined,
-              size: 20,
-              color: PlusColors.muted,
-            ),
-            const SizedBox(width: 10),
-            Expanded(
-              child: Text(
-                data.capabilities.carfax
-                    ? 'Your connected vehicle history is available.'
-                    : 'Automatic service history is coming. For now, keep your own reminders here.',
-                style: Theme.of(context).textTheme.bodySmall,
+        const SectionHeading('Make it yours'),
+        Card(
+          child: Column(
+            children: [
+              ListTile(
+                leading: const Icon(
+                  Icons.storefront_outlined,
+                  color: PlusColors.blue,
+                ),
+                title: const Text('My shops'),
+                subtitle: const Text('Saved contacts and scheduling requests'),
+                trailing: const Icon(Icons.chevron_right),
+                onTap: () => openMyShops(context, controller),
               ),
-            ),
-          ],
+              const Divider(height: 1),
+              ListTile(
+                leading: const Icon(
+                  Icons.history_outlined,
+                  color: PlusColors.blue,
+                ),
+                title: const Text('Service history'),
+                subtitle: const Text(
+                  'Service, parts and the details you remember',
+                ),
+                trailing: const Icon(Icons.chevron_right),
+                onTap: () => openVehicleHistory(context, controller),
+              ),
+            ],
+          ),
         ),
       ],
     );

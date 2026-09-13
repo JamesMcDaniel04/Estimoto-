@@ -9,6 +9,146 @@ import 'repository.dart';
 class DemoPlusRepository extends PlusRepository {
   DemoPlusRepository() : _state = jsonDecode(jsonEncode(demoSeed())) as Json;
   final Json _state;
+  final _shops = <Json>[];
+  final _outreach = <Json>[];
+  final _history = <Json>[];
+  final _workspaceKeys = <String, (String, Json)>{};
+  bool _shareInsights = false;
+  Json _copy(Json value) => jsonDecode(jsonEncode(value)) as Json;
+  Json _workspaceFind(List<Json> rows, String id) =>
+      rows.where((r) => r['id'] == id).firstOrNull ??
+      (throw const PlusApiException('This item is no longer available.', 404));
+  Json _once(String key, Json body, Json Function() create) {
+    final previous = _workspaceKeys[key];
+    if (previous != null) {
+      if (previous.$1 != jsonEncode(body)) {
+        throw const PlusApiException('The saved request details changed.', 409);
+      }
+      return _copy(previous.$2);
+    }
+    final result = create();
+    _workspaceKeys[key] = (jsonEncode(body), result);
+    return _copy(result);
+  }
+
+  @override
+  Future<List<Json>> listMyShops() async => _shops.map(_copy).toList();
+  @override
+  Future<Json> saveMyShop(Json body, {String? id}) async {
+    if (textOf(body, 'name').trim().isEmpty ||
+        (textOf(body, 'email').trim().isEmpty &&
+            textOf(body, 'phone').trim().isEmpty)) {
+      throw const PlusApiException(
+        'Add a shop name and an email or phone.',
+        422,
+      );
+    }
+    if (body['vehicle_id'] != null) {
+      _find('vehicles', body['vehicle_id'] as String);
+    }
+    final record = id == null
+        ? <String, dynamic>{'id': _id()}
+        : _workspaceFind(_shops, id);
+    record.addAll(_copy(body));
+    if (id == null) _shops.add(record);
+    return _copy(record);
+  }
+
+  @override
+  Future<void> deleteMyShop(String id) async {
+    _workspaceFind(_shops, id);
+    _shops.removeWhere((r) => r['id'] == id);
+  }
+
+  @override
+  Future<List<Json>> listShopOutreach() async =>
+      _outreach.reversed.map(_copy).toList();
+  @override
+  Future<Json> getShopOutreach(String id) async =>
+      _copy(_workspaceFind(_outreach, id));
+  @override
+  Future<Json> createShopOutreach(
+    Json body,
+    String idempotencyKey,
+  ) async => _once('draft:$idempotencyKey', body, () {
+    final shop = _workspaceFind(_shops, body['shop_id'] as String);
+    final vehicleId = body['vehicle_id'] ?? shop['vehicle_id'];
+    final vehicle = vehicleId == null
+        ? ''
+        : Vehicle.fromJson(_find('vehicles', vehicleId as String)).title;
+    final profile = _state['profile'] as Json;
+    final record = <String, dynamic>{
+      'id': _id(),
+      'shop_id': shop['id'],
+      'shop_name': shop['name'],
+      'vehicle_id': vehicleId,
+      'recipient_email': shop['email'] ?? '',
+      'recipient_phone': shop['phone'] ?? '',
+      'subject': 'Service availability request from Estimoto +',
+      'message':
+          'Service request: ${body['service_summary']}\nVehicle: $vehicle\n${body['customer_message'] ?? ''}',
+      'shared_contact': {
+        'name': profile['name'],
+        'email': profile['email'],
+        'phone': profile['phone'],
+      },
+      'vehicle_summary': vehicle,
+      'proposed_slots': body['proposed_slots'],
+      'review_hash': List.filled(64, 'd').join(),
+      'status': 'draft',
+      'delivery_status': 'draft',
+    };
+    _outreach.add(record);
+    return record;
+  });
+  @override
+  Future<Json> authorizeShopOutreach(
+    String id,
+    Json body,
+    String idempotencyKey,
+  ) async => _once('authorize:$idempotencyKey', body, () {
+    final row = _workspaceFind(_outreach, id);
+    if (body['share_contact'] != true ||
+        body['review_hash'] != row['review_hash']) {
+      throw const PlusApiException(
+        'Review and authorize these details first.',
+        422,
+      );
+    }
+    row['status'] = 'draft';
+    row['delivery_status'] = 'local_preview';
+    return row;
+  });
+  @override
+  Future<Json> getKnowledge() async => {
+    'records': _history.reversed.map(_copy).toList(),
+    'preferences': {'share_aggregate_insights': _shareInsights},
+  };
+  @override
+  Future<Json> addKnowledgeRecord(Json body, String idempotencyKey) async =>
+      _once('history:$idempotencyKey', body, () {
+        _find('vehicles', body['vehicle_id'] as String);
+        final record = <String, dynamic>{
+          ..._copy(body),
+          'id': _id(),
+          'source': 'customer_reported',
+          'created_at': DateTime.now().toIso8601String(),
+        };
+        _history.add(record);
+        return record;
+      });
+  @override
+  Future<void> deleteKnowledgeRecord(String id) async {
+    _workspaceFind(_history, id);
+    _history.removeWhere((r) => r['id'] == id);
+  }
+
+  @override
+  Future<Json> saveKnowledgePreferences(Json body) async {
+    _shareInsights = body['share_aggregate_insights'] == true;
+    return {'share_aggregate_insights': _shareInsights};
+  }
+
   final Map<String, (String, String)> _requestsByKey = {};
   final _photoBytes = <String, Uint8List>{};
   final Random _random = Random.secure();
@@ -221,6 +361,25 @@ class DemoPlusRepository extends PlusRepository {
             'That may need urgent professional attention. If you are driving, stop somewhere safe and arrange professional help. I can help you find a repair shop; tell me your ZIP code and what happened.',
         'intent': 'clarify',
         'specialty': 'mechanical',
+      });
+    }
+    if (RegExp(r'schedul|appointment|book').hasMatch(message) &&
+        RegExp(r'my shop|saved shop').hasMatch(message)) {
+      return AssistantAnswer.fromJson({
+        'reply':
+            'Choose your saved shop and preferred times, then review the exact request before authorizing it. This demo will not contact a shop.',
+        'intent': 'shop_outreach',
+      });
+    }
+    if (RegExp(r'history|last service|parts source').hasMatch(message)) {
+      final records = _history
+          .where((r) => vehicleId == null || r['vehicle_id'] == vehicleId)
+          .toList();
+      return AssistantAnswer.fromJson({
+        'reply': records.isEmpty
+            ? 'You have no service history saved for this car yet. Open Service history to add work you have already had done.'
+            : 'Your personal history includes ${records.length} service records. Open Service history to review the dates, shops and parts details you added.',
+        'intent': 'history',
       });
     }
     final requested = body['specialty'] as String?;

@@ -30,5 +30,20 @@ abstract class PlusRepository {
   Future<Json> addReminder(Json body);
   Future<Json> completeReminder(String id);
   Future<AssistantAnswer> askAssistant(Json body);
+  Future<List<Json>> listMyShops();
+  Future<Json> saveMyShop(Json body, {String? id});
+  Future<void> deleteMyShop(String id);
+  Future<List<Json>> listShopOutreach();
+  Future<Json> getShopOutreach(String id);
+  Future<Json> createShopOutreach(Json body, String idempotencyKey);
+  Future<Json> authorizeShopOutreach(
+    String id,
+    Json body,
+    String idempotencyKey,
+  );
+  Future<Json> getKnowledge();
+  Future<Json> addKnowledgeRecord(Json body, String idempotencyKey);
+  Future<void> deleteKnowledgeRecord(String id);
+  Future<Json> saveKnowledgePreferences(Json body);
   void close() {}
 }

@@ -5,6 +5,8 @@ import '../theme.dart';
 import '../widgets/common.dart';
 import 'find_help_screen.dart';
 import 'request_sheet.dart';
+import 'my_shops_screen.dart';
+import 'history_screen.dart';
 
 class EstibotScreen extends StatefulWidget {
   const EstibotScreen({super.key, required this.controller});
@@ -57,6 +59,25 @@ class _EstibotScreenState extends State<EstibotScreen> {
                     'Ask Estibot about your car or find someone to help.',
                   ),
                   VehiclePicker(controller: widget.controller),
+                  const SizedBox(height: 12),
+                  Wrap(
+                    spacing: 10,
+                    runSpacing: 4,
+                    children: [
+                      TextButton.icon(
+                        onPressed: () =>
+                            openMyShops(context, widget.controller),
+                        icon: const Icon(Icons.storefront_outlined),
+                        label: const Text('My shops & scheduling'),
+                      ),
+                      TextButton.icon(
+                        onPressed: () =>
+                            openVehicleHistory(context, widget.controller),
+                        icon: const Icon(Icons.history_outlined),
+                        label: const Text('Service history'),
+                      ),
+                    ],
+                  ),
                   const SizedBox(height: 20),
                   if (widget.controller.messages.isEmpty) ...[
                     Container(
@@ -92,6 +113,8 @@ class _EstibotScreenState extends State<EstibotScreen> {
                       'Find mobile dent repair',
                       'Help me understand an estimate',
                       'How do I check tire pressure?',
+                      'Help me schedule service with my shop',
+                      'What is in my car’s service history?',
                     ])
                       Padding(
                         padding: const EdgeInsets.only(bottom: 10),
@@ -143,6 +166,26 @@ class _EstibotScreenState extends State<EstibotScreen> {
                             ),
                           ),
                           if (!entry.isUser) ...[
+                            if (entry.answer!.intent == 'shop_outreach')
+                              Padding(
+                                padding: const EdgeInsets.only(top: 12),
+                                child: OutlinedButton.icon(
+                                  onPressed: () => openMyShops(
+                                    context,
+                                    widget.controller,
+                                    initialSummary:
+                                        widget.controller.messages
+                                            .where((e) => e.isUser)
+                                            .lastOrNull
+                                            ?.text ??
+                                        '',
+                                  ),
+                                  icon: const Icon(Icons.event_outlined),
+                                  label: const Text(
+                                    'Review a scheduling request',
+                                  ),
+                                ),
+                              ),
                             for (final provider in entry.answer!.providers)
                               Padding(
                                 padding: const EdgeInsets.only(top: 12),

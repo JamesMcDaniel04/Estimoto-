@@ -61,6 +61,7 @@ class ApiPlusRepository extends PlusRepository {
     String path, {
     Json? body,
     String? idempotencyKey,
+    bool collection = false,
   }) async {
     final request = http.Request(method, baseUri.resolve(path));
     request.headers.addAll(await _headers());
@@ -76,7 +77,7 @@ class ApiPlusRepository extends PlusRepository {
       final response = await http.Response.fromStream(
         await _client.send(request).timeout(const Duration(seconds: 20)),
       ).timeout(const Duration(seconds: 20));
-      return _decode(response);
+      return _decode(response, collection: collection);
     } on TimeoutException {
       throw const PlusApiException(
         'The connection timed out. Refresh to check whether your changes were saved before trying again.',
@@ -88,7 +89,7 @@ class ApiPlusRepository extends PlusRepository {
     }
   }
 
-  Json _decode(http.Response response) {
+  Json _decode(http.Response response, {bool collection = false}) {
     if (response.statusCode == 401) {
       throw const PlusApiException(
         'Your session has ended. Please sign in again.',
@@ -129,7 +130,10 @@ class ApiPlusRepository extends PlusRepository {
     }
     if (response.body.isEmpty) return {};
     try {
-      return Map<String, dynamic>.from(jsonDecode(response.body) as Map);
+      final decoded = jsonDecode(response.body);
+      // Collection routes return bare arrays; keep object routes unchanged.
+      if (collection && decoded is List) return {'items': decoded};
+      return Map<String, dynamic>.from(decoded as Map);
     } on FormatException {
       throw const PlusApiException(
         'We received an unreadable response. Please try again.',
@@ -281,6 +285,64 @@ class ApiPlusRepository extends PlusRepository {
       );
     }
   }
+
+  @override
+  Future<List<Json>> listMyShops() async =>
+      rowsOf(await _send('GET', '/v1/my-shops', collection: true), 'items');
+  @override
+  Future<Json> saveMyShop(Json body, {String? id}) => _send(
+    id == null ? 'POST' : 'PUT',
+    id == null ? '/v1/my-shops' : '/v1/my-shops/${Uri.encodeComponent(id)}',
+    body: body,
+  );
+  @override
+  Future<void> deleteMyShop(String id) async {
+    await _send('DELETE', '/v1/my-shops/${Uri.encodeComponent(id)}');
+  }
+
+  @override
+  Future<List<Json>> listShopOutreach() async => rowsOf(
+    await _send('GET', '/v1/shop-outreach', collection: true),
+    'items',
+  );
+  @override
+  Future<Json> getShopOutreach(String id) =>
+      _send('GET', '/v1/shop-outreach/${Uri.encodeComponent(id)}');
+  @override
+  Future<Json> createShopOutreach(Json body, String idempotencyKey) => _send(
+    'POST',
+    '/v1/shop-outreach',
+    body: body,
+    idempotencyKey: idempotencyKey,
+  );
+  @override
+  Future<Json> authorizeShopOutreach(
+    String id,
+    Json body,
+    String idempotencyKey,
+  ) => _send(
+    'POST',
+    '/v1/shop-outreach/${Uri.encodeComponent(id)}/authorize',
+    body: body,
+    idempotencyKey: idempotencyKey,
+  );
+  @override
+  Future<Json> getKnowledge() => _send('GET', '/v1/knowledge');
+  @override
+  Future<Json> addKnowledgeRecord(Json body, String idempotencyKey) => _send(
+    'POST',
+    '/v1/knowledge/records',
+    body: body,
+    idempotencyKey: idempotencyKey,
+  );
+  @override
+  Future<void> deleteKnowledgeRecord(String id) async {
+    await _send('DELETE', '/v1/knowledge/records/${Uri.encodeComponent(id)}');
+  }
+
+  @override
+  Future<Json> saveKnowledgePreferences(Json body) =>
+      _send('PUT', '/v1/knowledge/preferences', body: body);
 
   @override
   void close() => _client.close();
