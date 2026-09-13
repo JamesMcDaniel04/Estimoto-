@@ -74,6 +74,7 @@ class ServiceRequest(Base):
     delivery_status: Mapped[str] = mapped_column(String(20), default="queued")
     idempotency_key: Mapped[str] = mapped_column(String(200))
     payload_hash: Mapped[str] = mapped_column(String(64))
+    service_postal_code: Mapped[str] = mapped_column(String(5), default="")
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=now)
     updated_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=now)
     scheduled_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
@@ -99,6 +100,11 @@ class Outbox(Base):
     attempts: Mapped[int] = mapped_column(Integer, default=0)
     next_attempt_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=now)
     receipt_id: Mapped[str | None] = mapped_column(String(200), nullable=True)
+    payload: Mapped[dict | None] = mapped_column(JSON, nullable=True)
+    payload_hash: Mapped[str | None] = mapped_column(String(64), nullable=True)
+    claim_token: Mapped[str | None] = mapped_column(String(36), nullable=True)
+    lease_until: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+    suppressed: Mapped[bool] = mapped_column(Boolean, default=False)
 
 
 class Estimate(Base):

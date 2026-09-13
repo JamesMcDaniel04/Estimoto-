@@ -50,12 +50,17 @@ def verify_supabase(settings: Settings, token: str, client: httpx.Client | None 
             response = client.get(url, headers={"apikey": settings.supabase_publishable_key, "Authorization": f"Bearer {token}"})
     except httpx.HTTPError:
         raise HTTPException(503, "Sign-in is unavailable. Please try again later.")
-    if response.status_code != 200:
+    if response.status_code in {400, 401, 403}:
         raise HTTPException(401, "Sign in to continue.")
+    if response.status_code != 200:
+        raise HTTPException(503, "Sign-in is unavailable. Please try again later.")
     try:
-        return response.json()
+        identity = response.json()
     except ValueError:
         raise HTTPException(503, "Sign-in is unavailable. Please try again later.")
+    if not isinstance(identity, dict):
+        raise HTTPException(503, "Sign-in is unavailable. Please try again later.")
+    return identity
 
 
 def db_session(request: Request):

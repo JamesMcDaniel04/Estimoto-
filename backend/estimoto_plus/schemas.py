@@ -3,7 +3,9 @@ from __future__ import annotations
 from datetime import date as Date, datetime
 from typing import Literal
 
-from pydantic import BaseModel, ConfigDict, Field, model_validator
+from pydantic import BaseModel, ConfigDict, Field, field_validator, model_validator
+
+from .postal import canonical_zip
 
 
 class Strict(BaseModel):
@@ -16,6 +18,16 @@ class ProfileWrite(Strict):
     postal_code: str = Field(default="", max_length=30)
     contact_preference: Literal["email", "phone"] = "email"
 
+    @field_validator("postal_code")
+    @classmethod
+    def valid_postal(cls, value):
+        if not value.strip():
+            return ""
+        result = canonical_zip(value)
+        if result is None:
+            raise ValueError("Enter a valid ZIP code")
+        return result
+
 
 class VehicleCreate(Strict):
     year: int = Field(ge=1886, le=2100)
@@ -23,7 +35,7 @@ class VehicleCreate(Strict):
     model: str = Field(min_length=1, max_length=100)
     nickname: str = Field(default="", max_length=100)
     vin: str = Field(default="", max_length=40)
-    mileage: int = Field(default=0, ge=0)
+    mileage: int = Field(default=0, ge=0, le=5_000_000)
     insurer: str = Field(default="", max_length=100)
     policy_number: str = Field(default="", max_length=100)
 
@@ -34,13 +46,19 @@ class VehicleUpdate(Strict):
     model: str | None = Field(default=None, min_length=1, max_length=100)
     nickname: str | None = Field(default=None, max_length=100)
     vin: str | None = Field(default=None, max_length=40)
-    mileage: int | None = Field(default=None, ge=0)
+    mileage: int | None = Field(default=None, ge=0, le=5_000_000)
     insurer: str | None = Field(default=None, max_length=100)
     policy_number: str | None = Field(default=None, max_length=100)
 
+    @model_validator(mode="after")
+    def reject_supplied_nulls(self):
+        if any(getattr(self, name) is None for name in self.model_fields_set):
+            raise ValueError("Vehicle fields cannot be null")
+        return self
+
 
 class EstimateCreate(Strict):
-    vehicle_id: str
+    vehicle_id: str = Field(max_length=36)
     discipline: Literal["pdr", "collision"]
     description: str = Field(min_length=1, max_length=5000)
     claim_number: str = Field(default="", max_length=100)
@@ -48,10 +66,10 @@ class EstimateCreate(Strict):
 
 
 class ReminderCreate(Strict):
-    vehicle_id: str
+    vehicle_id: str = Field(max_length=36)
     title: str = Field(min_length=1, max_length=200)
     due_date: Date | None = None
-    due_mileage: int | None = Field(default=None, ge=0)
+    due_mileage: int | None = Field(default=None, ge=0, le=5_000_000)
 
     @model_validator(mode="after")
     def due_required(self):
@@ -61,8 +79,8 @@ class ReminderCreate(Strict):
 
 
 class RequestCreate(Strict):
-    vehicle_id: str
-    provider_id: str
+    vehicle_id: str = Field(max_length=36)
+    provider_id: str = Field(max_length=36)
     specialty: Literal["pdr", "collision", "maintenance", "mechanical"]
     description: str = Field(min_length=1, max_length=5000)
     preferred_time: str = Field(default="", max_length=200)
@@ -76,55 +94,84 @@ class AssistantInput(Strict):
     specialty: Literal["pdr", "collision", "maintenance", "mechanical"] | None = None
     mobile_only: bool = False
 
+    @field_validator("postal_code")
+    @classmethod
+    def assistant_postal(cls, value):
+        if value is None or not value.strip():
+            return None
+        result = canonical_zip(value)
+        if result is None:
+            raise ValueError("Enter a valid ZIP code")
+        return result
+
 
 class ProviderPublish(Strict):
     source_id: str = Field(min_length=1, max_length=100)
     name: str = Field(min_length=1, max_length=200)
     kind: Literal["shop", "technician"]
-    specialties: list[Literal["pdr", "collision", "maintenance", "mechanical"]]
-    postal_codes: list[str]
-    city: str = ""
-    address: str = ""
-    phone: str = ""
+    specialties: list[Literal["pdr", "collision", "maintenance", "mechanical"]] = Field(max_length=4)
+    postal_codes: list[str] = Field(max_length=500)
+    city: str = Field(default="", max_length=100)
+    address: str = Field(default="", max_length=300)
+    phone: str = Field(default="", max_length=50)
     mobile_service: bool = False
     accepting_requests: bool = False
     public_visible: bool = False
-    description: str = ""
+    description: str = Field(default="", max_length=5000)
+
+    @field_validator("postal_codes")
+    @classmethod
+    def provider_postal_codes(cls, values):
+        codes = []
+        for value in values:
+            code = canonical_zip(value)
+            if code is None:
+                raise ValueError("Provider ZIP codes must be valid")
+            if code not in codes:
+                codes.append(code)
+        return codes
 
 
 class RequestInboundEvent(Strict):
     event_id: str = Field(min_length=1, max_length=100)
-    provider_id: str
+    provider_id: str = Field(max_length=36)
     status: Literal["accepted", "scheduled", "declined", "cancelled", "completed"]
     message: str = Field(default="", max_length=2000)
     scheduled_at: datetime | None = None
 
+    @field_validator("scheduled_at")
+    @classmethod
+    def scheduled_time_zone(cls, value):
+        if value is not None and (value.tzinfo is None or value.utcoffset() is None):
+            raise ValueError("Scheduled time must include a time zone")
+        return value
+
 
 class EstimateSnapshot(Strict):
-    source_id: str
-    customer_id: str
-    vehicle_id: str
+    source_id: str = Field(min_length=1, max_length=100)
+    customer_id: str = Field(min_length=1, max_length=100)
+    vehicle_id: str = Field(max_length=36)
     discipline: Literal["pdr", "collision"]
-    description: str
-    claim_number: str = ""
+    description: str = Field(max_length=5000)
+    claim_number: str = Field(default="", max_length=100)
     date_of_loss: Date | None = None
     status: Literal["submitted", "reviewing", "ready", "approved"]
-    amount_cents: int | None = Field(default=None, ge=0)
-    provider_name: str = ""
+    amount_cents: int | None = Field(default=None, ge=0, le=2_147_483_647)
+    provider_name: str = Field(default="", max_length=200)
 
 
 class RepairStage(Strict):
-    title: str
+    title: str = Field(min_length=1, max_length=200)
     status: Literal["completed", "current", "upcoming"]
     date: Date | None = None
 
 
 class RepairSnapshot(Strict):
-    source_id: str
-    customer_id: str
-    vehicle_id: str
-    provider_name: str
-    title: str
-    status: str
+    source_id: str = Field(min_length=1, max_length=100)
+    customer_id: str = Field(min_length=1, max_length=100)
+    vehicle_id: str = Field(max_length=36)
+    provider_name: str = Field(max_length=200)
+    title: str = Field(max_length=200)
+    status: str = Field(max_length=50)
     estimated_completion: Date | None = None
-    stages: list[RepairStage]
+    stages: list[RepairStage] = Field(max_length=100)

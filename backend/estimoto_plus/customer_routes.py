@@ -5,16 +5,19 @@ from datetime import datetime, timezone
 from pathlib import Path
 from urllib.parse import quote
 
-from fastapi import APIRouter, Depends, File, Form, Header, HTTPException, Request, UploadFile
+from fastapi import APIRouter, Depends, Header, HTTPException, Request
+from starlette.datastructures import UploadFile
 from fastapi.responses import Response
 from PIL import Image, UnidentifiedImageError
-from sqlalchemy import select
+from sqlalchemy import select, update
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
 
 from .auth import current_customer, db_session
 from .models import Customer, Estimate, Outbox, Photo, Provider, Reminder, Repair, RequestEvent, ServiceRequest, Vehicle, now, uid
+from .postal import canonical_zip
 from .schemas import AssistantInput, EstimateCreate, ProfileWrite, ReminderCreate, RequestCreate, VehicleCreate, VehicleUpdate
+from .workflow import creation_payload, payload_hash, queue_cancellation
 
 router = APIRouter(prefix="/v1")
 
@@ -149,22 +152,27 @@ def create_request(body: RequestCreate, request: Request, idempotency_key: str |
         if existing.payload_hash != digest:
             raise HTTPException(409, "Idempotency key was used for another request.")
         return request_view(db, existing)
-    owned(db, Vehicle, body.vehicle_id, c)
+    v = owned(db, Vehicle, body.vehicle_id, c)
+    service_zip = canonical_zip(c.postal_code)
+    if not service_zip:
+        raise HTTPException(422, "Save a valid ZIP code before requesting service.")
     p = db.get(Provider, body.provider_id)
-    if not p or not p.public_visible or p.demo_only != c.demo or not p.accepting_requests or body.specialty not in p.specialties or (c.postal_code and c.postal_code not in p.postal_codes):
+    if not p or not p.public_visible or p.demo_only != c.demo or not p.accepting_requests or body.specialty not in p.specialties or service_zip not in p.postal_codes:
         raise HTTPException(409, "Provider is not accepting this request.")
     if not c.demo and not (request.app.state.settings.bridge_url and request.app.state.settings.bridge_key):
         raise HTTPException(503, "Requests are unavailable right now. Please try again later.")
     status = "local_preview" if c.demo else "queued"
-    r = ServiceRequest(customer_id=c.id, vehicle_id=body.vehicle_id, provider_id=body.provider_id,
+    r = ServiceRequest(id=uid(), customer_id=c.id, vehicle_id=body.vehicle_id, provider_id=body.provider_id,
                        specialty=body.specialty, description=body.description, preferred_time=body.preferred_time,
-                       idempotency_key=idempotency_key, payload_hash=digest, delivery_status=status)
+                       idempotency_key=idempotency_key, payload_hash=digest, service_postal_code=service_zip,
+                       delivery_status=status, created_at=now(), updated_at=now())
     db.add(r)
     try:
         db.flush()
         db.add(RequestEvent(request_id=r.id, status="requested", message="Request created."))
         if not c.demo:
-            db.add(Outbox(request_id=r.id))
+            snapshot = creation_payload(r, c, v, p)
+            db.add(Outbox(request_id=r.id, payload=snapshot, payload_hash=payload_hash(snapshot)))
         db.commit()
     except IntegrityError:
         db.rollback()
@@ -177,17 +185,28 @@ def create_request(body: RequestCreate, request: Request, idempotency_key: str |
 
 @router.post("/requests/{request_id}/cancel")
 def cancel_request(request_id: str, c: Customer = Depends(current_customer), db: Session = Depends(db_session)):
-    r = owned(db, ServiceRequest, request_id, c)
-    if r.status in {"declined", "cancelled", "completed"}:
+    owned(db, ServiceRequest, request_id, c)
+    stamp = now()
+    changed = db.execute(update(ServiceRequest).where(
+        ServiceRequest.id == request_id,
+        ServiceRequest.customer_id == c.id,
+        ServiceRequest.status.in_(("requested", "accepted", "scheduled")),
+    ).values(status="cancelled", updated_at=stamp).returning(ServiceRequest.id)).first()
+    if not changed:
+        db.rollback()
         raise HTTPException(409, "This request can no longer be cancelled.")
-    r.status = "cancelled"
-    r.updated_at = now()
-    if r.delivery_status in {"queued", "failed", "local_preview"}:
-        r.delivery_status = "cancelled"
-    elif r.delivery_status == "delivered":
-        db.add(Outbox(request_id=r.id, kind="cancel"))
+    db.expire_all()
+    r = db.get(ServiceRequest, request_id)
+    creation = db.scalar(select(Outbox).where(Outbox.request_id == r.id, Outbox.kind == "create").with_for_update())
+    if creation and (creation.attempts > 0 or creation.receipt_id):
+        creation.suppressed = True
+        queue_cancellation(db, r, creation)
+    elif creation:
+        creation.suppressed = True
+    r.delivery_status = "cancelled"
     db.add(RequestEvent(request_id=r.id, status="cancelled", message="Cancelled by customer."))
     db.commit()
+    db.refresh(r)
     return request_view(db, r)
 
 
@@ -208,15 +227,20 @@ def submit_estimate(estimate_id: str, c: Customer = Depends(current_customer), d
 
 
 @router.post("/estimates/{estimate_id}/photos", status_code=201)
-async def upload_photo(estimate_id: str, request: Request, file: UploadFile = File(...), label: str = Form(...),
+async def upload_photo(estimate_id: str, request: Request,
                        c: Customer = Depends(current_customer), db: Session = Depends(db_session)):
     e = owned(db, Estimate, estimate_id, c)
     if e.status != "draft":
         raise HTTPException(409, "Photos can only be added to drafts.")
-    if not label.strip() or len(label) > 100:
-        raise HTTPException(422, "Photo label is required.")
-    data = await file.read(10 * 1024 * 1024 + 1)
-    mime = file.content_type
+    async with request.form(max_files=1, max_fields=1, max_part_size=1024) as form:
+        file = form.get("file")
+        label = form.get("label")
+        if not isinstance(file, UploadFile) or not isinstance(label, str):
+            raise HTTPException(422, "Photo and label are required.")
+        if not label.strip() or len(label) > 100:
+            raise HTTPException(422, "Photo label is required.")
+        data = await file.read(10 * 1024 * 1024 + 1)
+        mime = file.content_type
     valid = ((mime == "image/jpeg" and data.startswith(b"\xff\xd8\xff")) or
              (mime == "image/png" and data.startswith(b"\x89PNG\r\n\x1a\n")) or
              (mime == "image/webp" and data.startswith(b"RIFF") and data[8:12] == b"WEBP"))
@@ -235,7 +259,11 @@ async def upload_photo(estimate_id: str, request: Request, file: UploadFile = Fi
     (path / storage_name).write_bytes(data)
     p = Photo(estimate_id=e.id, label=label.strip(), mime_type=mime, storage_name=storage_name)
     db.add(p)
-    db.commit()
+    try:
+        db.commit()
+    except Exception:
+        (path / storage_name).unlink(missing_ok=True)
+        raise
     return {"id": p.id, "label": p.label}
 
 
@@ -284,12 +312,12 @@ def assistant(body: AssistantInput, c: Customer = Depends(current_customer), db:
             specialty = "maintenance"
         elif any(word in message for word in ("engine", "won't start", "mechanical")):
             specialty = "mechanical"
-    postal = body.postal_code or c.postal_code
+    postal = canonical_zip(body.postal_code or c.postal_code)
     wants_provider = any(word in message for word in ("find", "shop", "technician", "repair", "help", "book"))
-    intent = "find_provider" if wants_provider and specialty and postal else ("clarify" if wants_provider else "advice")
+    intent = "find_provider" if wants_provider and specialty and postal and body.vehicle_id else ("clarify" if wants_provider else "advice")
     matches = matching_providers(db, specialty, postal, body.mobile_only, c.demo) if intent == "find_provider" else []
     if intent == "clarify":
-        missing = [name for name, value in (("repair type", specialty), ("postal code", postal)) if not value]
+        missing = [name for name, value in (("repair type", specialty), ("vehicle", body.vehicle_id), ("postal code", postal)) if not value]
         reply = "To find a provider, please share your " + " and ".join(missing or ["repair details"]) + "."
     elif intent == "find_provider":
         reply = "Here are providers that list this service area and specialty." if matches else "I couldn't find an opted-in provider matching those details."

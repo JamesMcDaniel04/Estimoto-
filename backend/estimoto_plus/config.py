@@ -14,3 +14,4 @@ class Settings:
     dev_sessions_enabled: bool = field(default_factory=lambda: os.getenv("DEV_SESSIONS_ENABLED", "false").lower() == "true")
     dev_token_secret: str = field(default_factory=lambda: os.getenv("DEV_TOKEN_SECRET", ""))
     photo_dir: str = field(default_factory=lambda: os.getenv("PHOTO_DIR", str(Path.home() / ".local/share/estimoto-plus/photos")))
+    cors_origins: str = field(default_factory=lambda: os.getenv("CORS_ORIGINS", ""))

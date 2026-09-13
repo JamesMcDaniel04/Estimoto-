@@ -1,6 +1,8 @@
 from fastapi import FastAPI, HTTPException
 from fastapi.exceptions import RequestValidationError
 from fastapi.responses import JSONResponse
+from fastapi.middleware.cors import CORSMiddleware
+from urllib.parse import urlparse
 from sqlalchemy import create_engine, event
 from sqlalchemy.orm import sessionmaker
 
@@ -9,6 +11,7 @@ from .bridge import router as bridge_router
 from .config import Settings
 from .customer_routes import router as customer_router
 from .models import Base, Customer, Provider, Vehicle
+from .upload_limit import PhotoBodyLimit
 
 
 def create_app(settings: Settings | None = None, *, auth_verifier=None, auth_client=None, bridge_transport=None):
@@ -20,7 +23,17 @@ def create_app(settings: Settings | None = None, *, auth_verifier=None, auth_cli
             raise ValueError("Production Supabase URL must use HTTPS")
         if settings.bridge_url and not settings.bridge_url.startswith("https://"):
             raise ValueError("Production bridge URL must use HTTPS")
+    origins = [origin.strip() for origin in settings.cors_origins.split(",") if origin.strip()]
+    for origin in origins:
+        parsed = urlparse(origin)
+        if origin == "*" or parsed.scheme not in {"http", "https"} or not parsed.netloc or parsed.path or parsed.query or parsed.fragment:
+            raise ValueError("CORS_ORIGINS must contain explicit HTTP origins")
     app = FastAPI(title="Estimoto + API", version="1.0")
+    app.add_middleware(PhotoBodyLimit)
+    if origins:
+        app.add_middleware(CORSMiddleware, allow_origins=origins, allow_credentials=False,
+                           allow_methods=["GET", "POST", "PUT", "DELETE"],
+                           allow_headers=["Authorization", "Content-Type", "Idempotency-Key"])
 
     @app.exception_handler(RequestValidationError)
     def validation_error(_request, _exc):
