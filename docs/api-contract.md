@@ -1,0 +1,25 @@
+# Estimoto + API v1
+
+All customer routes require `Authorization: Bearer <Supabase access token>`. JSON uses snake_case. Unknown fields are rejected on writes. Errors use `{"detail":"customer-safe explanation"}`. All IDs are opaque strings and every private lookup enforces authenticated ownership.
+
+`GET /v1/bootstrap` returns an object with `profile`, `vehicles`, `providers`, `estimates`, `repairs`, `requests`, `reminders`, and `capabilities`. Each collection is an array. Capabilities includes `live_requests`, `live_estimates`, `carfax`, `youtube_search`, `demo` booleans. The client must not infer live capabilities from the presence of sample rows.
+
+Profile: `id`, `email`, `name`, `phone`, `postal_code`, `contact_preference` (`email` or `phone`). `PUT /v1/profile` accepts name, phone, postal_code, contact_preference.
+
+Vehicle: `id`, `nickname`, `year`, `make`, `model`, `vin`, `mileage`, `insurer`, `policy_number`. `POST /v1/vehicles`, `PUT /v1/vehicles/{id}`, `DELETE /v1/vehicles/{id}`. Required fields: year, make, model; defaults: empty strings, mileage 0. Deletion of referenced vehicles returns 409.
+
+Provider: `id`, `name`, `kind` (`shop` or `technician`), `specialties` (array of `pdr`, `collision`, `maintenance`, `mechanical`), `postal_codes` (array of exact supported postal codes), `city`, `address`, `phone`, `mobile_service`, `accepting_requests`, `description`. `GET /v1/providers?specialty=pdr&postal_code=80202&mobile_only=true`. Only public opted-in providers appear; no fuzzy radius represented as exact distance.
+
+Request: `id`, `vehicle_id`, `provider_id`, `specialty`, `description`, `preferred_time`, `status`, `delivery_status`, `created_at`, `updated_at`, `scheduled_at` (nullable ISO datetime), `events` (array of {status, message, created_at}). `POST /v1/requests` accepts vehicle_id, provider_id, specialty, description, preferred_time, share_contact (must be true). Requires `Idempotency-Key`; POST /v1/requests/{id}/cancel cancels when permitted. GET /v1/requests lists only owned requests. Live requests require configured delivery bridge.
+
+Estimate: `id`, `vehicle_id`, `discipline` (`pdr` or `collision`), `description`, `claim_number`, `date_of_loss`, `status` (`draft`, `submitted`, `reviewing`, `ready`, `approved`), `amount_cents` (nullable integer), `provider_name`, `updated_at`, `photos` (array of {id, label}). `POST /v1/estimates` creates a draft, required vehicle_id/discipline/description and optional claim_number/date_of_loss. `POST /v1/estimates/{id}/photos` multipart file + label uploads a private JPEG/PNG/WebP with size/type validation; `GET /v1/estimates/{id}/photos/{photo_id}` is authenticated. `POST /v1/estimates/{id}/submit` is unavailable until a live estimator bridge is configured; drafts are never presented as submitted quotes.
+
+Repair: `id`, `vehicle_id`, `provider_name`, `title`, `status`, `updated_at`, `estimated_completion` (nullable ISO date), `stages` (array of {title, status: completed/current/upcoming, date: nullable ISO date}). Supplied only by the authenticated bridge.
+
+Reminder: `id`, `vehicle_id`, `title`, `due_date` (nullable YYYY-MM-DD), `due_mileage` (nullable integer), `completed` (boolean). POST /v1/reminders creates a reminder (at least one due field required); POST /v1/reminders/{id}/complete completes it.
+
+`POST /v1/assistant` accepts `message` (1..2000 chars), `vehicle_id` (nullable owned vehicle), `postal_code`, `specialty` (nullable), `mobile_only` (boolean). Returns `reply`, `intent` (`advice`, `find_provider`, `clarify`), `specialty` (nullable), `providers` (Provider[]), `videos` ({title, url, source}[]). It never mutates a request or invents diagnosis, appointments or availability. Deterministic fallback remains useful without AI keys.
+
+`POST /v1/dev/session` exists only under explicit development/demo configuration, returns `access_token` and `demo:true`; it seeds fictional data for a single demo identity. Release-mode customer login uses Supabase; demo sessions are never accepted in production.
+
+Bridge routes require a separate `X-Bridge-Key` and never accept customer tokens as authority. POST /v1/bridge/providers upserts an opt-in provider including `public_visible` and source IDs. POST /v1/bridge/requests/{id}/events accepts event_id, provider_id, status, message and optional scheduled_at, with replay protection and transition checks. Trusted estimate/repair snapshot endpoints bind records to an existing explicit customer/vehicle relationship; email/VIN cannot claim records. Durable outbox delivery POSTs to the configured fixed bridge URL with Idempotency-Key; only a persisted upstream receipt counts as delivered. See backend integration documentation for implemented receiver and worker schemas.
