@@ -79,7 +79,7 @@ class ApiPlusRepository extends PlusRepository {
       return _decode(response);
     } on TimeoutException {
       throw const PlusApiException(
-        'The connection timed out. Try again; your request will not be duplicated.',
+        'The connection timed out. Refresh to check whether your changes were saved before trying again.',
       );
     } on http.ClientException {
       throw const PlusApiException(

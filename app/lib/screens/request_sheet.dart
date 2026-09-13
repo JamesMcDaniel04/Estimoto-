@@ -1,4 +1,3 @@
-import 'dart:convert';
 import 'package:flutter/material.dart';
 import '../domain/models.dart';
 import '../state/plus_controller.dart';
@@ -15,7 +14,7 @@ Future<void> requestProvider(
   isScrollControlled: true,
   builder: (_) => RequestSheet(
     controller: controller,
-    provider: provider,
+    provider: controller.pendingRequest?.provider ?? provider,
     specialty: specialty,
     description: description,
   ),
@@ -43,13 +42,21 @@ class _RequestSheetState extends State<RequestSheet> {
   final form = GlobalKey<FormState>();
   late String specialty;
   bool share = false, busy = false;
-  String? error, fingerprint;
-  String key = PlusController.requestKey();
+  String? error;
+  bool get locked => widget.controller.pendingRequest != null;
   @override
   void initState() {
     super.initState();
-    description = TextEditingController(text: widget.description);
-    specialty = widget.provider.specialties.contains(widget.specialty)
+    final pending = widget.controller.pendingRequest;
+    description = TextEditingController(
+      text: pending == null
+          ? widget.description
+          : textOf(pending.body, 'description'),
+    );
+    timing.text = pending == null ? '' : textOf(pending.body, 'preferred_time');
+    specialty = pending != null
+        ? textOf(pending.body, 'specialty')
+        : widget.provider.specialties.contains(widget.specialty)
         ? widget.specialty!
         : widget.provider.specialties.first;
   }
@@ -70,38 +77,40 @@ class _RequestSheetState extends State<RequestSheet> {
       );
       return;
     }
-    final vehicle = widget.controller.selectedVehicle;
-    if (vehicle == null) {
+    final pending = widget.controller.pendingRequest;
+    final vehicle = pending == null
+        ? widget.controller.selectedVehicle
+        : widget.controller.snapshot!.vehicle(
+            textOf(pending.body, 'vehicle_id'),
+          );
+    if (vehicle == null && pending == null) {
       setState(() => error = 'Add a vehicle in your garage first.');
       return;
     }
     final profile = widget.controller.snapshot!.profile;
-    if (!RegExp(r'^\d{5}$').hasMatch(profile.postalCode)) {
+    if (pending == null && !RegExp(r'^\d{5}$').hasMatch(profile.postalCode)) {
       setState(
         () =>
             error = 'Add your service ZIP code in your profile before sending.',
       );
       return;
     }
-    final body = <String, dynamic>{
-      'vehicle_id': vehicle.id,
-      'provider_id': widget.provider.id,
-      'specialty': specialty,
-      'description': description.text.trim(),
-      'preferred_time': timing.text.trim(),
-      'share_contact': true,
-    };
-    final nextFingerprint = jsonEncode(body);
-    if (fingerprint != null && fingerprint != nextFingerprint) {
-      key = PlusController.requestKey();
-    }
-    fingerprint = nextFingerprint;
+    final body =
+        pending?.body ??
+        <String, dynamic>{
+          'vehicle_id': vehicle!.id,
+          'provider_id': widget.provider.id,
+          'specialty': specialty,
+          'description': description.text.trim(),
+          'preferred_time': timing.text.trim(),
+          'share_contact': true,
+        };
     setState(() {
       busy = true;
       error = null;
     });
     try {
-      await widget.controller.repository.createRequest(body, key);
+      await widget.controller.sendRequest(body, widget.provider);
       await widget.controller.refresh();
       widget.controller.selectTab(3);
       if (mounted) {
@@ -132,7 +141,8 @@ class _RequestSheetState extends State<RequestSheet> {
     final p = widget.controller.snapshot!.profile;
     final canSend =
         widget.controller.isDemo ||
-        widget.controller.snapshot!.capabilities.liveRequests;
+        widget.controller.snapshot!.capabilities.liveRequests ||
+        locked;
     return FormSheet(
       title: 'Review your request',
       child: Form(
@@ -150,7 +160,24 @@ class _RequestSheetState extends State<RequestSheet> {
               style: Theme.of(context).textTheme.bodySmall,
             ),
             const SizedBox(height: 20),
-            VehiclePicker(controller: widget.controller),
+            if (locked) ...[
+              const Text(
+                'A previous send has an uncertain outcome. Retry the saved details to confirm its status before creating a different request. You can cancel it from Repairs once confirmed.',
+              ),
+              const SizedBox(height: 16),
+              Text(
+                widget.controller.snapshot!
+                        .vehicle(
+                          textOf(
+                            widget.controller.pendingRequest!.body,
+                            'vehicle_id',
+                          ),
+                        )
+                        ?.title ??
+                    'Your saved vehicle',
+              ),
+            ] else
+              VehiclePicker(controller: widget.controller),
             const SizedBox(height: 16),
             DropdownButtonFormField<String>(
               initialValue: specialty,
@@ -163,7 +190,7 @@ class _RequestSheetState extends State<RequestSheet> {
                     ),
                   )
                   .toList(),
-              onChanged: busy
+              onChanged: busy || locked
                   ? null
                   : (s) => setState(() => specialty = s ?? specialty),
             ),
@@ -171,7 +198,7 @@ class _RequestSheetState extends State<RequestSheet> {
             TextFormField(
               key: const Key('request-description'),
               controller: description,
-              enabled: !busy,
+              enabled: !busy && !locked,
               maxLines: 3,
               maxLength: 2000,
               decoration: const InputDecoration(
@@ -184,7 +211,7 @@ class _RequestSheetState extends State<RequestSheet> {
             const SizedBox(height: 8),
             TextFormField(
               controller: timing,
-              enabled: !busy,
+              enabled: !busy && !locked,
               maxLength: 200,
               decoration: const InputDecoration(
                 labelText: 'Preferred timing',

@@ -23,7 +23,7 @@ Copy `config/live.example.json` to ignored `config/local.json`, fill in the dedi
 flutter run --dart-define-from-file=config/local.json
 ```
 
-Allow `io.estimoto.plus://login-callback/` in the Supabase Auth redirect configuration for native email links. Email OTP entry is also provided. Do not put service-role keys or bridge keys into a mobile build. Native sessions use Keychain/encrypted Android storage; web sessions are memory-only. The backend verifies each bearer token and owns authorization.
+Allow `io.estimoto.plus://login-callback/` in the Supabase Auth redirect configuration for native email links. Email OTP entry is also provided. Do not put service-role keys or bridge keys into a mobile build. Native sessions use Keychain/encrypted Android storage; web sessions are memory-only. The backend verifies each bearer token and owns authorization. Unresolved service requests retain their approved body and replay key in account-scoped encrypted storage, including across app restarts; web authentication tokens still stay in memory. Confirm an interrupted send from Repairs before changing its details or creating another request.
 
 A development API token can be supplied as `PLUS_DEV_TOKEN` in an ignored local configuration for debug builds only. Never include development tokens in a release configuration. Use `http://127.0.0.1:8000` from an iOS simulator or desktop, and `http://10.0.2.2:8000` from an Android emulator. Production origins require HTTPS. Browser API access additionally requires the backend's explicit CORS allowlist.
 

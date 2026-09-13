@@ -3,6 +3,7 @@ import '../domain/models.dart';
 import '../state/plus_controller.dart';
 import '../theme.dart';
 import '../widgets/common.dart';
+import 'request_sheet.dart';
 
 class RepairsScreen extends StatelessWidget {
   const RepairsScreen({super.key, required this.controller});
@@ -16,6 +17,22 @@ class RepairsScreen extends StatelessWidget {
           'Every step, in view.',
           'Follow your repairs and service requests.',
         ),
+        if (controller.pendingRequest != null)
+          Padding(
+            padding: const EdgeInsets.only(bottom: 18),
+            child: EmptyState(
+              icon: Icons.sync_problem_outlined,
+              title: 'Confirm your last request',
+              message:
+                  'The response was interrupted. Review the saved request before starting another.',
+              action: 'Review saved request',
+              onAction: () => requestProvider(
+                context,
+                controller,
+                controller.pendingRequest!.provider,
+              ),
+            ),
+          ),
         if (data.repairs.isEmpty && data.requests.isEmpty)
           EmptyState(
             icon: Icons.build_circle_outlined,

@@ -1,3 +1,4 @@
+import 'dart:math' as math;
 import 'package:flutter/material.dart';
 
 /// An original vector silhouette, sized independently of the actual vehicle.
@@ -19,9 +20,9 @@ class _CarPainter extends CustomPainter {
   final Color color;
   @override
   void paint(Canvas canvas, Size size) {
-    final s = size.width / 320;
+    final s = math.min(size.width / 320, size.height / 110);
     canvas.save();
-    canvas.translate(0, (size.height - 110 * s) / 2);
+    canvas.translate((size.width - 320 * s) / 2, (size.height - 110 * s) / 2);
     canvas.scale(s);
     canvas.drawOval(
       const Rect.fromLTWH(17, 91, 285, 11),

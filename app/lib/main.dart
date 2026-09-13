@@ -5,6 +5,8 @@ import 'package:supabase_flutter/supabase_flutter.dart';
 import 'app.dart';
 import 'data/api_repository.dart';
 import 'data/auth_storage.dart';
+import 'data/customer_auth.dart';
+import 'data/pending_request_store.dart';
 import 'data/demo_repository.dart';
 import 'data/repository.dart';
 import 'screens/welcome_screen.dart';
@@ -45,20 +47,37 @@ Future<void> main() async {
           'Sign-in could not start. You can try again later or explore the demo.';
     }
   }
-  runApp(PlusLauncher(setupError: setupError));
+  runApp(
+    PlusLauncher(
+      setupError: setupError,
+      auth: authConfigured && setupError == null
+          ? SupabaseCustomerAuth()
+          : null,
+    ),
+  );
 }
 
 class PlusLauncher extends StatefulWidget {
-  const PlusLauncher({super.key, this.setupError});
+  const PlusLauncher({
+    super.key,
+    this.setupError,
+    this.auth,
+    this.repositoryFactory,
+    this.pendingStore,
+  });
   final String? setupError;
+  final CustomerAuth? auth;
+  final PlusRepository Function(Future<String?> Function() token)?
+  repositoryFactory;
+  final PendingRequestStore? pendingStore;
   @override
   State<PlusLauncher> createState() => _PlusLauncherState();
 }
 
 class _PlusLauncherState extends State<PlusLauncher> {
   PlusController? controller;
-  StreamSubscription<AuthState>? authSubscription;
-  String? error;
+  StreamSubscription<String?>? authSubscription;
+  String? error, liveUserId;
   @override
   void initState() {
     super.initState();
@@ -66,75 +85,115 @@ class _PlusLauncherState extends State<PlusLauncher> {
     if (autoDemo) {
       controller = PlusController(DemoPlusRepository());
     } else if (!kReleaseMode && devToken.isNotEmpty && apiUrl.isNotEmpty) {
-      controller = PlusController(
-        ApiPlusRepository(baseUrl: apiUrl, token: () async => devToken),
-      );
+      try {
+        controller = PlusController(
+          ApiPlusRepository(baseUrl: apiUrl, token: () async => devToken),
+          pendingStore: widget.pendingStore ?? SecurePendingRequestStore(),
+        );
+      } catch (_) {
+        error =
+            'The local API configuration could not start. Check the server address.';
+      }
     }
-    if (authConfigured && widget.setupError == null) {
-      authSubscription = Supabase.instance.client.auth.onAuthStateChange.listen(
-        (state) {
+    final auth = widget.auth;
+    if (auth != null && widget.setupError == null) {
+      authSubscription = auth.identities.listen(
+        _identityChanged,
+        onError: (Object _, StackTrace _) {
           if (!mounted || controller?.repository.isDemo == true) return;
-          if (state.session != null && controller == null) _openLive();
-          if (state.event == AuthChangeEvent.signedOut) _clearController();
+          setState(
+            () => error =
+                'Your sign-in could not refresh. Check your connection or sign in again.',
+          );
+          controller?.reportSessionError();
         },
       );
-      if (Supabase.instance.client.auth.currentSession != null &&
-          controller == null) {
-        _openLive();
-      }
+      if (auth.userId != null && controller == null) _openLive(auth.userId!);
     }
   }
 
-  void _openLive() {
+  void _identityChanged(String? userId) {
+    if (!mounted || controller?.repository.isDemo == true) return;
+    if (userId == null) {
+      _clearController();
+    } else if (controller == null || liveUserId != userId) {
+      _openLive(userId);
+    }
+  }
+
+  void _openLive(String userId) {
+    final previous = controller;
+    // Drop all previous customer data before exposing another customer's token.
+    setState(() {
+      controller = null;
+      liveUserId = null;
+      error = null;
+    });
+    WidgetsBinding.instance.addPostFrameCallback((_) => previous?.dispose());
     try {
-      final repository = ApiPlusRepository(
-        baseUrl: apiUrl,
-        token: () async {
-          final auth = Supabase.instance.client.auth;
-          var session = auth.currentSession;
-          if (session != null &&
-              (session.expiresAt ?? 0) <=
-                  DateTime.now().millisecondsSinceEpoch ~/ 1000 + 60) {
-            try {
-              session = (await auth.refreshSession()).session;
-            } catch (_) {
-              throw const PlusApiException(
-                'Please sign in again to continue.',
-                401,
-              );
-            }
-          }
-          return session?.accessToken;
-        },
-      );
-      setState(() => controller = PlusController(repository));
+      Future<String?> boundToken() async {
+        final auth = widget.auth!;
+        if (auth.userId != userId) {
+          throw const PlusApiException(
+            'Your account changed. Please sign in again.',
+            401,
+          );
+        }
+        final value = await auth.accessToken();
+        if (auth.userId != userId) {
+          throw const PlusApiException(
+            'Your account changed. Please sign in again.',
+            401,
+          );
+        }
+        return value;
+      }
+
+      final repository =
+          widget.repositoryFactory?.call(boundToken) ??
+          ApiPlusRepository(baseUrl: apiUrl, token: boundToken);
+      setState(() {
+        liveUserId = userId;
+        controller = PlusController(
+          repository,
+          pendingStore: widget.pendingStore ?? SecurePendingRequestStore(),
+        );
+      });
     } catch (_) {
       setState(
         () => error =
-            'Sign-in is not available in this preview. You can explore the demo.',
+            'Sign-in could not start. Check your connection and try again.',
       );
     }
   }
 
   void _clearController() {
     final previous = controller;
-    if (mounted) setState(() => controller = null);
+    if (mounted) {
+      setState(() {
+        controller = null;
+        liveUserId = null;
+      });
+    }
     WidgetsBinding.instance.addPostFrameCallback((_) => previous?.dispose());
   }
 
   Future<void> _exit() async {
     final isDemo = controller?.repository.isDemo == true;
-    if (!isDemo && authConfigured && widget.setupError == null) {
+    if (!isDemo && widget.auth != null) {
       try {
-        await Supabase.instance.client.auth.signOut(scope: SignOutScope.local);
+        await widget.auth!.signOut();
       } catch (_) {
-        setState(
-          () => error = 'Sign-out could not complete. Please try again.',
-        );
+        if (mounted) {
+          setState(
+            () => error = 'Sign-out could not complete. Please try again.',
+          );
+          controller?.reportSessionError();
+        }
         return;
       }
     }
-    if (controller != null) _clearController();
+    if (mounted && controller != null) _clearController();
   }
 
   @override
@@ -158,7 +217,7 @@ class _PlusLauncherState extends State<PlusLauncher> {
       debugShowCheckedModeBanner: false,
       theme: plusTheme(),
       home: WelcomeScreen(
-        authAvailable: authConfigured && widget.setupError == null,
+        authAvailable: widget.auth != null && widget.setupError == null,
         setupError: error,
         onDemo: () =>
             setState(() => controller = PlusController(DemoPlusRepository())),
