@@ -69,6 +69,47 @@ void main() {
     await tester.pumpAndSettle();
     expect(tester.takeException(), isNull);
   });
+
+  testWidgets(
+    'cradled Estibot navigation leaves the composer clear and hides for typing',
+    (tester) async {
+      await launch(tester);
+      await tester.tap(find.byKey(const Key('nav-estibot')));
+      await tester.pumpAndSettle();
+      final bar = find.byType(BottomAppBar);
+      final fab = find.byType(FloatingActionButton);
+      expect(bar, findsOneWidget);
+      expect(fab, findsOneWidget);
+      final barRect = tester.getRect(bar);
+      final fabRect = tester.getRect(fab);
+      expect(fabRect.center.dx, closeTo(barRect.center.dx, 1));
+      expect(fabRect.top, lessThan(barRect.top));
+      expect(fabRect.bottom, greaterThan(barRect.top));
+      expect(
+        tester.getRect(find.byKey(const Key('assistant-message'))).bottom,
+        lessThanOrEqualTo(fabRect.top),
+      );
+      final shape = tester.widget<BottomAppBar>(bar).shape!;
+      final host = Rect.fromLTWH(0, 0, barRect.width, barRect.height);
+      final guest = fabRect.shift(-barRect.topLeft).inflate(8);
+      final path = shape.getOuterPath(host, guest);
+      expect(path.contains(Offset(host.center.dx, guest.center.dy)), isFalse);
+      expect(path.contains(Offset(36, 36)), isTrue);
+
+      tester.view.viewInsets = const FakeViewPadding(bottom: 300);
+      addTearDown(tester.view.resetViewInsets);
+      await tester.pumpAndSettle();
+      expect(fab, findsNothing);
+      expect(
+        tester.getRect(find.byKey(const Key('assistant-message'))).bottom,
+        lessThanOrEqualTo(544),
+      );
+      tester.view.resetViewInsets();
+      await tester.pumpAndSettle();
+      expect(fab, findsOneWidget);
+      expect(tester.takeException(), isNull);
+    },
+  );
   testWidgets(
     'a reviewed request requires consent, stays pending, and can cancel',
     (tester) async {
