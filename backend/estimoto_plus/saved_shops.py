@@ -426,6 +426,19 @@ def _claim_mail(db, outbox_id):
         item.finished_at = current
         db.commit()
         return "failed"
+    try:
+        stale_slots = not outreach.proposed_slots or any(
+            datetime.fromisoformat(value) <= current + timedelta(hours=1)
+            for value in outreach.proposed_slots)
+    except (TypeError, ValueError):
+        stale_slots = True
+    if stale_slots:
+        uncertain = item.first_attempt_at is not None
+        outreach.status = "delivery_unknown" if uncertain else "delivery_failed"
+        outreach.delivery_status = outreach.status
+        item.finished_at = current
+        db.commit()
+        return "unknown" if uncertain else "failed"
     if item.first_attempt_at and current >= _utc(item.first_attempt_at) + RETRY_WINDOW:
         outreach.delivery_status = "delivery_unknown"
         outreach.status = "delivery_unknown"

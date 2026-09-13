@@ -280,3 +280,16 @@ def test_confirmation_rejects_past_offered_slot_without_mutating(shops, monkeypa
     monkeypatch.setattr(saved_shops, "now", lambda: datetime.now(timezone.utc) + timedelta(days=3))
     assert client.post(action_path, data={"slot": reviewed["proposed_slots"][0]}).status_code == 422
     assert client.get(f"/v1/shop-outreach/{reviewed['id']}", headers=auth()).json()["status"] == "waiting_for_reply"
+
+
+def test_delayed_worker_never_first_sends_stale_slots(shops, monkeypatch):
+    from estimoto_plus import saved_shops
+    client, app, sent = shops
+    shop = create_shop(client)
+    reviewed = draft(client, shop["id"]).json()
+    assert authorize(client, reviewed).status_code == 200
+    monkeypatch.setattr(saved_shops, "now", lambda: datetime.now(timezone.utc) + timedelta(days=3))
+    assert saved_shops.deliver_shop_batch(app.state.session_factory, app.state.shop_mail_transport)["failed"] == 1
+    assert sent == []
+    state = client.get(f"/v1/shop-outreach/{reviewed['id']}", headers=auth()).json()
+    assert state["status"] == "delivery_failed"
