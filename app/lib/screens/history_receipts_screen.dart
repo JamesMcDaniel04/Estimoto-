@@ -1,4 +1,4 @@
-import 'dart:typed_data';
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:image_picker/image_picker.dart';
 import 'package:pdfx/pdfx.dart';
@@ -14,6 +14,35 @@ import '../state/plus_controller.dart';
 import '../widgets/common.dart';
 import '../widgets/workspace_widgets.dart';
 
+enum ReceiptChoice { camera, gallery, pdf }
+
+class ReceiptPickerButtons extends StatelessWidget {
+  const ReceiptPickerButtons({super.key, required this.onSelected});
+  final ValueChanged<ReceiptChoice>? onSelected;
+
+  @override
+  Widget build(BuildContext context) => Wrap(
+    spacing: 10,
+    runSpacing: 10,
+    children: [
+      for (final choice in ReceiptChoice.values)
+        OutlinedButton.icon(
+          onPressed: onSelected == null ? null : () => onSelected!(choice),
+          icon: Icon(switch (choice) {
+            ReceiptChoice.camera => Icons.camera_alt_outlined,
+            ReceiptChoice.gallery => Icons.photo_library_outlined,
+            ReceiptChoice.pdf => Icons.picture_as_pdf_outlined,
+          }),
+          label: Text(switch (choice) {
+            ReceiptChoice.camera => 'Take photo',
+            ReceiptChoice.gallery => 'Choose photo',
+            ReceiptChoice.pdf => 'Choose PDF',
+          }),
+        ),
+    ],
+  );
+}
+
 class HistoryReceiptsScreen extends StatefulWidget {
   const HistoryReceiptsScreen({
     super.key,
@@ -22,12 +51,16 @@ class HistoryReceiptsScreen extends StatefulWidget {
     this.store,
     this.captureService,
     this.pdfPicker,
+    this.initialChoice,
+    this.onDone,
   });
   final PlusController controller;
   final String recordId;
   final ReceiptPendingStore? store;
   final EstimateCaptureService? captureService;
   final Future<XFile?> Function()? pdfPicker;
+  final ReceiptChoice? initialChoice;
+  final VoidCallback? onDone;
   @override
   State<HistoryReceiptsScreen> createState() => _HistoryReceiptsScreenState();
 }
@@ -46,12 +79,23 @@ class _HistoryReceiptsScreenState extends State<HistoryReceiptsScreen>
   bool busy = false, loading = true, corrupt = false, otherPicker = false;
   String? error, notice;
   int epoch = 0;
+  bool initialChoiceHandled = false;
   bool get current =>
       mounted &&
       identical(widget.controller, boundController) &&
       widget.recordId == boundRecordId &&
       widget.controller.isCurrentCustomer(owner);
   bool valid(int run) => current && run == epoch;
+  bool get canAdd =>
+      current &&
+      !busy &&
+      !loading &&
+      record != null &&
+      pending == null &&
+      pickerPending == null &&
+      !otherPicker &&
+      !corrupt &&
+      rowsOf(record!, 'receipts').length < 10;
   @override
   void initState() {
     super.initState();
@@ -105,6 +149,7 @@ class _HistoryReceiptsScreenState extends State<HistoryReceiptsScreen>
   Future<void> load() async {
     if (!current) return;
     final run = ++epoch;
+    var foundEntry = false;
     setState(() {
       loading = true;
       error = null;
@@ -133,6 +178,7 @@ class _HistoryReceiptsScreenState extends State<HistoryReceiptsScreen>
         knowledge,
         'records',
       ).where((r) => r['id'] == widget.recordId).firstOrNull;
+      foundEntry = found != null;
       setState(() {
         record = found;
         if (found == null) {
@@ -152,7 +198,23 @@ class _HistoryReceiptsScreenState extends State<HistoryReceiptsScreen>
     } finally {
       if (valid(run)) setState(() => loading = false);
     }
+    if (!valid(run) || initialChoiceHandled) return;
+    initialChoiceHandled = true;
+    // A browser picker needs a fresh click after the asynchronous history save.
+    // Native may open the requested picker once; reopening/recovery never does.
+    if (kIsWeb || !foundEntry || !canAdd || widget.initialChoice == null) {
+      return;
+    }
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (valid(run) && canAdd) choose(widget.initialChoice!);
+    });
   }
+
+  Future<void> choose(ReceiptChoice choice) => switch (choice) {
+    ReceiptChoice.camera => photo(ImageSource.camera),
+    ReceiptChoice.gallery => photo(ImageSource.gallery),
+    ReceiptChoice.pdf => pdf(),
+  };
 
   Future<void> action(Future<void> Function() work) async {
     if (!current || busy || loading) return;
@@ -392,15 +454,18 @@ class _HistoryReceiptsScreenState extends State<HistoryReceiptsScreen>
     }
     final receipts = record == null ? <Json>[] : rowsOf(record!, 'receipts');
     final ownPending = pending?.recordId == widget.recordId;
-    final canAdd =
-        !busy &&
-        !loading &&
-        record != null &&
-        pending == null &&
-        pickerPending == null &&
-        !otherPicker &&
-        !corrupt &&
-        receipts.length < 10;
+    final addingHistory = widget.onDone != null;
+    final controls = Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        const SectionHeading('Add a receipt'),
+        ReceiptPickerButtons(onSelected: canAdd ? choose : null),
+        const SizedBox(height: 10),
+        Text(
+          '${receipts.length} of 10 receipts · Up to 10 MB each\nJPEG, PNG, WebP or PDF',
+        ),
+      ],
+    );
     final vehicle = widget.controller.snapshot!.vehicle(
       textOf(record ?? {}, 'vehicle_id'),
     );
@@ -415,8 +480,34 @@ class _HistoryReceiptsScreenState extends State<HistoryReceiptsScreen>
           ),
         ],
       ),
+      bottomNavigationBar: addingHistory
+          ? SafeArea(
+              top: false,
+              child: Padding(
+                padding: const EdgeInsets.fromLTRB(20, 12, 20, 16),
+                child: FilledButton(
+                  onPressed: busy || loading ? null : widget.onDone,
+                  child: const Text('Done'),
+                ),
+              ),
+            )
+          : null,
       body: PageBody(
         children: [
+          if (addingHistory) ...[
+            const PageHeading(
+              'History entry saved.',
+              'Your details are saved. Receipt uploads belong to this entry.',
+            ),
+            if (!loading && receipts.isEmpty)
+              Text(
+                ownPending || pickerPending != null
+                    ? 'A receipt is waiting for confirmation. Review the unfinished attachment below before retrying.'
+                    : 'No receipt attached yet. Choose a photo or PDF below, or tap Done to add one later.',
+              ),
+            controls,
+            const SizedBox(height: 24),
+          ],
           PageHeading(
             record == null
                 ? 'Your saved history'
@@ -566,32 +657,7 @@ class _HistoryReceiptsScreenState extends State<HistoryReceiptsScreen>
                     }),
               child: const Text('Discard unreadable upload'),
             ),
-          const SectionHeading('Add a receipt'),
-          Wrap(
-            spacing: 10,
-            runSpacing: 10,
-            children: [
-              OutlinedButton.icon(
-                onPressed: canAdd ? () => photo(ImageSource.camera) : null,
-                icon: const Icon(Icons.camera_alt_outlined),
-                label: const Text('Take photo'),
-              ),
-              OutlinedButton.icon(
-                onPressed: canAdd ? () => photo(ImageSource.gallery) : null,
-                icon: const Icon(Icons.photo_library_outlined),
-                label: const Text('Choose photo'),
-              ),
-              OutlinedButton.icon(
-                onPressed: canAdd ? pdf : null,
-                icon: const Icon(Icons.picture_as_pdf_outlined),
-                label: const Text('Choose PDF'),
-              ),
-            ],
-          ),
-          const SizedBox(height: 10),
-          Text(
-            '${receipts.length} of 10 receipts · Up to 10 MB each\nJPEG, PNG, WebP or PDF',
-          ),
+          if (!addingHistory) controls,
           const SectionHeading('Saved receipts'),
           if (!loading && receipts.isEmpty)
             const EmptyState(

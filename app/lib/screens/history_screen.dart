@@ -1,6 +1,8 @@
 import 'package:flutter/material.dart';
+import 'package:image_picker/image_picker.dart';
 import '../domain/models.dart';
 import '../services/customer_workspace.dart';
+import '../services/estimate_capture.dart';
 import '../state/plus_controller.dart';
 import '../widgets/common.dart';
 import '../widgets/workspace_widgets.dart';
@@ -82,12 +84,11 @@ class _HistoryScreenState extends WorkspaceState<HistoryScreen> {
   }
 
   Future<void> add() async {
-    final saved = await Navigator.of(context).push<Json>(
+    await Navigator.of(context).push<Json>(
       MaterialPageRoute<Json>(
         builder: (_) => HistoryEditor(controller: controller),
       ),
     );
-    if (active && saved != null) await openReceipts(textOf(saved, 'id'));
     if (active) await load();
   }
 
@@ -372,8 +373,17 @@ class _HistoryScreenState extends WorkspaceState<HistoryScreen> {
 }
 
 class HistoryEditor extends StatefulWidget {
-  const HistoryEditor({super.key, required this.controller});
+  const HistoryEditor({
+    super.key,
+    required this.controller,
+    this.receiptStore,
+    this.captureService,
+    this.pdfPicker,
+  });
   final PlusController controller;
+  final ReceiptPendingStore? receiptStore;
+  final EstimateCaptureService? captureService;
+  final Future<XFile?> Function()? pdfPicker;
   @override
   State<HistoryEditor> createState() => _HistoryEditorState();
 }
@@ -387,6 +397,8 @@ class _HistoryEditorState extends WorkspaceState<HistoryEditor> {
   String type = 'maintenance';
   DateTime date = DateTime.now();
   PendingWorkspaceWrite? pending;
+  Json? savedRecord;
+  ReceiptChoice? receiptChoice;
   bool restoring = true;
   @override
   void initState() {
@@ -455,7 +467,7 @@ class _HistoryEditorState extends WorkspaceState<HistoryEditor> {
     }
   }
 
-  Future<void> save() async {
+  Future<void> save({ReceiptChoice? attach}) async {
     if (restoring || (pending == null && !form.currentState!.validate())) {
       return;
     }
@@ -478,7 +490,10 @@ class _HistoryEditorState extends WorkspaceState<HistoryEditor> {
         final result = await workspace.addHistory(body);
         if (mounted && active) {
           controller.historyChanged();
-          Navigator.pop(context, result);
+          setState(() {
+            savedRecord = result;
+            receiptChoice = attach;
+          });
         }
       } catch (_) {
         if (active) {
@@ -497,14 +512,39 @@ class _HistoryEditorState extends WorkspaceState<HistoryEditor> {
   @override
   Widget build(BuildContext context) {
     if (!current) return unavailable;
+    if (savedRecord != null) {
+      return HistoryReceiptsScreen(
+        key: ValueKey('saved-history-${textOf(savedRecord!, 'id')}'),
+        controller: controller,
+        recordId: textOf(savedRecord!, 'id'),
+        store: widget.receiptStore,
+        captureService: widget.captureService,
+        pdfPicker: widget.pdfPicker,
+        initialChoice: receiptChoice,
+        onDone: () => Navigator.pop(context, savedRecord),
+      );
+    }
     final locked = busy || restoring || pending != null;
     return Scaffold(
       appBar: AppBar(title: const Text('Add service history')),
+      bottomNavigationBar: SafeArea(
+        top: false,
+        child: Padding(
+          padding: const EdgeInsets.fromLTRB(20, 12, 20, 16),
+          child: BusyButton(
+            busy: busy,
+            label: pending != null
+                ? 'Recover saved entry'
+                : 'Save history entry',
+            onPressed: restoring ? null : () => save(),
+          ),
+        ),
+      ),
       body: PageBody(
         children: [
           const PageHeading(
             'Remember the details.',
-            'Save work that has already happened. Add receipt photos or PDFs after saving this entry. Leave unknown details blank.',
+            'Save work that has already happened. Leave unknown details blank.',
           ),
           if (pending != null)
             const Padding(
@@ -524,6 +564,21 @@ class _HistoryEditorState extends WorkspaceState<HistoryEditor> {
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
+                const SectionHeading('Attach a receipt (optional)'),
+                const Text(
+                  'Choosing a photo or PDF saves the details in this form first, then attaches your receipt to that saved entry. You can cancel the picker and add it later.',
+                ),
+                const SizedBox(height: 12),
+                ReceiptPickerButtons(
+                  onSelected: busy || restoring
+                      ? null
+                      : (choice) => save(attach: choice),
+                ),
+                const SizedBox(height: 10),
+                const Text(
+                  'Photos or PDFs · Up to 10 MB each · Private to you',
+                ),
+                const SectionHeading('Service details'),
                 if (pending != null)
                   ReviewBlock(
                     'Saved vehicle',
@@ -627,13 +682,6 @@ class _HistoryEditorState extends WorkspaceState<HistoryEditor> {
                     ),
                   ),
                 if (error != null) WorkspaceError(error!),
-                BusyButton(
-                  busy: busy,
-                  label: pending != null
-                      ? 'Recover saved entry'
-                      : 'Save history entry',
-                  onPressed: restoring ? null : save,
-                ),
               ],
             ),
           ),
