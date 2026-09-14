@@ -68,7 +68,10 @@ class AvailabilityWrite(BaseModel):
     def aware_dates(cls, value):
         if value.tzinfo is None or value.utcoffset() is None:
             raise ValueError('Use an offset-aware timestamp.')
-        return value.astimezone(timezone.utc)
+        try:
+            return value.astimezone(timezone.utc)
+        except OverflowError:
+            raise ValueError('Choose a valid appointment date.') from None
 
     @field_validator('time_zone')
     @classmethod
@@ -167,7 +170,7 @@ def check_slots(db, settings, transport, customer_id, slots, duration, generatio
     current = now()
     starts = [utc(v) for v in slots]
     if not 1 <= len(starts) <= 3 or any(v is None or v < current + timedelta(hours=1) or
-            v + timedelta(minutes=duration) > current + timedelta(days=90) for v in starts):
+            v > current + timedelta(days=90) - timedelta(minutes=duration) for v in starts):
         raise HTTPException(422, 'Choose one to three future appointment times.')
     if max(starts) + timedelta(minutes=duration) - min(starts) > timedelta(days=14):
         raise HTTPException(422, 'Choose appointment times within one 14-day window.')

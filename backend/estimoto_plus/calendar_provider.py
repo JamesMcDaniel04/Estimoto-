@@ -34,7 +34,7 @@ def instant(value):
         if stamp.tzinfo is None or stamp.utcoffset() is None:
             raise ValueError()
         return stamp.astimezone(timezone.utc)
-    except ValueError:
+    except (ValueError, OverflowError):
         raise CalendarUnavailable() from None
 
 
@@ -166,6 +166,15 @@ class CalendarProvider:
                 raise CalendarUnavailable()
             page = next_page
         raise CalendarUnavailable()
+
+    def verify_connection(self, connection, customer_id, attempt_id):
+        code, data = self.call('GET', '/connections/' + quote(connection, safe=''),
+                               params={'provider_config_key': self.settings.nango_calendar_integration_id}, allow=(404,))
+        if code == 404:
+            raise CalendarUnavailable(401)
+        data = data.get('data', data)
+        if not owned(data, customer_id, attempt_id, self.settings) or connection_id(data) != connection:
+            raise CalendarUnavailable(403)
 
     def freebusy(self, connection, selected, start, end):
         if not 1 <= len(selected) <= 10:

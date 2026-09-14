@@ -10,6 +10,28 @@ databases. Live Google readiness is a separate gate and remains disabled by
 default. This task did not connect a real Google account, access user calendars,
 send shop messages, create real events, change provider configuration, or deploy.
 
+## Independent review follow-up
+
+The follow-up commit containing this report update fixes the independent review's
+cancellation and confirmation findings. Same-binding cancellation can delete the
+exact old copy after a timezone/selection/sync preference change or a prior
+reschedule conflict. It still cannot access disconnected/different-account copies.
+Proxy GET/DELETE 404 or 410 now require revalidated owned Nango binding and exact
+nonce-bearing calendar access before an absent event can be marked removed.
+The public confirmation route reads its bounded body asynchronously, then runs the
+whole synchronous admission transaction in a worker thread. Extreme timestamp
+arithmetic/UTC conversion returns a definite 422 instead of an overflow exception.
+
+The original full-suite command below passed **230 tests, zero skipped, 24.32s**;
+the focused PostgreSQL command passed **47 tests, zero skipped, 8.57s**. The socket
+smoke again passed with one calendar, one event, one update and one delete. Added
+regressions cover changed sync preferences, two cleanup workers, disconnected or
+different bindings, conflict-to-cancellation, Nango 404 during both GET and DELETE,
+event-loop exclusion during actual shop confirmation, and UTC-boundary timestamps.
+These results supersede the initial candidate counts below. Known missing scope
+metadata is still a provider-readiness limit: actual capability 401/403 fails
+closed into reconnect_required; no claim of live partial-grant verification is made.
+
 ## Delivered
 
 - Private customer connection, attempt, provisioning and event-operation tables;

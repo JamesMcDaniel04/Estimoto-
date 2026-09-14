@@ -19,6 +19,20 @@ def test_full_duration_overlap_and_endpoint_touching():
     assert [r['start'] for r in rows] == ['2026-09-14T16:30:00+00:00', '2026-09-14T17:00:00+00:00']
 
 
+@pytest.mark.parametrize('timestamp', ['9999-12-31T23:59:59+00:00', '9999-12-31T23:59:59-07:00', '0001-01-01T00:00:00+07:00'])
+def test_extreme_checked_timestamp_is_definite_rejection(calendar, timestamp):
+    client, app = calendar
+    connect(client, app)
+    state = select_calendar(client)
+    body = request_body(client, app)
+    body.update(calendar_check=True, calendar_generation=state['generation'],
+                proposed_slots=[timestamp], duration_minutes=60)
+    headers = {**auth(), 'Idempotency-Key': 'extreme-date'}
+    response = client.post('/v1/requests', headers=headers, json=body)
+    assert response.status_code == 422
+    assert client.post('/v1/requests', headers=headers, json=body).json() == response.json()
+
+
 def test_dst_weekend_skipped_and_business_hours_use_changed_offset():
     start = datetime(2026, 10, 30, 14, tzinfo=timezone.utc)
     end = datetime(2026, 11, 3, 19, tzinfo=timezone.utc)
@@ -109,8 +123,10 @@ def test_all_day_busy_and_saved_booking_block_proposals(calendar):
 
 
 def test_outreach_worker_and_shop_confirmation_recheck_calendar(calendar, monkeypatch):
+    import asyncio
     import httpx
     import re
+    from estimoto_plus import saved_shops
     from estimoto_plus.saved_shops import deliver_shop_batch
     client, app = calendar
     monkeypatch.setenv('RESEND_API_KEY', 'synthetic-mail')
@@ -139,6 +155,14 @@ def test_outreach_worker_and_shop_confirmation_recheck_calendar(calendar, monkey
     assert deliver_shop_batch(app.state.session_factory, app.state.shop_mail_transport,
                                calendar_settings=app.state.settings, calendar_transport=app.state.calendar_transport)['delivered'] == 1
     path = re.search(r'/v1/shop-actions/[A-Za-z0-9_-]+', sent[0].read().decode()).group(0)
+    original_check = saved_shops.check_slots
+    def off_event_loop(*args, **kwargs):
+        try:
+            asyncio.get_running_loop()
+        except RuntimeError:
+            return original_check(*args, **kwargs)
+        raise AssertionError('Blocking Calendar admission must run outside the event loop')
+    monkeypatch.setattr(saved_shops, 'check_slots', off_event_loop)
     stub.busy = [{'start': start.isoformat(), 'end': (start + timedelta(minutes=30)).isoformat()}]
     assert client.post(path, data={'slot': second['proposed_slots'][0]}).status_code == 422
     assert client.get('/v1/shop-outreach/' + second['id'], headers=auth()).json()['status'] == 'waiting_for_reply'

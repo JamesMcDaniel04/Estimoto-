@@ -105,6 +105,15 @@ reminders. Provider writes specify Retries: 0 and sendUpdates=none.
 Sync statuses: not_enabled, pending, synced, conflict, reconnect_required,
 attention_needed, removed. Messages contain no upstream response text.
 
+Cancellation cleanup of an existing owned copy is permitted while the original
+Nango binding remains connected, even after changing selected calendars, timezone,
+or disabling future sync. Prior reschedule conflicts do not block that cleanup.
+Disconnected or different-account bindings cannot delete the old copy. An apparent
+missing event from a proxy 404/410 is not sufficient evidence of removal: the
+worker revalidates connection ownership and access to the exact app calendar.
+Shop confirmation performs its synchronous DB/provider admission transaction in
+a worker thread after asynchronously reading the bounded form body.
+
 If the app calendar is selected, its current event can overlap a reschedule.
 We do not subtract a merged free/busy interval because that could hide another
 event. The first release instead asks the customer to adjust the existing copy

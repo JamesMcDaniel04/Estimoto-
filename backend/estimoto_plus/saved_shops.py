@@ -13,6 +13,7 @@ from typing import Literal
 import httpx
 from fastapi import APIRouter, Depends, Header, HTTPException, Request
 from fastapi.responses import HTMLResponse
+from starlette.concurrency import run_in_threadpool
 from pydantic import BaseModel, ConfigDict, Field, field_validator
 from sqlalchemy import or_, select, update
 from sqlalchemy.orm import Session
@@ -87,7 +88,10 @@ class OutreachDraftWrite(Strict, CalendarChecked):
         for value in values:
             if value.tzinfo is None or value.utcoffset() is None:
                 raise ValueError("Slots need a time zone")
-            utc = value.astimezone(timezone.utc)
+            try:
+                utc = value.astimezone(timezone.utc)
+            except OverflowError:
+                raise ValueError('Choose a valid appointment date.') from None
             normalized.append(utc)
         if len(set(normalized)) != len(normalized):
             raise ValueError("Slots must be distinct")
@@ -383,7 +387,7 @@ def shop_action_landing(token: str, db: Session = Depends(db_session)):
 
 
 @router.post("/shop-actions/{token}", response_class=HTMLResponse)
-async def confirm_shop_slot(token: str, request: Request, db: Session = Depends(db_session)):
+async def confirm_shop_slot(token: str, request: Request):
     if request.headers.get("content-type", "").split(";", 1)[0].lower() != "application/x-www-form-urlencoded":
         raise HTTPException(415, "Use the confirmation form.")
     raw = bytearray()
@@ -398,6 +402,16 @@ async def confirm_shop_slot(token: str, request: Request, db: Session = Depends(
     if set(fields) != {"slot"} or len(fields["slot"]) != 1 or len(fields["slot"][0]) > 40:
         raise HTTPException(422, "Choose an offered time.")
     slot = fields["slot"][0]
+    return await run_in_threadpool(_confirm_shop_slot_transaction, request.app.state.session_factory,
+                                   request.app.state.settings, request.app.state.calendar_transport, token, slot)
+
+
+def _confirm_shop_slot_transaction(factory, settings, transport, token, slot):
+    with factory() as db:
+        return _confirm_shop_slot(db, settings, transport, token, slot)
+
+
+def _confirm_shop_slot(db, settings, transport, token, slot):
     record = _action_record(db, token)
     _lock_customer(db, record.customer_id)
     _lock_outreach(db, record.id)
@@ -413,7 +427,7 @@ async def confirm_shop_slot(token: str, request: Request, db: Session = Depends(
         if datetime.fromisoformat(slot) <= now():
             raise HTTPException(422, "That offered time has passed.")
         if record.calendar_check:
-            check_slots(db, request.app.state.settings, request.app.state.calendar_transport, record.customer_id,
+            check_slots(db, settings, transport, record.customer_id,
                         [datetime.fromisoformat(slot)], record.duration_minutes, record.calendar_generation, frozen=record)
         record.status = "confirmed"
         record.confirmed_slot = slot

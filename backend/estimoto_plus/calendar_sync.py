@@ -64,6 +64,13 @@ def current_binding(row, source, settings):
                 row.environment == settings.nango_environment and 1 <= len(row.selected_calendar_ids) <= 10)
 
 
+def cleanup_binding(row, operation, settings):
+    # Changed scheduling preferences must not strand a prior owned copy.
+    return bool(row and operation and row.status == 'connected' and row.nango_connection_id and
+                row.nango_connection_id == operation.nango_connection_id and
+                row.integration_id == settings.nango_calendar_integration_id and row.environment == settings.nango_environment)
+
+
 def _prepare(db, settings, kind, source_id):
     source = db.get(MODELS[kind], source_id)
     if not source:
@@ -79,10 +86,6 @@ def _prepare(db, settings, kind, source_id):
         return None
     operation = db.scalar(select(CalendarOperation).where(CalendarOperation.customer_id == customer_id,
                          CalendarOperation.source_kind == kind, CalendarOperation.source_id == source_id))
-    if not current_binding(row, source, settings):
-        set_state(source, operation, 'reconnect_required')
-        db.commit()
-        return None
     action = source_action(source, kind)
     if action is None or action == 'delete' and operation is None:
         if action == 'delete':
@@ -91,10 +94,16 @@ def _prepare(db, settings, kind, source_id):
         else:
             db.commit()
         return None
+    cleanup = action == 'delete' and cleanup_binding(row, operation, settings)
+    if not cleanup and not current_binding(row, source, settings):
+        set_state(source, operation, 'reconnect_required')
+        db.commit()
+        return None
     if operation and operation.claim_token and operation.lease_until and utc(operation.lease_until) > now():
         db.commit()
         return None
-    if operation and operation.state in ('attention_needed', 'conflict', 'reconnect_required'):
+    if operation and operation.state in ('attention_needed', 'conflict', 'reconnect_required') and not (
+            cleanup and (operation.action != 'delete' or operation.state == 'reconnect_required')):
         db.commit()
         return None
     if not operation:
@@ -103,12 +112,12 @@ def _prepare(db, settings, kind, source_id):
                                       generation=row.generation, nango_connection_id=row.nango_connection_id,
                                       event_id=UUID(operation_id).hex, payload={}, payload_hash='', attempts=0, next_attempt_at=now())
         db.add(operation)
-    if operation.generation != row.generation or operation.nango_connection_id != row.nango_connection_id:
+    if not cleanup and (operation.generation != row.generation or operation.nango_connection_id != row.nango_connection_id):
         set_state(source, operation, 'reconnect_required')
         db.commit()
         return None
     # Recover a possibly completed earlier write before replacing its immutable payload.
-    if operation.state != 'uncertain':
+    if operation.state != 'uncertain' or action == 'delete':
         try:
             desired = event_payload(operation.id, operation.event_id, source, kind) if action == 'upsert' else {}
         except (ValueError, TypeError):
@@ -237,7 +246,8 @@ def _execute(db, settings, transport, identifier, claim):
     if not source or operation.claim_token != claim or utc(operation.lease_until) <= now():
         db.rollback()
         return 'skipped'
-    if not current_binding(row, source, settings) or operation.generation != row.generation or operation.nango_connection_id != row.nango_connection_id:
+    cleanup = operation.action == 'delete' and source_action(source, operation.source_kind) == 'delete' and cleanup_binding(row, operation, settings)
+    if not cleanup and (not current_binding(row, source, settings) or operation.generation != row.generation or operation.nango_connection_id != row.nango_connection_id):
         set_state(source, operation, 'reconnect_required')
         operation.claim_token, operation.lease_until = None, None
         db.commit()
@@ -246,6 +256,11 @@ def _execute(db, settings, transport, identifier, claim):
     try:
         calendar_id = operation.calendar_id
         if not calendar_id:
+            if operation.action == 'delete':
+                provision = db.scalar(select(CalendarProvision).where(CalendarProvision.customer_id == customer_id,
+                                     CalendarProvision.nango_connection_id == row.nango_connection_id))
+                if not provision or provision.status == 'pending':
+                    return _mark_applied(source, operation)  # No calendar creation was admitted.
             calendar_id = _provision(db, provider, row, operation, source)
             if not calendar_id:
                 return operation.state
@@ -261,9 +276,21 @@ def _execute(db, settings, transport, identifier, claim):
             set_state(source, operation, 'attention_needed')
             return 'attention_needed'
         if operation.action == 'delete':
+            absence = code in (404, 410)
             if exists:
                 # Delete only a copy carrying the exact operation's provenance.
-                provider.call('DELETE', exact_path, connection=row.nango_connection_id, params={'sendUpdates': 'none'}, allow=(404, 410))
+                delete_code, _ = provider.call('DELETE', exact_path, connection=row.nango_connection_id, params={'sendUpdates': 'none'}, allow=(404, 410))
+                absence = delete_code in (404, 410)
+            if absence:
+                # A proxy 404 can mean a vanished Nango binding, not an absent event.
+                provider.verify_connection(row.nango_connection_id, customer_id, row.attempt_id)
+                provision = db.scalar(select(CalendarProvision).where(CalendarProvision.customer_id == customer_id,
+                                     CalendarProvision.nango_connection_id == row.nango_connection_id))
+                if not provision or not any(v['id'] == calendar_id and v.get('accessRole') == 'owner' and
+                        v.get('description') == 'estimoto-plus-calendar:' + provision.nonce
+                        for v in provider.calendars(row.nango_connection_id)):
+                    set_state(source, operation, 'attention_needed')
+                    return 'attention_needed'
             return _mark_applied(source, operation)
         if exists and _same_event(existing, operation.payload):
             return _mark_applied(source, operation)

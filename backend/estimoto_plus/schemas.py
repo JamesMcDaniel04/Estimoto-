@@ -105,7 +105,10 @@ class RequestCreate(Strict, CalendarChecked):
         from datetime import timezone
         if any(v.tzinfo is None or v.utcoffset() is None for v in values) or len(set(values)) != len(values):
             raise ValueError('Choose distinct offset-aware times.')
-        return [v.astimezone(timezone.utc) for v in values]
+        try:
+            return [v.astimezone(timezone.utc) for v in values]
+        except OverflowError:
+            raise ValueError('Choose a valid appointment date.') from None
 
     share_contact: Literal[True]
 

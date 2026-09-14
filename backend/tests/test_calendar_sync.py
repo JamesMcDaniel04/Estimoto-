@@ -3,6 +3,7 @@ from concurrent.futures import ThreadPoolExecutor
 from datetime import datetime, timedelta, timezone
 import json
 import httpx
+import pytest
 
 from test_customer_calendar import auth, calendar, connect, select_calendar
 from test_calendar_scheduling import request_body
@@ -131,6 +132,92 @@ def test_two_workers_reschedule_same_event_and_cancel_only_that_event(calendar):
     batch(app)
     assert writes.deletes == 1 and not writes.events
     assert client.get('/v1/requests', headers=auth()).json()[0]['calendar_sync_status'] == 'removed'
+
+
+@pytest.mark.parametrize('sync_enabled', [True, False])
+def test_cancellation_removes_owned_copy_after_preferences_change(calendar, sync_enabled):
+    client, app = calendar
+    stub, identifier, _ = scheduled(client, app)
+    writes = CalendarWrites(stub)
+    batch(app)
+    event_id = next(iter(writes.events))
+    assert client.put('/v1/calendar/google/preferences', headers=auth(), json={
+        'selected_calendar_ids': ['primary@example.test'], 'time_zone': 'Etc/UTC',
+        'sync_confirmed': sync_enabled}).status_code == 200
+    batch(app)  # An earlier generation is no longer allowed to upsert.
+    with app.state.session_factory() as db:
+        row = db.get(ServiceRequest, identifier)
+        row.delivery_status = 'delivered'
+        db.commit()
+    assert client.post('/v1/bridge/requests/' + identifier + '/events', headers={'X-Bridge-Key': 'test'}, json={
+        'event_id': 'cancel-after-preference', 'provider_id': 'shop', 'status': 'cancelled', 'message': ''}).status_code == 200
+    with ThreadPoolExecutor(max_workers=2) as pool:
+        list(pool.map(lambda _: batch(app), range(2)))
+    assert writes.deletes == 1 and event_id not in writes.events
+    assert writes.calendar_posts == 1 and writes.event_posts == 1 and writes.puts == 0
+    assert client.get('/v1/requests', headers=auth()).json()[0]['calendar_sync_status'] == 'removed'
+
+
+@pytest.mark.parametrize('binding_change', ['disconnect', 'other_connection'])
+def test_cancelled_copy_never_uses_disconnected_or_different_binding(calendar, binding_change):
+    from estimoto_plus.calendar_models import CalendarConnection
+    client, app = calendar
+    stub, identifier, _ = scheduled(client, app)
+    writes = CalendarWrites(stub)
+    batch(app)
+    if binding_change == 'disconnect':
+        assert client.delete('/v1/calendar/google/connection', headers=auth()).status_code == 200
+    with app.state.session_factory() as db:
+        db.get(ServiceRequest, identifier).status = 'cancelled'
+        if binding_change == 'other_connection':
+            row = db.get(CalendarConnection, 'alice')
+            row.nango_connection_id, row.generation = 'other-account', row.generation + 1
+        db.commit()
+    before = len(stub.calls)
+    batch(app)
+    assert not any('/proxy/' in call.url.path for call in stub.calls[before:])
+    assert writes.deletes == 0 and len(writes.events) == 1
+
+
+def test_cancellation_cleans_prior_copy_after_reschedule_conflict(calendar):
+    client, app = calendar
+    stub, identifier, stamp = scheduled(client, app)
+    writes = CalendarWrites(stub)
+    batch(app)
+    moved = stamp + timedelta(hours=2)
+    with app.state.session_factory() as db:
+        db.get(ServiceRequest, identifier).scheduled_at = moved
+        db.commit()
+    stub.busy = [{'start': moved.isoformat(), 'end': (moved + timedelta(hours=1)).isoformat()}]
+    batch(app)
+    assert client.get('/v1/requests', headers=auth()).json()[0]['calendar_sync_status'] == 'conflict'
+    with app.state.session_factory() as db:
+        db.get(ServiceRequest, identifier).status = 'cancelled'
+        db.commit()
+    batch(app)
+    assert writes.deletes == 1 and not writes.events
+    assert client.get('/v1/requests', headers=auth()).json()[0]['calendar_sync_status'] == 'removed'
+
+
+@pytest.mark.parametrize('failed_method', ['GET', 'DELETE'])
+def test_missing_nango_connection_is_never_reported_as_removed_copy(calendar, failed_method):
+    client, app = calendar
+    stub, identifier, _ = scheduled(client, app)
+    writes = CalendarWrites(stub)
+    batch(app)
+    with app.state.session_factory() as db:
+        db.get(ServiceRequest, identifier).status = 'cancelled'
+        db.commit()
+    def vanished_connection(request):
+        if '/events/' in request.url.path and request.method == failed_method:
+            stub.connections = []
+            return httpx.Response(404, json={'error': 'Nango connection missing'})
+        return writes(request)
+    stub.on_request = vanished_connection
+    batch(app)
+    state = client.get('/v1/requests', headers=auth()).json()[0]
+    assert state['calendar_sync_status'] == 'reconnect_required'
+    assert len(writes.events) == 1 and writes.deletes == 0
 
 
 def test_unrelated_event_id_collision_is_never_overwritten(calendar):
