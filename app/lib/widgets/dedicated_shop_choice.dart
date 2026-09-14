@@ -11,6 +11,7 @@ Future<bool> chooseDedicatedShop(
   required String source,
   required String sourceId,
   required String vehicleId,
+  List<Json> aliases = const [],
 }) async {
   final owner = CustomerWorkspace.forController(controller);
   bool valid() =>
@@ -25,8 +26,14 @@ Future<bool> chooseDedicatedShop(
   bool matches(String type) => existing.any(
     (f) =>
         f['specialty'] == type &&
-        f['source'] == source &&
-        f['source_id'] == sourceId,
+        ((f['source'] == source && f['source_id'] == sourceId) ||
+            aliases.any(
+              (alias) =>
+                  alias['vehicle_id'] == vehicleId &&
+                  alias['specialty'] == type &&
+                  alias['source'] == f['source'] &&
+                  alias['source_id'] == f['source_id'],
+            )),
   );
   final choice = await showDialog<String>(
     context: context,

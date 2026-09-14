@@ -309,6 +309,39 @@ void main() {
     },
   );
   testWidgets(
+    'a merged independent favorite stays visible and removable on its participating result',
+    (tester) async {
+      final repo = DiscoveryRepository();
+      final c = await discoveryController(repo);
+      final reference = {
+        'vehicle_id': c.selectedVehicle!.id,
+        'specialty': 'pdr',
+        'source': 'openstreetmap',
+        'source_id': 'node:123',
+      };
+      repo.favorites = [reference];
+      repo.response = envelope(
+        providers: [
+          {
+            ...partner(),
+            'favorite': true,
+            'favorite_references': [reference],
+          },
+        ],
+      );
+      await mountDiscovery(tester, c);
+      await tester.pumpAndSettle();
+      expect(find.text('Request help'), findsOneWidget);
+      expect(find.text('Your dedicated shop: PDR'), findsOneWidget);
+      await tapDiscovery(tester, find.text('Change or remove saved choice'));
+      await tapDiscovery(tester, find.text('Remove: PDR'));
+      expect(repo.favorites, isEmpty);
+      expect(repo.savedFavorite, isNull);
+      expect(find.text('Your dedicated shop: PDR'), findsNothing);
+      expect(find.text('Save as my dedicated shop'), findsOneWidget);
+    },
+  );
+  testWidgets(
     'private favorite saves and removes the source reference without contacting a listing',
     (tester) async {
       final repo = DiscoveryRepository()

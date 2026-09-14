@@ -159,6 +159,7 @@ class _DiscoveryResultsState extends WorkspaceState<DiscoveryResults> {
         source: provider.source,
         sourceId: provider.sourceId,
         vehicleId: widget.vehicleId!,
+        aliases: rowsOf(provider.json, 'favorite_references'),
       );
       if (saved && sameSearch && run == epoch) await loadFavorites();
     });
@@ -210,8 +211,15 @@ class _DiscoveryResultsState extends WorkspaceState<DiscoveryResults> {
         favorites: favorites
             .where(
               (f) =>
-                  f['source'] == provider.source &&
-                  f['source_id'] == provider.sourceId,
+                  (f['source'] == provider.source &&
+                      f['source_id'] == provider.sourceId) ||
+                  rowsOf(provider.json, 'favorite_references').any(
+                    (alias) =>
+                        alias['vehicle_id'] == widget.vehicleId &&
+                        alias['specialty'] == f['specialty'] &&
+                        alias['source'] == f['source'] &&
+                        alias['source_id'] == f['source_id'],
+                  ),
             )
             .map((f) => specialtyLabel(textOf(f, 'specialty')))
             .toList(),
