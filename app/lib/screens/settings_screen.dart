@@ -80,6 +80,37 @@ class SettingsScreen extends StatelessWidget {
                     : 'To change your email, sign in with the new address. Your email is how shops reach you and how you sign in.',
                 style: theme.textTheme.bodySmall,
               ),
+              const SectionHeading('Connections'),
+              Card(
+                child: Padding(
+                  padding: const EdgeInsets.symmetric(vertical: 8),
+                  child: Column(
+                    children: [
+                      ListTile(
+                        leading: Icon(
+                          Icons.hub_outlined,
+                          color: theme.colorScheme.primary,
+                        ),
+                        title: const Text('Nango'),
+                        subtitle: const Text(
+                          'Google Calendar · Not configured',
+                        ),
+                      ),
+                      const Divider(indent: 16, endIndent: 16),
+                      const ListTile(
+                        leading: Icon(
+                          Icons.mail_outline,
+                          color: Color(0xFFEA4335),
+                        ),
+                        title: Text('Gmail'),
+                        subtitle: Text(
+                          'Car-service appointments, estimates and receipts\nNot configured',
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              ),
               const SectionHeading('Profile'),
               Text(
                 'Shops see these details only when you choose to share a request.',
