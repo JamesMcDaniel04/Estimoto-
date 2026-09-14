@@ -148,10 +148,15 @@ def search(db, request, customer, postal, vehicle=None, specialty=None, mobile_o
     candidates.sort(key=rank)
     seen, unique = {}, []
     for row in candidates:
-        # Exact public business identity, never fuzzy shop/technician identity inference.
+        # A shared chain phone is not a physical-shop identity. Only merge
+        # sources that publish the same complete street address and ZIP.
         name = re.sub(r'\W+', '', row['name'].casefold())
-        contact = re.sub(r'\D', '', row['phone']) or row['address'].casefold().strip()
-        key = (name, contact) if contact else (row['source'], row['source_id'])
+        address = row['address'].strip()
+        complete_address = (re.match(r'^\d{1,8}[A-Za-z]?\s+[A-Za-z]', address) is not None and
+                            re.search(r'(?<!\d)\d{5}(?:-\d{4})?\s*$', address) is not None)
+        location = re.sub(r'\W+', '', address.casefold()) if complete_address else ''
+        phone = re.sub(r'\D', '', row['phone'])
+        key = (name, phone, location) if location else (row['source'], row['source_id'])
         if key in seen:
             position = seen[key]
             previous = unique[position]

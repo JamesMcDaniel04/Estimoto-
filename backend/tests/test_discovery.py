@@ -335,7 +335,11 @@ def test_starred_public_duplicate_preserves_participating_handoff(clients):
     client, _ = clients
     vehicle, stub = setup(client)
     identifier = partner(client)
-    stub.elements = [stub.shop(1, 'Demolition Dent fixture', {'phone': '3035550100', 'service:vehicle:pdr': 'yes'})]
+    stub.elements = [stub.shop(1, 'Demolition Dent fixture', {
+        'phone': '3035550100', 'service:vehicle:pdr': 'yes',
+        'addr:housenumber': '1', 'addr:street': 'Example St',
+        'addr:city': 'Denver', 'addr:state': 'CO', 'addr:postcode': '80221',
+    })]
     client.get('/v1/discovery', headers=h('alice'))
     assert client.put('/v1/discovery/favorites/pdr', headers=h('alice'), json={
         'vehicle_id': vehicle, 'source': 'openstreetmap', 'source_id': 'node:1'}).status_code == 200
@@ -344,3 +348,25 @@ def test_starred_public_duplicate_preserves_participating_handoff(clients):
     row = data['providers'][0]
     assert row['id'] == identifier and row['favorite'] and row['request_modes'] == ['shop_visit']
     assert row['specialty_evidence'][0]['basis'] == 'owner_declared'
+
+
+def test_shared_phone_different_address_keeps_distinct_shop_and_favorite(clients):
+    client, _ = clients
+    vehicle, stub = setup(client)
+    partner_id = partner(client)
+    stub.elements = [stub.shop(1, 'Demolition Dent fixture', {
+        'phone': '3035550100', 'service:vehicle:pdr': 'yes',
+        'addr:housenumber': '99', 'addr:street': 'Other St',
+        'addr:city': 'Denver', 'addr:state': 'CO', 'addr:postcode': '80204',
+    })]
+    client.get('/v1/discovery', headers=h('alice'))
+    assert client.put('/v1/discovery/favorites/pdr', headers=h('alice'), json={
+        'vehicle_id': vehicle, 'source': 'openstreetmap', 'source_id': 'node:1'}).status_code == 200
+    data = client.get('/v1/discovery', headers=h('alice'), params={'vehicle_id': vehicle, 'specialty': 'pdr'}).json()
+    matches = [row for row in data['providers'] if row['name'] == 'Demolition Dent fixture']
+    assert len(matches) == 2
+    by_id = {row['id']: row for row in matches}
+    assert by_id['osm:node:1']['favorite'] is True
+    assert by_id['osm:node:1']['request_modes'] == []
+    assert by_id[partner_id]['favorite'] is False
+    assert by_id[partner_id]['request_modes'] == ['shop_visit']
