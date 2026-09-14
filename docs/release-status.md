@@ -1,25 +1,34 @@
-# Live customer preview — build 9, September 14, 2026
+# Live customer preview — build 10, September 14, 2026
 
-Estimoto + build 9 is published at https://estimoto-plus-api.fly.dev/ and the
-permanent Android download. The live API/web and signed mobile artifacts use
-`9dc9e750f63b73cbbd920c27b5f6d14534e4c5e8`, with schema `a63e90b72d14`.
-The exact public Android APK was installed over build 8 on an emulator. The iOS
-build-9 IPA is VALID and in internal testing; Plus external approval remains unverified.
+Estimoto + build 10 is live on web and the permanent Android download, from
+`62683757a569c3c82e37bbbf03be6658d780f77f`. Network shops accepting requests have a blue
+Request help button on the card; tapping the rest of the card opens its profile.
+This release also includes the concurrently merged Settings screen. iOS build 10
+is VALID and available internally; external review remains pending.
 
 [Download latest Android](https://estimoto-plus-api.fly.dev/android/download) ·
-[Mobile delivery](mobile-release.md) · [Build-9 evidence](releases/2026-09-14-build9.json) ·
+[Mobile delivery](mobile-release.md) · [Build-10 evidence](releases/2026-09-14-build10.json) ·
 [Audit follow-up](qa/2026-09-13-audit-closure.md)
 
 ## Delivered surfaces
 
 | Surface | Verified state |
 | --- | --- |
-| Customer API/web | `/version` matched `9dc9e75`; `/ready` is ready at schema `a63e90b72d14`. Served JavaScript matches the local build. The hashed brand image matches exactly and appeared in a returning browser without clearing its cache. |
-| Android customer app | Signed 0.1.0 (9); exact public APK hash checked and installed over build 8 on an emulator. Version 9, welcome artwork and demo card → profile → saved PDR choice verified. |
-| iOS customer app | Build 9 VALID, exact 632-character notes and both groups verified. Internal `IN_BETA_TESTING`; external `READY_FOR_BETA_SUBMISSION`. No build-9 review submission was attempted; build 2 remains `WAITING_FOR_REVIEW`. |
-| Repository | `main` and `origin/main` were fast-forwarded from the old `1a69205` history and contain artifact source `e5d0e4a`; no force-push. |
-| Hosted CI | Build-9 [run 34814184249](https://github.com/JamesMcDaniel04/Estimoto-plus/actions/runs/34814184249) failed with all four jobs at zero steps; annotation check `103881307863` confirms account billing prevented startup. No hosted CI pass is claimed. |
+| Customer API/web | `/version` matched `6268375`; `/ready` is ready at schema `a63e90b72d14`. Served JavaScript matches the local build. |
+| Android customer app | Signed 0.1.0 (10); exact public APK installed over build 9 on an emulator. Card request button and separate profile navigation verified in demo. |
+| iOS customer app | Build 10 VALID, exact 561-character notes and both groups verified. Internal `IN_BETA_TESTING`; external `READY_FOR_BETA_SUBMISSION`. Build 2 review preserved. |
+| Repository | `main` includes the badge change, the concurrently merged Settings commits and release source `6268375`; no force-push. |
+| Hosted CI | [Run 34815970821](https://github.com/JamesMcDaniel04/Estimoto-plus/actions/runs/34815970821) has no executed steps; check `103886600083` confirms the existing billing block. Local verification is recorded separately. |
 | Original Estimoto mobile | Separate build 232, source `a0a2af9cfb8c88cb3b7eb9860a42554dcf57714f`, shipped with 38 exact-tab tests and external approval. Its approval does not approve Plus. |
+
+## Build 10 validation
+
+All 217 app tests and analysis passed after integrating Settings; 19 capture-web
+tests and the capture build passed. The exact public Android APK was installed
+over build 9. Native demo checks verified the card's Request help button opens
+the review form and that tapping the card body opens the profile. No real
+request or shop contact was sent. Build-9 evidence below remains historical.
+The delivered email already uses the permanent URL, which now serves build 10.
 
 ## What changed in build 9
 
@@ -37,7 +46,7 @@ No new Auth account,
 shop outreach or live customer mutation was used for build-9 checks. These demo
 checks do not establish a live customer's saved-shop or request outcome.
 
-Android build 9 uses the same permanent URL already present in the delivered
+Android build 10 uses the same permanent URL already present in the delivered
 build-8 invite. No duplicate email was sent.
 
 ## What changed in build 8
