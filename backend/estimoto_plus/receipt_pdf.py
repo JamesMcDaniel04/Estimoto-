@@ -5,10 +5,37 @@ from io import BytesIO
 
 
 _ACTIVE_KEYS = frozenset({
-    "/OpenAction", "/AA", "/Annots", "/AcroForm", "/XFA",
+    "/OpenAction", "/AA", "/AcroForm", "/XFA",
     "/JS", "/JavaScript", "/EmbeddedFiles", "/EF", "/AF",
     "/RichMedia", "/Perms", "/Collection",
 })
+# Page annotations are walked like any other object: passive markup and
+# /Link annotations pass, while widgets, attachments, media and every
+# action other than the two below are rejected by the checks in the walk.
+_LINK_SCHEMES = ("http://", "https://", "mailto:", "tel:")
+
+
+def _inert_action(action) -> bool:
+    """Allow only an internal page jump or a plain web/mail/phone link.
+
+    The app rasterizes receipts, so links are never followed there; the
+    scheme allowlist keeps the file safe for whatever opens it next.
+    """
+    from pypdf.generic import DictionaryObject, TextStringObject
+
+    if not isinstance(action, DictionaryObject):
+        return False
+    kind = str(action.get("/S"))
+    keys = {str(k) for k in action}
+    if kind == "/GoTo":
+        return not keys - {"/S", "/D", "/Type"}
+    if kind == "/URI":
+        target = action.get("/URI")
+        target = target.get_object() if hasattr(target, "get_object") else target
+        return (not keys - {"/S", "/URI", "/Type", "/IsMap"}
+                and isinstance(target, (TextStringObject, str))
+                and str(target).lower().startswith(_LINK_SCHEMES))
+    return False
 _ACTIVE_ACTIONS = frozenset({
     "/JavaScript", "/Launch", "/GoToR", "/GoToE", "/URI",
     "/SubmitForm", "/ImportData", "/Rendition", "/RichMediaExecute",
@@ -57,14 +84,14 @@ def inert_object_graph(root):
             for key, value in obj.items():
                 label = str(key)
                 if label == "/A":
-                    # The only action a flattened receipt needs is an
-                    # internal page jump from a bookmark. Reject all other
-                    # action kinds, chained actions and malformed targets.
+                    # A receipt needs at most a bookmark page jump or a web
+                    # link. Chained actions and malformed targets are
+                    # rejected, and the validated action is not walked
+                    # again so its /S value is judged here only.
                     action = value.get_object() if isinstance(value, IndirectObject) else value
-                    if (not isinstance(action, DictionaryObject) or
-                            str(action.get("/S")) != "/GoTo" or
-                            {str(k) for k in action} - {"/S", "/D", "/Type"}):
+                    if not _inert_action(action):
                         return False
+                    continue
                 if label in _ACTIVE_KEYS or (
                     label == "/S" and str(value) in _ACTIVE_ACTIONS
                 ) or (label == "/Type" and str(value) in _ACTIVE_TYPES) or (
