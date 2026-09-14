@@ -1,10 +1,12 @@
 import 'package:flutter/material.dart';
 import '../domain/models.dart';
 import '../state/plus_controller.dart';
-import '../theme.dart';
 import '../widgets/common.dart';
+import '../widgets/workspace_widgets.dart';
+import '../widgets/discovery_results.dart';
+import '../widgets/dedicated_shop_choice.dart';
+import 'my_shops_screen.dart';
 import 'garage_forms.dart';
-import 'request_sheet.dart';
 
 class FindHelpScreen extends StatefulWidget {
   const FindHelpScreen({super.key, required this.controller});
@@ -13,41 +15,97 @@ class FindHelpScreen extends StatefulWidget {
   State<FindHelpScreen> createState() => _FindHelpScreenState();
 }
 
-class _FindHelpScreenState extends State<FindHelpScreen> {
+class _FindHelpScreenState extends WorkspaceState<FindHelpScreen> {
+  @override
+  PlusController get controller => widget.controller;
   String? specialty;
-  bool mobileOnly = false;
+  bool mobileOnly = false, loading = true;
+  Json? result;
+  int epoch = 0;
+  String scope = '';
+  String get currentScope =>
+      '${controller.selectedVehicle?.id}|${controller.snapshot?.profile.postalCode}|$specialty|$mobileOnly';
+  @override
+  void initState() {
+    super.initState();
+    load();
+  }
+
+  @override
+  void changed() {
+    if (active && scope != currentScope) {
+      load();
+    } else {
+      super.changed();
+    }
+  }
+
+  Future<void> load() async {
+    if (!active) return;
+    final run = ++epoch;
+    final postal = controller.snapshot!.profile.postalCode,
+        vehicle = controller.selectedVehicle?.id;
+    setState(() {
+      scope = currentScope;
+      loading = postal.isNotEmpty;
+      result = null;
+      error = null;
+    });
+    if (postal.isEmpty) return;
+    try {
+      final value = await controller.repository.discoverProviders({
+        'postal_code': postal,
+        'vehicle_id': ?vehicle,
+        if (specialty != null) 'specialty': specialty,
+        'mobile_only': mobileOnly,
+      });
+      if (!active || run != epoch || scope != currentScope) return;
+      setState(() => result = value);
+    } catch (e) {
+      if (active && run == epoch) {
+        setState(() => error = PlusController.readableError(e));
+      }
+    } finally {
+      if (active && run == epoch) setState(() => loading = false);
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
-    final data = widget.controller.snapshot!;
-    final postal = data.profile.postalCode;
-    final providers = data.providers
-        .where(
-          (p) => p.matches(
-            specialty: specialty,
-            postalCode: postal,
-            mobileOnly: mobileOnly,
-          ),
-        )
-        .toList();
+    if (!current) return unavailable;
+    final postal = controller.snapshot!.profile.postalCode;
     return PageBody(
       children: [
         const PageHeading(
           'Find your kind of help.',
-          'Connect with participating shops and technicians.',
+          'Nearby shops, mobile providers and a place for your trusted favorites.',
         ),
+        VehiclePicker(controller: controller),
+        const SizedBox(height: 12),
         Card(
-          child: ListTile(
-            leading: const Icon(
-              Icons.location_on_outlined,
-              color: PlusColors.blue,
-            ),
-            title: Text(
-              postal.isEmpty ? 'Choose your service area' : 'Serving $postal',
-            ),
-            subtitle: const Text('Your saved ZIP code'),
-            trailing: TextButton(
-              onPressed: () => editProfile(context, widget.controller),
-              child: const Text('Change'),
+          child: Padding(
+            padding: const EdgeInsets.fromLTRB(16, 16, 16, 8),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Row(
+                  children: [
+                    const Icon(Icons.location_on_outlined),
+                    const SizedBox(width: 10),
+                    Expanded(
+                      child: Text(
+                        postal.isEmpty
+                            ? 'Choose your service area'
+                            : 'Near $postal',
+                      ),
+                    ),
+                  ],
+                ),
+                TextButton(
+                  onPressed: () => editProfile(context, controller),
+                  child: const Text('Change service ZIP'),
+                ),
+              ],
             ),
           ),
         ),
@@ -56,166 +114,82 @@ class _FindHelpScreenState extends State<FindHelpScreen> {
           spacing: 8,
           runSpacing: 4,
           children: [
-            for (final type in <String?>[
-              null,
-              'pdr',
-              'collision',
-              'maintenance',
-              'mechanical',
-            ])
+            for (final type in <String?>[null, ...discoverySpecialties])
               ChoiceChip(
                 label: Text(
                   type == null ? 'All services' : specialtyLabel(type),
                 ),
                 selected: specialty == type,
-                onSelected: (_) => setState(() => specialty = type),
+                onSelected: (_) {
+                  specialty = type;
+                  load();
+                },
               ),
           ],
         ),
-        const SizedBox(height: 10),
         SwitchListTile.adaptive(
           contentPadding: EdgeInsets.zero,
           title: const Text('Come to me'),
-          subtitle: const Text('Show mobile technicians'),
+          subtitle: const Text(
+            'Find providers listing mobile coverage for my ZIP',
+          ),
           value: mobileOnly,
-          onChanged: (value) => setState(() => mobileOnly = value),
+          onChanged: (value) {
+            mobileOnly = value;
+            load();
+          },
         ),
-        const SizedBox(height: 8),
         if (postal.isEmpty)
           EmptyState(
             icon: Icons.location_searching,
             title: 'Where does your car need help?',
             message:
-                'Add a ZIP code so we can show providers who cover your area.',
+                'Add a service ZIP in your saved profile to find nearby shops.',
             action: 'Add ZIP code',
-            onAction: () => editProfile(context, widget.controller),
-          )
-        else if (providers.isEmpty)
-          const EmptyState(
-            icon: Icons.search_off_outlined,
-            title: 'No matches here yet',
-            message:
-                'Try another service or turn off mobile-only search. More participating providers can join over time.',
-          )
-        else ...[
-          Text(
-            '${providers.length} ${providers.length == 1 ? 'provider' : 'providers'} serving your area',
-            style: Theme.of(context).textTheme.bodySmall,
+            onAction: () => editProfile(context, controller),
           ),
-          const SizedBox(height: 14),
-          for (final provider in providers)
-            Padding(
-              padding: const EdgeInsets.only(bottom: 14),
-              child: ProviderCard(
-                provider: provider,
-                onRequest: () => requestProvider(
-                  context,
-                  widget.controller,
-                  provider,
-                  specialty: specialty,
+        if (loading)
+          const Padding(
+            padding: EdgeInsets.all(16),
+            child: Column(
+              children: [
+                LinearProgressIndicator(),
+                SizedBox(height: 12),
+                Text(
+                  'Checking nearby listings. A fresh search can take up to a minute.',
                 ),
-              ),
+              ],
             ),
-        ],
+          ),
+        if (error != null) WorkspaceError(error!),
+        if (result != null)
+          DiscoveryResults(
+            key: ValueKey(scope),
+            controller: controller,
+            data: result!,
+            vehicleId: controller.selectedVehicle?.id,
+            postalCode: postal,
+            specialty: specialty,
+            mobileOnly: mobileOnly,
+          ),
+        if (postal.isNotEmpty)
+          OutlinedButton.icon(
+            onPressed: loading ? null : load,
+            icon: const Icon(Icons.refresh),
+            label: const Text('Refresh directory'),
+          ),
         const SizedBox(height: 12),
         OutlinedButton.icon(
-          onPressed: () => widget.controller.selectTab(2),
+          onPressed: () => openMyShops(context, controller),
+          icon: const Icon(Icons.storefront_outlined),
+          label: const Text('My shops & scheduling'),
+        ),
+        OutlinedButton.icon(
+          onPressed: () => controller.selectTab(2),
           icon: const Icon(Icons.support_agent_outlined),
           label: const Text('Let Estibot help me choose'),
         ),
       ],
     );
   }
-}
-
-class ProviderCard extends StatelessWidget {
-  const ProviderCard({
-    super.key,
-    required this.provider,
-    required this.onRequest,
-  });
-  final ProviderProfile provider;
-  final VoidCallback onRequest;
-  @override
-  Widget build(BuildContext context) => Card(
-    child: Padding(
-      padding: const EdgeInsets.all(20),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Row(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Container(
-                padding: const EdgeInsets.all(12),
-                decoration: BoxDecoration(
-                  color: const Color(0xFFEDF3FB),
-                  borderRadius: BorderRadius.circular(14),
-                ),
-                child: Icon(
-                  provider.kind == 'technician'
-                      ? Icons.handyman_outlined
-                      : Icons.storefront_outlined,
-                  color: PlusColors.navy,
-                ),
-              ),
-              const SizedBox(width: 13),
-              Expanded(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text(
-                      provider.name,
-                      style: Theme.of(context).textTheme.titleMedium,
-                    ),
-                    const SizedBox(height: 4),
-                    Text(
-                      provider.city,
-                      style: Theme.of(context).textTheme.bodySmall,
-                    ),
-                  ],
-                ),
-              ),
-            ],
-          ),
-          const SizedBox(height: 14),
-          Wrap(
-            spacing: 6,
-            runSpacing: 6,
-            children: [
-              for (final service in provider.specialties)
-                StatusPill(specialtyLabel(service)),
-              if (provider.mobileService)
-                const StatusPill('Mobile service', color: Color(0xFF08796D)),
-            ],
-          ),
-          const SizedBox(height: 14),
-          Text(
-            provider.description,
-            style: Theme.of(context).textTheme.bodySmall,
-          ),
-          const SizedBox(height: 18),
-          SizedBox(
-            width: double.infinity,
-            child: FilledButton(
-              onPressed: provider.acceptingRequests ? onRequest : null,
-              child: const Text('Request help'),
-            ),
-          ),
-          if (provider.address.isNotEmpty)
-            TextButton.icon(
-              onPressed: () => openExternal(
-                context,
-                Uri.https('www.google.com', '/maps/search/', {
-                  'api': '1',
-                  'query': '${provider.name} ${provider.address}',
-                }).toString(),
-              ),
-              icon: const Icon(Icons.map_outlined, size: 18),
-              label: const Text('View on map'),
-            ),
-        ],
-      ),
-    ),
-  );
 }

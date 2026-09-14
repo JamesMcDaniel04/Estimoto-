@@ -6,6 +6,7 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:image_picker/image_picker.dart';
 import 'package:estimoto_plus/data/demo_repository.dart';
 import 'package:estimoto_plus/data/repository.dart';
+import 'package:estimoto_plus/data/pending_request_store.dart';
 import 'package:estimoto_plus/domain/models.dart';
 import 'package:estimoto_plus/screens/estimate_forms.dart';
 import 'package:estimoto_plus/services/estimate_capture.dart';
@@ -55,7 +56,7 @@ class _Repository extends DemoPlusRepository {
           'public_visible': true,
           'accepting_requests': true,
           'specialties': ['pdr', 'collision'],
-          'postal_codes': ['80202'],
+          'postal_codes': ['80221'],
           'city': 'Denver',
         },
         {
@@ -109,6 +110,13 @@ class _Repository extends DemoPlusRepository {
     };
   }
   late Json data;
+  final discoveryQueries = <Json>[];
+  @override
+  Future<Json> discoverProviders(Json query) async {
+    discoveryQueries.add(Map.of(query));
+    return super.discoverProviders(query);
+  }
+
   final uploads = <String>[];
   final sends = <Json>[];
   int photoReads = 0;
@@ -219,6 +227,52 @@ Future<void> _tap(WidgetTester tester, Finder finder) async {
 
 void main() {
   testWidgets(
+    'legacy uncertain estimate retry preserves its exact body without service_mode or discovery admission',
+    (tester) async {
+      final repo = _Repository(complete: true);
+      final c = PlusController(repo);
+      final old = {'provider_id': 'shop-1', 'share_contact': true};
+      await c.pendingStore.write(
+        'estimate:customer-1:estimate-1',
+        PendingRequest(
+          body: old,
+          key: 'estimate:estimate-1',
+          provider: ProviderProfile.fromJson(
+            (repo.data['providers'] as List).first as Json,
+          ),
+        ),
+      );
+      await c.refresh();
+      await tester.pumpWidget(
+        MaterialApp(
+          home: Scaffold(
+            body: Builder(
+              builder: (context) => TextButton(
+                onPressed: () => showModalBottomSheet<void>(
+                  context: context,
+                  isScrollControlled: true,
+                  builder: (_) => EstimateSubmissionReview(
+                    controller: c,
+                    estimate: c.snapshot!.estimates.single,
+                    onEditProfile: () {},
+                  ),
+                ),
+                child: const Text('Open review'),
+              ),
+            ),
+          ),
+        ),
+      );
+      await _tap(tester, find.text('Open review'));
+      expect(repo.discoveryQueries, isEmpty);
+      await _tap(tester, find.byKey(const Key('estimate-share-contact')));
+      await _tap(tester, find.byKey(const Key('estimate-send')));
+      expect(repo.sends.single, {...old, 'key': 'estimate:estimate-1'});
+      expect(repo.sends.single.containsKey('service_mode'), isFalse);
+    },
+  );
+
+  testWidgets(
     'guided PDR capture saves all required views and a real panel before explicit shop consent',
     (tester) async {
       final repository = _Repository();
@@ -238,6 +292,8 @@ void main() {
       expect(find.text('Photos ready for your review'), findsOneWidget);
       expect(repository.sends, isEmpty);
       await _tap(tester, find.byKey(const Key('estimate-review')));
+      expect(repository.discoveryQueries.single['vehicle_id'], 'vehicle-1');
+      expect(repository.discoveryQueries.single['specialty'], 'pdr');
       expect(find.byType(TextField), findsNothing);
       expect(find.text('alex@example.test'), findsOneWidget);
       expect(find.text('Private shop'), findsNothing);
@@ -255,6 +311,7 @@ void main() {
       expect(repository.sends.single, {
         'provider_id': 'shop-1',
         'share_contact': true,
+        'service_mode': 'shop_visit',
         'key': 'estimate:estimate-1',
       });
       expect(controller.snapshot!.estimates.single.amountCents, isNull);

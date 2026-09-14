@@ -3,6 +3,8 @@ import '../domain/models.dart';
 import '../services/estimate_capture_steps.dart';
 import '../state/plus_controller.dart';
 import 'common.dart';
+import 'workspace_widgets.dart';
+import 'discovery_results.dart';
 
 List<String> missingEstimateContact(CustomerProfile profile) => [
   if (profile.name.trim().isEmpty) 'name',
@@ -11,21 +13,6 @@ List<String> missingEstimateContact(CustomerProfile profile) => [
   if (profile.phone.replaceAll(RegExp(r'\D'), '').length < 7) 'phone',
   if (!RegExp(r'^\d{5}$').hasMatch(profile.postalCode.trim())) 'ZIP code',
 ];
-
-List<ProviderProfile> eligibleEstimateProviders(
-  PlusSnapshot snapshot,
-  CustomerEstimate estimate,
-) => snapshot.providers
-    .where(
-      (provider) =>
-          provider.kind == 'shop' &&
-          provider.json['public_visible'] != false &&
-          provider.matches(
-            specialty: estimate.discipline,
-            postalCode: snapshot.profile.postalCode,
-          ),
-    )
-    .toList();
 
 class EstimateSubmissionReview extends StatefulWidget {
   const EstimateSubmissionReview({
@@ -42,23 +29,91 @@ class EstimateSubmissionReview extends StatefulWidget {
       _EstimateSubmissionReviewState();
 }
 
-class _EstimateSubmissionReviewState extends State<EstimateSubmissionReview> {
+class _EstimateSubmissionReviewState
+    extends WorkspaceState<EstimateSubmissionReview> {
+  @override
+  PlusController get controller => widget.controller;
+  Json? discovery;
+  String? serviceMode;
+  bool loading = true;
+  int epoch = 0;
+  String scope = '';
+  String get currentScope =>
+      '${controller.snapshot?.profile.postalCode}|${widget.estimate.vehicleId}|${widget.estimate.discipline}';
+  List<ProviderProfile> get providers => discovery == null
+      ? []
+      : [
+              ...discoveryProviders(discovery!, 'providers'),
+              ...discoveryProviders(discovery!, 'shop_visit_alternatives'),
+            ]
+            .take(100)
+            .where(
+              (p) =>
+                  !p.independent &&
+                  p.kind == 'shop' &&
+                  p.specialties.contains(widget.estimate.discipline) &&
+                  p.requestModes.isNotEmpty,
+            )
+            .toList();
   ProviderProfile? selected;
   ProviderProfile? get chosen =>
       widget.controller.pendingEstimate(widget.estimate.id)?.provider ??
       selected;
-  bool share = false, busy = false;
-  String? error;
+  bool share = false;
   late final String customerId;
   @override
   void initState() {
     super.initState();
     customerId = widget.controller.snapshot!.profile.id;
     selected = widget.controller.pendingEstimate(widget.estimate.id)?.provider;
+    loadShops();
+  }
+
+  @override
+  void changed() {
+    if (active && scope != currentScope) {
+      loadShops();
+    } else {
+      super.changed();
+    }
+  }
+
+  Future<void> loadShops() async {
+    if (!active) return;
+    final run = ++epoch;
+    setState(() {
+      scope = currentScope;
+      selected = null;
+      share = false;
+      serviceMode = null;
+      discovery = null;
+      error = null;
+      loading = true;
+    });
+    if (controller.pendingEstimate(widget.estimate.id) != null) {
+      setState(() => loading = false);
+      return;
+    }
+    try {
+      final value = await controller.repository.discoverProviders({
+        'postal_code': controller.snapshot!.profile.postalCode,
+        'vehicle_id': widget.estimate.vehicleId,
+        'specialty': widget.estimate.discipline,
+        'mobile_only': false,
+      });
+      if (!active || run != epoch || scope != currentScope) return;
+      setState(() => discovery = value);
+    } catch (e) {
+      if (active && run == epoch) {
+        setState(() => error = PlusController.readableError(e));
+      }
+    } finally {
+      if (active && run == epoch) setState(() => loading = false);
+    }
   }
 
   Future<void> _send() async {
-    if (!widget.controller.isCurrentCustomer(customerId)) return;
+    if (!active || busy) return;
     final snapshot = widget.controller.snapshot!;
     final pending = widget.controller.pendingEstimate(widget.estimate.id);
     final latest = snapshot.estimates
@@ -72,15 +127,21 @@ class _EstimateSubmissionReviewState extends State<EstimateSubmissionReview> {
       );
       return;
     }
+    if (pending == null && serviceMode == null) {
+      setState(
+        () => error = 'Choose a shop visit or mobile service before sharing.',
+      );
+      return;
+    }
     if (pending == null &&
         (latest == null ||
             latest.status != 'draft' ||
             missingEstimateContact(snapshot.profile).isNotEmpty ||
             !estimatePhotosReady(snapshot, latest) ||
-            !eligibleEstimateProviders(
-              snapshot,
-              widget.estimate,
-            ).any((p) => p.id == chosen!.id))) {
+            scope != currentScope ||
+            !providers.any(
+              (p) => p.id == chosen!.id && p.requestModes.contains(serviceMode),
+            ))) {
       setState(
         () => error =
             'Your details or shop availability changed. Close this review and check the estimate before sending.',
@@ -94,7 +155,12 @@ class _EstimateSubmissionReviewState extends State<EstimateSubmissionReview> {
     try {
       await widget.controller.submitEstimate(
         widget.estimate.id,
-        pending?.body ?? {'provider_id': chosen!.id, 'share_contact': true},
+        pending?.body ??
+            {
+              'provider_id': chosen!.id,
+              'share_contact': true,
+              'service_mode': serviceMode,
+            },
         pending?.provider ?? chosen!,
       );
       if (widget.controller.isCurrentCustomer(customerId)) {
@@ -131,12 +197,12 @@ class _EstimateSubmissionReviewState extends State<EstimateSubmissionReview> {
       final profile = snapshot.profile;
       final pending = widget.controller.pendingEstimate(widget.estimate.id);
       final missingContact = missingEstimateContact(profile);
-      final providers = eligibleEstimateProviders(snapshot, widget.estimate);
       final canSend =
           pending != null ||
           (snapshot.capabilities.liveEstimates &&
               missingContact.isEmpty &&
               estimatePhotosReady(snapshot, widget.estimate) &&
+              !loading &&
               providers.isNotEmpty);
       return FormSheet(
         title: 'Review estimate sharing',
@@ -185,15 +251,18 @@ class _EstimateSubmissionReviewState extends State<EstimateSubmissionReview> {
               const Text(
                 'The previous submission has an unconfirmed outcome. Retry the saved submission to check its result; its shop and sharing choice stay the same.',
               ),
-            ] else if (providers.isEmpty) ...[
-              const Text(
-                'No accepting shop currently matches this estimate type and your saved ZIP code. Your draft and photos remain saved. Check your profile or try again later.',
-              ),
-              TextButton(
-                onPressed: busy ? null : () => widget.controller.refresh(),
-                child: const Text('Refresh shops'),
-              ),
-            ] else
+            ] else ...[
+              if (loading) const LinearProgressIndicator(),
+              if (discovery != null) DiscoveryNotice(discovery!),
+              if (!loading && providers.isEmpty) ...[
+                const Text(
+                  'No accepting estimating shop was returned for this work within 30 miles of your saved ZIP. Your draft and photos remain saved. Refresh to check nearby shops again.',
+                ),
+                TextButton(
+                  onPressed: busy || loading ? null : loadShops,
+                  child: const Text('Refresh shops'),
+                ),
+              ],
               for (final provider in providers)
                 Padding(
                   padding: const EdgeInsets.only(bottom: 10),
@@ -208,6 +277,9 @@ class _EstimateSubmissionReviewState extends State<EstimateSubmissionReview> {
                             ? null
                             : () => setState(() {
                                 selected = provider;
+                                serviceMode = provider.requestModes.length == 1
+                                    ? provider.requestModes.single
+                                    : null;
                                 share = false;
                                 error = null;
                               }),
@@ -232,6 +304,10 @@ class _EstimateSubmissionReviewState extends State<EstimateSubmissionReview> {
                                         context,
                                       ).textTheme.titleMedium,
                                     ),
+                                    if (provider.distanceMiles != null)
+                                      Text(
+                                        'About ${provider.distanceMiles!.toStringAsFixed(1)} mi from your ZIP center',
+                                      ),
                                     if (provider.city.isNotEmpty)
                                       Text(provider.city),
                                     Text(
@@ -250,6 +326,35 @@ class _EstimateSubmissionReviewState extends State<EstimateSubmissionReview> {
                     ),
                   ),
                 ),
+              if (discovery != null) DiscoveryDetails(discovery!),
+              if (chosen != null) ...[
+                const SectionHeading('Service location'),
+                for (final mode in chosen!.requestModes)
+                  Padding(
+                    padding: const EdgeInsets.only(bottom: 8),
+                    child: OutlinedButton.icon(
+                      key: Key('estimate-mode-$mode'),
+                      onPressed: busy
+                          ? null
+                          : () => setState(() {
+                              serviceMode = mode;
+                              share = false;
+                            }),
+                      icon: Icon(
+                        serviceMode == mode
+                            ? Icons.radio_button_checked
+                            : Icons.radio_button_off,
+                      ),
+                      label: Text(serviceModeLabel(mode)),
+                    ),
+                  ),
+              ],
+            ],
+            if (pending?.body['service_mode'] != null)
+              ReviewBlock(
+                'Service location',
+                serviceModeLabel(pending!.body['service_mode'] as String),
+              ),
             const SizedBox(height: 10),
             CheckboxListTile(
               key: const Key('estimate-share-contact'),

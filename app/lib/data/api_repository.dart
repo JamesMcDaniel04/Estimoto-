@@ -63,6 +63,7 @@ class ApiPlusRepository extends PlusRepository {
     Json? body,
     String? idempotencyKey,
     bool collection = false,
+    Duration timeout = const Duration(seconds: 20),
   }) async {
     final request = http.Request(method, baseUri.resolve(path));
     request.headers.addAll(await _headers());
@@ -76,8 +77,8 @@ class ApiPlusRepository extends PlusRepository {
     request.followRedirects = false;
     try {
       final response = await http.Response.fromStream(
-        await _client.send(request).timeout(const Duration(seconds: 20)),
-      ).timeout(const Duration(seconds: 20));
+        await _client.send(request).timeout(timeout),
+      ).timeout(timeout);
       return _decode(response, collection: collection);
     } on TimeoutException {
       throw const PlusApiException(
@@ -149,6 +150,56 @@ class ApiPlusRepository extends PlusRepository {
         'We received an unexpected response. Please try again.',
       );
     }
+  }
+
+  @override
+  Future<Json> discoverProviders(Json query) => _send(
+    'GET',
+    Uri(
+      path: '/v1/discovery',
+      queryParameters: {
+        if (query['postal_code'] != null)
+          'postal_code': query['postal_code'].toString(),
+        'radius_miles': '30',
+        if (query['vehicle_id'] != null)
+          'vehicle_id': query['vehicle_id'].toString(),
+        if (query['specialty'] != null)
+          'specialty': query['specialty'].toString(),
+        'mobile_only': (query['mobile_only'] == true).toString(),
+      },
+    ).toString(),
+    timeout: const Duration(seconds: 60),
+  );
+  @override
+  Future<List<Json>> listDiscoveryFavorites(String vehicleId) async => rowsOf(
+    await _send(
+      'GET',
+      Uri(
+        path: '/v1/discovery/favorites',
+        queryParameters: {'vehicle_id': vehicleId},
+      ).toString(),
+      collection: true,
+    ),
+    'items',
+  );
+  @override
+  Future<Json> saveDiscoveryFavorite(String specialty, Json body) => _send(
+    'PUT',
+    '/v1/discovery/favorites/${Uri.encodeComponent(specialty)}',
+    body: body,
+  );
+  @override
+  Future<void> deleteDiscoveryFavorite(
+    String specialty,
+    String vehicleId,
+  ) async {
+    await _send(
+      'DELETE',
+      Uri(
+        path: '/v1/discovery/favorites/${Uri.encodeComponent(specialty)}',
+        queryParameters: {'vehicle_id': vehicleId},
+      ).toString(),
+    );
   }
 
   @override
@@ -372,7 +423,12 @@ class ApiPlusRepository extends PlusRepository {
   @override
   Future<AssistantAnswer> askAssistant(Json body) async =>
       AssistantAnswer.fromJson(
-        await _send('POST', '/v1/assistant', body: body),
+        await _send(
+          'POST',
+          '/v1/assistant',
+          body: body,
+          timeout: const Duration(seconds: 60),
+        ),
       );
 
   @override

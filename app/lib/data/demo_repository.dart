@@ -16,6 +16,102 @@ class DemoPlusRepository extends PlusRepository {
   final _history = <Json>[];
   final _vehicleImages = <String, VehiclePhoto>{};
 
+  final _dedicated = <String, Json>{};
+  @override
+  Future<Json> discoverProviders(Json query) async {
+    final snapshot = await bootstrap();
+    final postal = textOf(query, 'postal_code', snapshot.profile.postalCode);
+    final specialty = query['specialty'] as String?;
+    final vehicle = query['vehicle_id'] as String?;
+    final listings = <Json>[];
+    for (final p in snapshot.providers) {
+      if (p.json['public_visible'] == false ||
+          !p.acceptingRequests ||
+          (specialty != null && !p.specialties.contains(specialty))) {
+        continue;
+      }
+      // Fictional demo geography only; no public directory or provider is contacted.
+      if (!p.postalCodes.contains(postal) &&
+          !p.postalCodes.any(
+            (z) => z.length >= 2 && postal.startsWith(z.substring(0, 2)),
+          )) {
+        continue;
+      }
+      final modes = [
+        if (p.kind == 'shop') 'shop_visit',
+        if (p.mobileService && p.postalCodes.contains(postal)) 'mobile',
+      ];
+      listings.add({
+        ...p.json,
+        'source': 'estimoto',
+        'source_id': p.sourceId,
+        'request_modes': modes,
+        'distance_miles': 4.5,
+        'mobile_status': p.mobileService ? 'listed' : 'not_listed',
+        'vehicle_match': {'status': 'not_verified'},
+        'specialty_evidence': <Json>[],
+        'favorite': _dedicated.values.any(
+          (r) =>
+              r['vehicle_id'] == vehicle &&
+              r['source_id'] == p.sourceId &&
+              (specialty == null || r['specialty'] == specialty),
+        ),
+      });
+    }
+    final mobile = query['mobile_only'] == true;
+    final primary = mobile
+        ? listings
+              .where((r) => (r['request_modes'] as List).contains('mobile'))
+              .toList()
+        : listings;
+    final alternatives = mobile
+        ? listings
+              .where(
+                (r) =>
+                    r['kind'] == 'shop' &&
+                    !(r['request_modes'] as List).contains('mobile'),
+              )
+              .toList()
+        : <Json>[];
+    return {
+      'postal_code': postal,
+      'radius_miles': 30,
+      'distance_basis': 'zip_centroid',
+      'status': 'ready',
+      'exhaustive': false,
+      'truncated': false,
+      'checked_at': DateTime.now().toUtc().toIso8601String(),
+      'providers': primary.take(100).toList(),
+      'shop_visit_alternatives': alternatives
+          .take(100 - primary.take(100).length)
+          .toList(),
+      'source_attributions': <Json>[],
+      'message':
+          'Sample listings and distances only. No live directory or provider was contacted.',
+    };
+  }
+
+  @override
+  Future<List<Json>> listDiscoveryFavorites(String vehicleId) async =>
+      _dedicated.values
+          .where((r) => r['vehicle_id'] == vehicleId)
+          .map(_copy)
+          .toList();
+  @override
+  Future<Json> saveDiscoveryFavorite(String specialty, Json body) async {
+    final row = {...body, 'specialty': specialty};
+    _dedicated['${body['vehicle_id']}/$specialty'] = _copy(row);
+    return _copy(row);
+  }
+
+  @override
+  Future<void> deleteDiscoveryFavorite(
+    String specialty,
+    String vehicleId,
+  ) async {
+    _dedicated.remove('$vehicleId/$specialty');
+  }
+
   Json _calendar = {
     'configured': false,
     'connected': true,
@@ -592,23 +688,25 @@ class DemoPlusRepository extends PlusRepository {
           RegExp(
             r'at (my )?(home|house|work)|mobile|driveway|come to',
           ).hasMatch(message);
-      final providers = _rows('providers')
-          .map(ProviderProfile.fromJson)
-          .where(
-            (p) => p.matches(
-              specialty: specialty,
-              postalCode: postal,
-              mobileOnly: mobile,
-            ),
-          )
-          .toList();
+      final discovery = await discoverProviders({
+        ...body,
+        'specialty': specialty,
+        'mobile_only': mobile,
+      });
+      final providers = [
+        ...rowsOf(discovery, 'providers'),
+        ...rowsOf(discovery, 'shop_visit_alternatives'),
+      ];
       return AssistantAnswer.fromJson({
         'reply': providers.isEmpty
             ? 'I could not find a participating provider for that service and ZIP code. You can adjust the service or look for a shop instead of mobile help.'
-            : 'These ${mobile ? 'mobile ' : ''}providers cover $postal and handle ${specialtyLabel(specialty).toLowerCase()}. Choose one to review your request. Your preferred time will need their confirmation.',
+            : 'Here are sample nearby options for ${specialtyLabel(specialty).toLowerCase()}. Check whether each offers a shop visit or mobile service, then review your request. The provider must confirm availability.',
         'intent': 'find_provider',
         'specialty': specialty,
-        'providers': providers.map((p) => p.json).toList(),
+        'providers': providers,
+        'discovery': {...discovery}
+          ..remove('providers')
+          ..remove('shop_visit_alternatives'),
       });
     }
     final reply = RegExp(r'oil').hasMatch(message)

@@ -5,12 +5,16 @@ import '../widgets/common.dart';
 import '../widgets/workspace_widgets.dart';
 import '../widgets/calendar_slot_picker.dart';
 import '../services/calendar_time.dart';
+import '../widgets/discovery_results.dart';
 
 Future<void> requestProvider(
   BuildContext context,
   PlusController controller,
   ProviderProfile provider, {
   String? specialty,
+  String? serviceMode,
+  String? searchedVehicleId,
+  String? searchedPostalCode,
   String description = '',
 }) => showModalBottomSheet<void>(
   context: context,
@@ -19,6 +23,9 @@ Future<void> requestProvider(
     controller: controller,
     provider: controller.pendingRequest?.provider ?? provider,
     specialty: specialty,
+    serviceMode: serviceMode,
+    searchedVehicleId: searchedVehicleId,
+    searchedPostalCode: searchedPostalCode,
     description: description,
   ),
 );
@@ -29,11 +36,14 @@ class RequestSheet extends StatefulWidget {
     required this.controller,
     required this.provider,
     this.specialty,
+    this.serviceMode,
+    this.searchedVehicleId,
+    this.searchedPostalCode,
     this.description = '',
   });
   final PlusController controller;
   final ProviderProfile provider;
-  final String? specialty;
+  final String? specialty, serviceMode, searchedVehicleId, searchedPostalCode;
   final String description;
   @override
   State<RequestSheet> createState() => _RequestSheetState();
@@ -47,12 +57,26 @@ class _RequestSheetState extends WorkspaceState<RequestSheet> {
   final timing = TextEditingController();
   final form = GlobalKey<FormState>();
   late String specialty;
+  String? serviceMode;
   bool share = false;
+  bool get validSearch =>
+      locked ||
+      (widget.searchedPostalCode == null ||
+              widget.searchedPostalCode ==
+                  controller.snapshot?.profile.postalCode) &&
+          (widget.searchedVehicleId == null ||
+              widget.searchedVehicleId == controller.selectedVehicle?.id);
   bool get locked => widget.controller.pendingRequest != null;
   @override
   void initState() {
     super.initState();
     final pending = widget.controller.pendingRequest;
+    serviceMode = pending != null
+        ? pending.body['service_mode'] as String?
+        : widget.serviceMode ??
+              (widget.provider.requestModes.length == 1
+                  ? widget.provider.requestModes.single
+                  : null);
     description = TextEditingController(
       text: pending == null
           ? widget.description
@@ -74,7 +98,7 @@ class _RequestSheetState extends WorkspaceState<RequestSheet> {
   }
 
   Future<void> send() async {
-    if (!active || busy) return;
+    if (!active || busy || !validSearch) return;
     if (!form.currentState!.validate()) return;
     if (!share) {
       setState(
@@ -101,6 +125,14 @@ class _RequestSheetState extends WorkspaceState<RequestSheet> {
       );
       return;
     }
+    if (pending == null &&
+        (widget.provider.independent ||
+            !widget.provider.requestModes.contains(serviceMode))) {
+      setState(
+        () => error = 'Choose an available shop visit or mobile service.',
+      );
+      return;
+    }
     final body =
         pending?.body ??
         <String, dynamic>{
@@ -110,6 +142,7 @@ class _RequestSheetState extends WorkspaceState<RequestSheet> {
           'description': description.text.trim(),
           'preferred_time': timing.text.trim(),
           'share_contact': true,
+          'service_mode': serviceMode,
           if (calendar != null) ...calendar!.requestFields,
         };
     setState(() {
@@ -152,6 +185,14 @@ class _RequestSheetState extends WorkspaceState<RequestSheet> {
   @override
   Widget build(BuildContext context) {
     if (!current) return unavailable;
+    if (!validSearch) {
+      return const FormSheet(
+        title: 'Your search changed',
+        child: Text(
+          'Close this review and find nearby providers for your current vehicle and service ZIP.',
+        ),
+      );
+    }
     final p = widget.controller.snapshot!.profile;
     final canSend =
         widget.controller.isDemo ||
@@ -190,11 +231,19 @@ class _RequestSheetState extends WorkspaceState<RequestSheet> {
                         ?.title ??
                     'Your saved vehicle',
               ),
-            ] else
+            ] else if (widget.searchedVehicleId != null)
+              Text(
+                controller.snapshot!
+                        .vehicle(widget.searchedVehicleId!)
+                        ?.title ??
+                    'Your selected vehicle',
+              )
+            else
               VehiclePicker(controller: widget.controller),
             const SizedBox(height: 16),
             DropdownButtonFormField<String>(
               initialValue: specialty,
+              isExpanded: true,
               decoration: const InputDecoration(labelText: 'Service'),
               items: widget.provider.specialties
                   .map(
@@ -208,6 +257,40 @@ class _RequestSheetState extends WorkspaceState<RequestSheet> {
                   ? null
                   : (s) => setState(() => specialty = s ?? specialty),
             ),
+            const SizedBox(height: 16),
+            if (locked)
+              ReviewBlock(
+                'Service location',
+                serviceMode == null
+                    ? 'As previously submitted'
+                    : serviceModeLabel(serviceMode!),
+              )
+            else ...[
+              const Text(
+                'Service location',
+                style: TextStyle(fontWeight: FontWeight.w600),
+              ),
+              const SizedBox(height: 8),
+              for (final mode in widget.provider.requestModes)
+                Padding(
+                  padding: const EdgeInsets.only(bottom: 8),
+                  child: OutlinedButton.icon(
+                    key: Key('request-mode-$mode'),
+                    onPressed: busy
+                        ? null
+                        : () => setState(() {
+                            serviceMode = mode;
+                            share = false;
+                          }),
+                    icon: Icon(
+                      serviceMode == mode
+                          ? Icons.radio_button_checked
+                          : Icons.radio_button_off,
+                    ),
+                    label: Text(serviceModeLabel(mode)),
+                  ),
+                ),
+            ],
             const SizedBox(height: 16),
             TextFormField(
               key: const Key('request-description'),
@@ -312,7 +395,10 @@ class _RequestSheetState extends WorkspaceState<RequestSheet> {
               ),
               onChanged: busy
                   ? null
-                  : (value) => setState(() => share = value == true),
+                  : (value) => setState(() {
+                      share = value == true;
+                      error = null;
+                    }),
             ),
             if (widget.controller.isDemo)
               const Padding(

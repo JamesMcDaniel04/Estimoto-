@@ -66,6 +66,18 @@ class ProviderProfile {
       (json['specialties'] as List? ?? []).cast<String>();
   List<String> get postalCodes =>
       (json['postal_codes'] as List? ?? []).cast<String>();
+  String get source => textOf(json, 'source', 'estimoto');
+  String get sourceId => textOf(json, 'source_id', id);
+  bool get independent => source != 'estimoto';
+  List<String> get requestModes => independent || !acceptingRequests
+      ? []
+      : json.containsKey('request_modes')
+      ? (json['request_modes'] as List? ?? [])
+            .whereType<String>()
+            .where((s) => ['shop_visit', 'mobile'].contains(s))
+            .toList()
+      : [if (kind == 'shop') 'shop_visit', if (mobileService) 'mobile'];
+  double? get distanceMiles => (json['distance_miles'] as num?)?.toDouble();
   bool get mobileService => json['mobile_service'] == true;
   bool get acceptingRequests => json['accepting_requests'] == true;
   bool matches({
@@ -210,10 +222,14 @@ class AssistantAnswer {
         json,
         'providers',
       ).map(ProviderProfile.fromJson).toList(),
-      videos = rowsOf(json, 'videos');
+      videos = rowsOf(json, 'videos'),
+      discovery = json['discovery'] is Map
+          ? Map<String, dynamic>.from(json['discovery'] as Map)
+          : null;
   final String reply;
   final String intent;
   final String? specialty;
   final List<ProviderProfile> providers;
   final List<Json> videos;
+  final Json? discovery;
 }

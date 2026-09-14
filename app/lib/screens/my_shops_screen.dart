@@ -4,6 +4,7 @@ import '../state/plus_controller.dart';
 import '../widgets/common.dart';
 import '../widgets/workspace_widgets.dart';
 import 'shop_outreach_screen.dart';
+import '../widgets/dedicated_shop_choice.dart';
 
 void openMyShops(
   BuildContext context,
@@ -245,6 +246,32 @@ class _MyShopsScreenState extends WorkspaceState<MyShopsScreen> {
                         ),
                       const SizedBox(height: 16),
                       OutlinedButton.icon(
+                        onPressed: busy || controller.selectedVehicle == null
+                            ? null
+                            : () => perform(() async {
+                                final saved = await chooseDedicatedShop(
+                                  context,
+                                  controller,
+                                  source: 'my_shop',
+                                  sourceId: textOf(shop, 'id'),
+                                  vehicleId: controller.selectedVehicle!.id,
+                                );
+                                if (mounted &&
+                                    context.mounted &&
+                                    active &&
+                                    saved) {
+                                  showMessage(
+                                    context,
+                                    'Dedicated shop preference updated.',
+                                  );
+                                }
+                              }),
+                        icon: const Icon(Icons.bookmark_outline),
+                        label: Text(
+                          'Dedicated shop for ${controller.selectedVehicle?.title ?? 'a saved vehicle'}',
+                        ),
+                      ),
+                      OutlinedButton.icon(
                         onPressed: busy ? null : () => schedule(shop),
                         icon: const Icon(Icons.event_outlined),
                         label: const Text('Prepare a scheduling request'),
@@ -301,9 +328,14 @@ class _MyShopsScreenState extends WorkspaceState<MyShopsScreen> {
 }
 
 class ShopEditor extends StatefulWidget {
-  const ShopEditor({super.key, required this.controller, this.shop});
+  const ShopEditor({
+    super.key,
+    required this.controller,
+    this.shop,
+    this.initialContact,
+  });
   final PlusController controller;
-  final Json? shop;
+  final Json? shop, initialContact;
   @override
   State<ShopEditor> createState() => _ShopEditorState();
 }
@@ -325,9 +357,12 @@ class _ShopEditorState extends WorkspaceState<ShopEditor> {
       'website',
       'notes',
     ]) {
-      fields[key] = TextEditingController(text: textOf(widget.shop ?? {}, key));
+      fields[key] = TextEditingController(
+        text: textOf(widget.shop ?? widget.initialContact ?? {}, key),
+      );
     }
-    vehicleId = widget.shop?['vehicle_id'] as String?;
+    vehicleId =
+        (widget.shop ?? widget.initialContact)?['vehicle_id'] as String?;
   }
 
   @override

@@ -6,8 +6,22 @@ import '../data/pending_request_store.dart';
 import '../domain/models.dart';
 
 class ChatEntry {
-  ChatEntry.user(this.text) : answer = null;
-  ChatEntry.assistant(this.answer) : text = answer!.reply;
+  ChatEntry.user(this.text)
+    : answer = null,
+      vehicleId = null,
+      postalCode = '',
+      mobileOnly = false,
+      prompt = '';
+  ChatEntry.assistant(
+    this.answer, {
+    this.vehicleId,
+    this.postalCode = '',
+    this.mobileOnly = false,
+    this.prompt = '',
+  }) : text = answer!.reply;
+  final String? vehicleId;
+  final String postalCode, prompt;
+  final bool mobileOnly;
   final String text;
   final AssistantAnswer? answer;
   bool get isUser => answer == null;
@@ -255,19 +269,53 @@ class PlusController extends ChangeNotifier {
   }
 
   Future<void> ask(String message) async {
-    if (asking || message.trim().isEmpty) return;
+    final customer = snapshot?.profile.id;
+    if (asking ||
+        message.trim().isEmpty ||
+        customer == null ||
+        !isCurrentCustomer(customer)) {
+      return;
+    }
+    final vehicle = selectedVehicle?.id, postal = snapshot!.profile.postalCode;
+    final mobile = RegExp(
+      r'mobile|come to me|come to my|at my (home|work|house)',
+      caseSensitive: false,
+    ).hasMatch(message);
     messages.add(ChatEntry.user(message.trim()));
     asking = true;
     _notify();
     try {
       final answer = await repository.askAssistant({
         'message': message.trim(),
-        'vehicle_id': selectedVehicle?.id,
-        'postal_code': snapshot?.profile.postalCode ?? '',
-        'mobile_only': false,
+        'vehicle_id': vehicle,
+        'postal_code': postal,
+        'mobile_only': mobile,
       });
-      messages.add(ChatEntry.assistant(answer));
+      if (!isCurrentCustomer(customer)) return;
+      if (selectedVehicle?.id != vehicle ||
+          snapshot!.profile.postalCode != postal) {
+        messages.add(
+          ChatEntry.assistant(
+            AssistantAnswer.fromJson({
+              'reply':
+                  'Your vehicle or service ZIP changed while I was checking. Ask again for the current selection.',
+              'intent': 'clarify',
+            }),
+          ),
+        );
+        return;
+      }
+      messages.add(
+        ChatEntry.assistant(
+          answer,
+          vehicleId: vehicle,
+          postalCode: postal,
+          mobileOnly: mobile,
+          prompt: message.trim(),
+        ),
+      );
     } catch (e) {
+      if (!isCurrentCustomer(customer)) return;
       messages.add(
         ChatEntry.assistant(
           AssistantAnswer.fromJson({

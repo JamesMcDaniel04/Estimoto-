@@ -53,6 +53,27 @@ abstract class PlusRepository {
   Future<Json> addKnowledgeRecord(Json body, String idempotencyKey);
   Future<void> deleteKnowledgeRecord(String id);
   Future<Json> saveKnowledgePreferences(Json body);
+  Future<Json> discoverProviders(Json query) async => {
+    'providers': <Json>[],
+    'shop_visit_alternatives': <Json>[],
+    'status': 'unavailable',
+    'postal_code': query['postal_code'],
+    'radius_miles': 30,
+    'distance_basis': 'zip_centroid',
+    'exhaustive': false,
+    'truncated': false,
+    'source_attributions': <Json>[],
+    'message': 'Nearby listings are unavailable. Try again later.',
+  };
+  Future<List<Json>> listDiscoveryFavorites(String vehicleId) async => [];
+  Future<Json> saveDiscoveryFavorite(String specialty, Json body) =>
+      throw const PlusApiException(
+        'Dedicated shops are unavailable. Try again later.',
+      );
+  Future<void> deleteDiscoveryFavorite(String specialty, String vehicleId) =>
+      throw const PlusApiException(
+        'Dedicated shops are unavailable. Try again later.',
+      );
   Future<Json> getCalendarStatus() async => {
     'configured': false,
     'connected': false,
