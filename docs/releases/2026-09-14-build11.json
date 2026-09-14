@@ -1,0 +1,137 @@
+{
+  "schema": 1,
+  "version": "0.1.0",
+  "build": 11,
+  "source_sha": "9c53dd85889938dd40a8195b89dc4a43bc98f4f9",
+  "previous_release_record": "2026-09-14-build10.json",
+  "change": "Receipt photo/PDF controls appear directly on Add service history. Fixed Save action, inline confirmed-entry receipt editor, honest attachment status and Done. Existing request cards and Settings retained.",
+  "validation": {
+    "flutter_passed": 227,
+    "flutter_analysis": "No issues found",
+    "focused_backend_receipt_pdf_passed": 15,
+    "chrome_inline_picker_passed": 1,
+    "capture_web_passed": 19,
+    "capture_build_passed": true,
+    "backend_unchanged_from_build10": true,
+    "earlier_backend_gate_record": "2026-09-14-build8.json"
+  },
+  "live": {
+    "source_sha": "9c53dd85889938dd40a8195b89dc4a43bc98f4f9",
+    "checked_at": "2026-09-14T07:26:31.053229+00:00",
+    "ready": {
+      "status": "ready",
+      "schema_revision": "a63e90b72d14"
+    },
+    "main_js_matches_local": true,
+    "main_js_sha256": "df38b6ce7a63aff8dd6a29fc1ffa677fbee613fb8072f40bb5d8da0576da34fc"
+  },
+  "android": {
+    "asset_url": "https://github.com/JamesMcDaniel04/Estimoto-/releases/download/v0.1.0-beta.11/estimoto-plus-0.1.0-11.apk",
+    "byte_size": 62534023,
+    "certificate_sha256": "e6d106fccc6c0e77e04a46c64f8edffdafb11b502d4857e51606c725086581dd",
+    "package": "io.estimoto.plus",
+    "sha256": "b935330a70aae1e4d297399a4116ecfd8372e1d46a231a383f262839d5512e41",
+    "version_code": 11,
+    "version_name": "0.1.0",
+    "download_url": "/android/download",
+    "aab_sha256": "8f1d35a9f735434cefae8e7eef2d68fdf344c709dca8caebb597e60f3703d19a",
+    "aab_bytes": 60328339,
+    "public_apk_download_hash_verified": true,
+    "installed_exact_public_apk_over_build10_on_emulator": true,
+    "physical_device_verified": false
+  },
+  "ios": {
+    "app_id": "6811678079",
+    "build_id": "8c5faefa-35cf-4df4-b008-3cce5c6ff57f",
+    "build_number": 11,
+    "ipa_sha256": "2a2ecf658eb91513563098c539ed637d2d8a717d4e945735f3cb33baf2d68288",
+    "ipa_bytes": 25900287,
+    "signature": "verified",
+    "upload_exit_code": 0,
+    "processing": "VALID",
+    "groups": [
+      {
+        "id": "802bde7a-afd5-476f-8fd3-bb9fb054bf8b",
+        "name": "Internal Testers",
+        "isInternalGroup": true,
+        "publicLinkEnabled": null
+      },
+      {
+        "id": "07b3da65-a780-43e3-a089-2597051912af",
+        "name": "Customer Preview",
+        "isInternalGroup": false,
+        "publicLinkEnabled": true
+      }
+    ],
+    "notes": {
+      "locale": "en-US",
+      "exact_match_after_file_trim": true,
+      "actual_length": 592,
+      "expected_length": 592,
+      "actual_sha256": "daaf8fef1d1a3ccb7d30c62aaf25c52e24aed639b7c2c99a319ebb1582dd691f",
+      "expected_sha256": "daaf8fef1d1a3ccb7d30c62aaf25c52e24aed639b7c2c99a319ebb1582dd691f"
+    },
+    "beta_detail": {
+      "autoNotifyEnabled": true,
+      "internalBuildState": "IN_BETA_TESTING",
+      "externalBuildState": "READY_FOR_BETA_SUBMISSION"
+    },
+    "readback_at": "2026-09-14T07:33:36.745013+00:00",
+    "external_review_submission_attempted": false,
+    "existing_build2_review_preserved": true,
+    "physical_device_verified": false,
+    "evidence_sha256": "0130137c18b414f9bf5b38a29baed1f8b19b6909266a8153869e85a2b4628750"
+  },
+  "ui_verification": {
+    "source_sha": "9c53dd85889938dd40a8195b89dc4a43bc98f4f9",
+    "checked_at": "2026-09-14T07:37:47.000317+00:00",
+    "android_version_code": 11,
+    "installed_exact_public_apk_over_build10": true,
+    "native_receipt_buttons_visible_before_optional_fields": true,
+    "native_pdf_picker_selected_fixture": true,
+    "native_private_pdf_rendered": true,
+    "native_cancel_preserved_one_receipt": true,
+    "native_reopened_saved_entry": true,
+    "web_demo_visible_controls_and_inline_save_verified": true,
+    "web_demo_done_returned_to_one_entry": true,
+    "synthetic_auth_account_and_exact_fixture_cleanup_verified": true,
+    "deleted_token_read_and_write_status": 401,
+    "qa_sessions_signed_out": true,
+    "web_qa_tab_closed": true,
+    "physical_device_verified": false,
+    "screenshots": {
+      "plus11-android-receipt-form.png": "5e7d68e2d2d8fb4db04f0e5cab63b56ed1627f1e138756acd3a0d46e72da750d",
+      "plus11-android-receipt-saved.png": "f7855158f6060c74963332bb0a3d674ea78fde8a64713d30fa23bb49294308ba",
+      "plus11-android-receipt-view.png": "7d1820ca75e3a2527b702bfe15edca28d23de2beb88f7f24d34015f73fd2643a",
+      "plus11-web-receipt-form.png": "81db5f2f804bce544da81a2f14a05027d479cb853853c23f07f25260f732fd37",
+      "plus11-web-receipt-saved.png": "1b3f95f028bdcc7d3214f2cda4b12b1840c8fcd5f81ff3819fe9a8a5506ffd0d"
+    }
+  },
+  "live_receipt_upload": {
+    "source_sha": "9c53dd85889938dd40a8195b89dc4a43bc98f4f9",
+    "checked_at": "2026-09-14T07:35:26.211555+00:00",
+    "synthetic_owner": true,
+    "one_record_one_receipt": true,
+    "native_selected_pdf_bytes_match": true,
+    "private_no_store": true,
+    "unauthenticated_download_status": 401,
+    "receipt_sha256": "cba93d365339d1d1f4c5a9596b7aa557d469d2b6d6e76d1f05bb93cf70ec8426",
+    "bytes": 844
+  },
+  "invite": {
+    "new_email_sent": false,
+    "existing_delivered_invite_uses_stable_url": true,
+    "stable_url": "https://estimoto-plus-api.fly.dev/android/download"
+  },
+  "hosted_ci": {
+    "run_id": 34817696365,
+    "check_id": 103891868936,
+    "jobs_with_steps": 0,
+    "status": "blocked_by_account_billing"
+  },
+  "remaining_limits": [
+    "Real customer mailbox/code entry and physical-device QA remain unverified; this release used an isolated synthetic account.",
+    "Plus external TestFlight approval still awaits the existing build2 review.",
+    "Provider and customer connection limits in release-status.md remain."
+  ]
+}
