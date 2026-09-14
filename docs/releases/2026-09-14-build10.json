@@ -1,0 +1,120 @@
+{
+  "schema": 1,
+  "version": "0.1.0",
+  "build": 10,
+  "source_sha": "62683757a569c3c82e37bbbf03be6658d780f77f",
+  "previous_release_record": "2026-09-14-build9.json",
+  "change": "Network providers accepting requests have a Request help card button. Card body opens the profile. Includes concurrently merged Settings and mobile version define initialization.",
+  "validation": {
+    "flutter_passed": 217,
+    "flutter_analysis": "No issues found",
+    "capture_web_passed": 19,
+    "capture_build_passed": true,
+    "backend_unchanged_from_build9": true,
+    "earlier_backend_gate_record": "2026-09-14-build8.json"
+  },
+  "live": {
+    "source_sha": "62683757a569c3c82e37bbbf03be6658d780f77f",
+    "checked_at": "2026-09-14T07:05:17.253996+00:00",
+    "ready": {
+      "status": "ready",
+      "schema_revision": "a63e90b72d14"
+    },
+    "main_js_matches_local": true,
+    "main_js_sha256": "4fcb1a84baca12f936f7e3ef5d6147c9e1379d3a13b59cd349357279069ebc61"
+  },
+  "android": {
+    "asset_url": "https://github.com/JamesMcDaniel04/Estimoto-/releases/download/v0.1.0-beta.10/estimoto-plus-0.1.0-10.apk",
+    "byte_size": 62534023,
+    "certificate_sha256": "e6d106fccc6c0e77e04a46c64f8edffdafb11b502d4857e51606c725086581dd",
+    "package": "io.estimoto.plus",
+    "sha256": "dc4670b561cbd0736baf44a27334c4d1b24098d79afbdc629a6d8cbfa07d6bf3",
+    "version_code": 10,
+    "version_name": "0.1.0",
+    "download_url": "/android/download",
+    "apk_sha256": "dc4670b561cbd0736baf44a27334c4d1b24098d79afbdc629a6d8cbfa07d6bf3",
+    "apk_bytes": 62534023,
+    "aab_sha256": "966823ba7683cffe367a47d1f7a31f95e8ab03ccde28347b68ea8827948ebfd1",
+    "aab_bytes": 60332076,
+    "public_apk_download_hash_verified": true,
+    "installed_exact_public_apk_over_build9_on_emulator": true,
+    "physical_device_verified": false
+  },
+  "ios": {
+    "app_id": "6811678079",
+    "build_id": "63747bc9-e640-46f0-810c-b1aeb6ea1a74",
+    "build_number": 10,
+    "ipa_sha256": "e3ceff8c3d85798f5c877e895caa8b49eb11188a4ac3632003c50d7e245d2fc6",
+    "ipa_bytes": 25901352,
+    "signature": "verified",
+    "upload_exit_code": 0,
+    "processing": "VALID",
+    "groups": [
+      {
+        "id": "802bde7a-afd5-476f-8fd3-bb9fb054bf8b",
+        "name": "Internal Testers",
+        "isInternalGroup": true,
+        "publicLinkEnabled": null
+      },
+      {
+        "id": "07b3da65-a780-43e3-a089-2597051912af",
+        "name": "Customer Preview",
+        "isInternalGroup": false,
+        "publicLinkEnabled": true
+      }
+    ],
+    "notes": {
+      "locale": "en-US",
+      "exact_match_after_file_trim": true,
+      "actual_length": 561,
+      "expected_length": 561,
+      "actual_sha256": "776acc23ff2805886ab2940b9e8f69b5887f4ed30adc2f27297f788859c31947",
+      "expected_sha256": "776acc23ff2805886ab2940b9e8f69b5887f4ed30adc2f27297f788859c31947"
+    },
+    "beta_detail": {
+      "autoNotifyEnabled": true,
+      "internalBuildState": "IN_BETA_TESTING",
+      "externalBuildState": "READY_FOR_BETA_SUBMISSION"
+    },
+    "readback_at": "2026-09-14T07:11:24.949350+00:00",
+    "external_review_submission_attempted": false,
+    "existing_build2_review_preserved": true,
+    "physical_device_verified": false,
+    "evidence_sha256": "150949aae01e4692d80067c51f0b207bdefcbd8acf5bf2b31e76179ffa5fb966"
+  },
+  "ui_verification": {
+    "source_sha": "62683757a569c3c82e37bbbf03be6658d780f77f",
+    "checked_at": "2026-09-14T07:11:43.156329+00:00",
+    "android_version_code": 10,
+    "android_request_badge_verified": true,
+    "android_profile_tap_verified": true,
+    "web_request_badge_and_profile_verified": true,
+    "web_settings_version_and_source_verified": true,
+    "demo_only": true,
+    "no_real_requests_sent": true,
+    "no_new_auth_accounts_created": true,
+    "sample_sessions_left_and_qa_browser_tab_closed": true,
+    "physical_device_verified": false,
+    "screenshots": {
+      "plus10-android-card.png": "dfb67879dc7682c6bd8ef2491884132b9abc232f0ccaf43a8a5b858f34b4f153",
+      "plus10-android-request-review.png": "fd2d1db917f9cab2a543613f0936fccf377919a1bccb12d72ac3f98dd92c14e9",
+      "plus10-web-request-review.png": "01820de3ec913a6aa516a9ddb9d2bbeb13f0d1d70ed1e1751af5b61ed6e5da7b"
+    }
+  },
+  "invite": {
+    "new_email_sent": false,
+    "existing_delivered_invite_uses_stable_url": true,
+    "stable_url": "https://estimoto-plus-api.fly.dev/android/download"
+  },
+  "hosted_ci": {
+    "run_id": 34815970821,
+    "check_id": 103886600083,
+    "jobs_with_steps": 0,
+    "status": "blocked_by_account_billing"
+  },
+  "remaining_limits": [
+    "Real customer mailbox/code entry and physical-device QA remain unverified.",
+    "Plus external TestFlight approval still awaits the existing build2 review.",
+    "Provider/customer connection limits in release-status.md remain."
+  ]
+}

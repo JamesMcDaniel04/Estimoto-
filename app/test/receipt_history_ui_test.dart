@@ -10,6 +10,7 @@ import 'package:estimoto_plus/domain/models.dart';
 import 'package:estimoto_plus/screens/history_receipts_screen.dart';
 import 'package:estimoto_plus/screens/history_screen.dart';
 import 'package:estimoto_plus/services/estimate_capture.dart';
+import 'package:estimoto_plus/services/customer_workspace.dart';
 import 'package:estimoto_plus/services/receipt_api.dart';
 import 'package:estimoto_plus/services/receipt_pending.dart';
 import 'package:estimoto_plus/state/plus_controller.dart';
@@ -18,6 +19,24 @@ import 'package:estimoto_plus/widgets/history_cost_summary.dart';
 
 class _Repo extends DemoPlusRepository {
   bool failFirst = false, failKnowledge = false;
+  bool commitBeforeUploadFailure = false;
+  bool uncertainHistory = false;
+  Completer<void>? historyGate;
+  final historyWrites = <(Json, String)>[];
+  @override
+  Future<Json> addKnowledgeRecord(Json body, String idempotencyKey) async {
+    historyWrites.add((Map<String, dynamic>.from(body), idempotencyKey));
+    final result = await super.addKnowledgeRecord(body, idempotencyKey);
+    await historyGate?.future;
+    if (uncertainHistory && historyWrites.length == 1) {
+      throw const PlusApiException(
+        'Connection lost while saving history.',
+        408,
+      );
+    }
+    return result;
+  }
+
   Completer<Json>? delayedKnowledge;
   int reads = 0;
   @override
@@ -45,6 +64,7 @@ class _Api extends ReceiptApi {
   Future<Json> upload(ReceiptPending value) async {
     repo.uploads.add(value);
     if (repo.failFirst && repo.uploads.length == 1) {
+      if (repo.commitBeforeUploadFailure) await delegate.upload(value);
       throw const PlusApiException(
         'Connection lost. Retry the saved receipt.',
         408,
@@ -63,8 +83,13 @@ class _Picker extends EstimatePhotoPicker {
   Future<XFile?> Function()? callback;
   XFile? lost;
   int recovered = 0;
+  final sources = <ImageSource>[];
   @override
-  Future<XFile?> pick(ImageSource source) async => callback?.call();
+  Future<XFile?> pick(ImageSource source) async {
+    sources.add(source);
+    return callback?.call();
+  }
+
   @override
   Future<XFile?> recover() async {
     recovered++;
@@ -123,6 +148,386 @@ Future<void> tap(WidgetTester t, String text) async {
 
 void main() {
   setUpAll(loadReceiptProofFonts);
+  testWidgets(
+    'inline receipt choices validate before saving and keep cancellation honest',
+    (t) async {
+      final repo = _Repo();
+      final c = PlusController(repo);
+      await c.refresh();
+      final store = MemoryReceiptPendingStore();
+      var picks = 0;
+      await mount(
+        t,
+        HistoryEditor(
+          controller: c,
+          receiptStore: store,
+          pdfPicker: () async {
+            picks++;
+            return picks == 1
+                ? null
+                : XFile.fromData(
+                    Uint8List.fromList('%PDF-1.4 receipt'.codeUnits),
+                    name: 'service.pdf',
+                  );
+          },
+        ),
+      );
+      expect(find.text('Take photo'), findsOneWidget);
+      expect(find.text('Choose photo'), findsOneWidget);
+      expect(find.text('Choose PDF'), findsOneWidget);
+      expect(
+        find.textContaining('saves the details in this form first'),
+        findsOneWidget,
+      );
+      expect(find.text('Save history entry').hitTestable(), findsOneWidget);
+      final cost = find.byKey(const ValueKey('history-cost_cents'));
+      await t.ensureVisible(cost);
+      await t.enterText(cost, '12.345');
+      await tap(t, 'Choose PDF');
+      expect(picks, 0);
+      expect(repo.historyWrites, isEmpty);
+      await t.ensureVisible(cost);
+      await t.enterText(cost, '81.27');
+      await tap(t, 'Choose PDF');
+      expect(picks, 1);
+      expect(repo.historyWrites, hasLength(1));
+      final entry = rowsOf(await repo.getKnowledge(), 'records').single;
+      expect(entry['cost_cents'], 8127);
+      expect(find.text('History entry saved.'), findsOneWidget);
+      expect(find.textContaining('No receipt attached yet.'), findsOneWidget);
+      expect(find.text('Done').hitTestable(), findsOneWidget);
+      expect(repo.uploads, isEmpty);
+      expect(await store.read(c.snapshot!.profile.id), isNull);
+      await tap(t, 'Choose PDF');
+      expect(repo.historyWrites, hasLength(1));
+      expect(repo.uploads.single.recordId, entry['id']);
+      expect(repo.uploads.single.ownerId, c.snapshot!.profile.id);
+      expect(find.text('Receipt saved privately.'), findsOneWidget);
+      expect(find.textContaining('No receipt attached yet.'), findsNothing);
+      expect(t.takeException(), isNull);
+    },
+  );
+  testWidgets(
+    'uncertain inline history save never opens picker and recovers the original entry once',
+    (t) async {
+      final repo = _Repo()..uncertainHistory = true;
+      final c = PlusController(repo);
+      await c.refresh();
+      var picks = 0;
+      await mount(
+        t,
+        HistoryEditor(
+          controller: c,
+          pdfPicker: () async {
+            picks++;
+            return null;
+          },
+        ),
+      );
+      final shop = find.byKey(const ValueKey('history-shop_name'));
+      await t.ensureVisible(shop);
+      await t.enterText(shop, 'Original repair shop');
+      await tap(t, 'Choose PDF');
+      expect(picks, 0);
+      expect(repo.historyWrites, hasLength(1));
+      expect(rowsOf(await repo.getKnowledge(), 'records'), hasLength(1));
+      expect(find.text('Recover saved entry'), findsOneWidget);
+      expect(t.widget<TextFormField>(shop).enabled, isFalse);
+      final original = await CustomerWorkspace.forController(
+        c,
+      ).pending('history-record');
+      expect(original, isNotNull);
+      await mount(t, const SizedBox());
+      await mount(
+        t,
+        HistoryEditor(
+          controller: c,
+          pdfPicker: () async {
+            picks++;
+            return null;
+          },
+        ),
+      );
+      expect(picks, 0);
+      await tap(t, 'Choose PDF');
+      expect(picks, 1);
+      expect(repo.historyWrites, hasLength(2));
+      expect(repo.historyWrites.last.$2, original!.key);
+      expect(repo.historyWrites.last.$1, repo.historyWrites.first.$1);
+      expect(rowsOf(await repo.getKnowledge(), 'records'), hasLength(1));
+      expect(find.text('History entry saved.'), findsOneWidget);
+      expect(
+        await CustomerWorkspace.forController(c).pending('history-record'),
+        isNull,
+      );
+      expect(t.takeException(), isNull);
+    },
+  );
+  testWidgets('account change during inline save never opens a picker', (
+    t,
+  ) async {
+    final repo = _Repo()..historyGate = Completer<void>();
+    final c = PlusController(repo);
+    await c.refresh();
+    var picks = 0;
+    await mount(
+      t,
+      HistoryEditor(
+        controller: c,
+        pdfPicker: () async {
+          picks++;
+          return null;
+        },
+      ),
+    );
+    await t.ensureVisible(find.text('Choose PDF'));
+    await t.tap(find.text('Choose PDF'));
+    await t.pump();
+    expect(repo.historyWrites, hasLength(1));
+    c.invalidateSession();
+    repo.historyGate!.complete();
+    await t.pumpAndSettle();
+    expect(picks, 0);
+    expect(repo.uploads, isEmpty);
+    expect(find.text('Sign in to view your saved details.'), findsOneWidget);
+  });
+  for (final source in ImageSource.values) {
+    testWidgets(
+      'inline $source attaches only to the confirmed history record',
+      (t) async {
+        final repo = _Repo();
+        final c = PlusController(repo);
+        await c.refresh();
+        final native = MemoryEstimateCaptureStore();
+        final store = MemoryReceiptPendingStore();
+        String? pickedTarget;
+        final picker = _Picker()
+          ..callback = () async {
+            final entry = rowsOf(await repo.getKnowledge(), 'records').single;
+            pickedTarget = native.value!.estimateId;
+            expect(pickedTarget, entry['id']);
+            expect(native.value!.customerId, c.snapshot!.profile.id);
+            expect(native.value!.targetKind, 'receipt');
+            return XFile('/private/receipt.jpg');
+          };
+        await mount(
+          t,
+          HistoryEditor(
+            controller: c,
+            receiptStore: store,
+            captureService: EstimateCaptureService(
+              store: native,
+              picker: picker,
+              readBytes: (_) async => Uint8List.fromList([255, 216, 255, 1]),
+            ),
+          ),
+        );
+        await tap(
+          t,
+          source == ImageSource.camera ? 'Take photo' : 'Choose photo',
+        );
+        expect(picker.sources, [source]);
+        expect(repo.uploads.single.recordId, pickedTarget);
+        expect(repo.historyWrites, hasLength(1));
+        expect(native.value, isNull);
+        expect(await store.read(c.snapshot!.profile.id), isNull);
+        expect(find.text('Receipt saved privately.'), findsOneWidget);
+        await t.tap(find.byTooltip('Refresh receipts'));
+        await t.pumpAndSettle();
+        expect(picker.sources, [source]);
+        expect(repo.uploads, hasLength(1));
+        expect(t.takeException(), isNull);
+      },
+    );
+  }
+  testWidgets(
+    'inline receipt retry keeps the exact committed upload after uncertainty',
+    (t) async {
+      final repo = _Repo()
+        ..failFirst = true
+        ..commitBeforeUploadFailure = true;
+      final c = PlusController(repo);
+      await c.refresh();
+      final store = MemoryReceiptPendingStore();
+      var picks = 0;
+      await mount(
+        t,
+        HistoryEditor(
+          controller: c,
+          receiptStore: store,
+          pdfPicker: () async {
+            picks++;
+            return XFile.fromData(
+              Uint8List.fromList('%PDF-1.4 receipt'.codeUnits),
+              name: 'saved.pdf',
+            );
+          },
+        ),
+      );
+      await tap(t, 'Choose PDF');
+      final pending = await store.read(c.snapshot!.profile.id);
+      expect(pending, isNotNull);
+      expect(repo.uploads, hasLength(1));
+      expect(find.text('Attachment waiting to finish'), findsOneWidget);
+      expect(
+        find.textContaining('A receipt is waiting for confirmation.'),
+        findsOneWidget,
+      );
+      expect(find.textContaining('No receipt attached yet.'), findsNothing);
+      await mount(t, const SizedBox());
+      await mount(
+        t,
+        HistoryReceiptsScreen(
+          controller: c,
+          recordId: pending!.recordId,
+          store: store,
+        ),
+      );
+      expect(repo.uploads, hasLength(1));
+      expect(picks, 1);
+      await tap(t, 'Retry saved receipt');
+      expect(repo.uploads, hasLength(2));
+      expect(repo.uploads.last.samePayload(pending), isTrue);
+      expect(repo.historyWrites, hasLength(1));
+      final entry = rowsOf(await repo.getKnowledge(), 'records').single;
+      expect(rowsOf(entry, 'receipts'), hasLength(1));
+      expect(await store.read(c.snapshot!.profile.id), isNull);
+    },
+  );
+  testWidgets(
+    'another entry pending receipt blocks the inline picker without rebinding bytes',
+    (t) async {
+      final repo = _Repo();
+      final (c, original) = await _setup(repo);
+      final store = MemoryReceiptPendingStore();
+      final pending = ReceiptPending(
+        ownerId: c.snapshot!.profile.id,
+        recordId: original['id'],
+        operationId: '11111111-1111-4111-8111-111111111111',
+        filename: 'original.pdf',
+        mimeType: 'application/pdf',
+        bytes: Uint8List.fromList('%PDF-1.4 original'.codeUnits),
+      );
+      await store.write(pending);
+      var picks = 0;
+      await mount(
+        t,
+        HistoryEditor(
+          controller: c,
+          receiptStore: store,
+          pdfPicker: () async {
+            picks++;
+            return null;
+          },
+        ),
+      );
+      await tap(t, 'Choose PDF');
+      expect(picks, 0);
+      expect(repo.uploads, isEmpty);
+      expect(
+        (await store.read(c.snapshot!.profile.id))!.samePayload(pending),
+        isTrue,
+      );
+      expect(find.text('History entry saved.'), findsOneWidget);
+      expect(
+        find.text('Another history entry has an unfinished receipt'),
+        findsOneWidget,
+      );
+      expect(
+        t
+            .widget<OutlinedButton>(
+              find.widgetWithText(OutlinedButton, 'Choose PDF'),
+            )
+            .onPressed,
+        isNull,
+      );
+      expect(rowsOf(await repo.getKnowledge(), 'records'), hasLength(2));
+    },
+  );
+  testWidgets(
+    'inline PDF rejection keeps the entry saved and permits another choice',
+    (t) async {
+      final repo = _Repo();
+      final c = PlusController(repo);
+      await c.refresh();
+      final store = MemoryReceiptPendingStore();
+      final files = [
+        XFile.fromData(
+          Uint8List.fromList('not a receipt'.codeUnits),
+          name: 'fake.pdf',
+        ),
+        XFile.fromData(Uint8List(maxReceiptBytes + 1), name: 'large.pdf'),
+        XFile.fromData(Uint8List(0), name: 'empty.pdf'),
+      ];
+      var picks = 0;
+      await mount(
+        t,
+        HistoryEditor(
+          controller: c,
+          receiptStore: store,
+          pdfPicker: () async => files[picks++],
+        ),
+      );
+      for (var i = 0; i < files.length; i++) {
+        await tap(t, 'Choose PDF');
+        expect(picks, i + 1);
+        expect(repo.uploads, isEmpty);
+        expect(repo.historyWrites, hasLength(1));
+        expect(await store.read(c.snapshot!.profile.id), isNull);
+        expect(find.text('History entry saved.'), findsOneWidget);
+        expect(find.textContaining('No receipt attached yet.'), findsOneWidget);
+        expect(
+          t
+              .widget<OutlinedButton>(
+                find.widgetWithText(OutlinedButton, 'Choose PDF'),
+              )
+              .onPressed,
+          isNotNull,
+        );
+      }
+      expect(
+        find.text('Choose a receipt no larger than 10 MB.'),
+        findsOneWidget,
+      );
+      expect(t.takeException(), isNull);
+    },
+  );
+  testWidgets(
+    'inline PDF result is dropped when the account changes in the picker',
+    (t) async {
+      final repo = _Repo();
+      final c = PlusController(repo);
+      await c.refresh();
+      final owner = c.snapshot!.profile.id;
+      final store = MemoryReceiptPendingStore();
+      final selected = Completer<XFile?>();
+      await mount(
+        t,
+        HistoryEditor(
+          controller: c,
+          receiptStore: store,
+          pdfPicker: () => selected.future,
+        ),
+      );
+      await t.ensureVisible(find.text('Choose PDF'));
+      await t.tap(find.text('Choose PDF'));
+      for (var i = 0; i < 5; i++) {
+        await t.pump();
+      }
+      expect(find.text('History entry saved.'), findsOneWidget);
+      c.invalidateSession();
+      selected.complete(
+        XFile.fromData(
+          Uint8List.fromList('%PDF-1.4 private'.codeUnits),
+          name: 'private.pdf',
+        ),
+      );
+      await t.pumpAndSettle();
+      expect(repo.uploads, isEmpty);
+      expect(await store.read(owner), isNull);
+      expect(find.text('Sign in to view your saved details.'), findsOneWidget);
+    },
+  );
   testWidgets(
     'receipt retry at 320px large text uses one immutable upload after resume',
     (t) async {

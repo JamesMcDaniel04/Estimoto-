@@ -1,8 +1,34 @@
-# Mobile customer preview — build 9
+# Mobile customer preview — build 10
 
-Estimoto + uses bundle/package `io.estimoto.plus` and connects to
-https://estimoto-plus-api.fly.dev/. Explicit demo mode keeps fictional data local.
-Current release evidence is in [build 9](releases/2026-09-14-build9.json).
+Package `io.estimoto.plus`, source `62683757a569c3c82e37bbbf03be6658d780f77f`.
+[Download latest Android](https://estimoto-plus-api.fly.dev/android/download) ·
+[Build-10 evidence](releases/2026-09-14-build10.json) ·
+[Release notes](releases/0.1.0-10-beta-notes.md)
+
+Network shop cards again show Request help when accepting requests. The button
+opens request review; tapping the card body opens its profile. This build includes
+Settings and displays version 0.1.0 (10). All 217 app tests and analysis passed;
+19 capture-web tests and its build passed. Backend code is unchanged from build 9.
+
+| Artifact | Bytes | SHA-256 |
+| --- | ---: | --- |
+| APK | 62,534,023 | `dc4670b561cbd0736baf44a27334c4d1b24098d79afbdc629a6d8cbfa07d6bf3` |
+| AAB | 60,332,076 | `966823ba7683cffe367a47d1f7a31f95e8ab03ccde28347b68ea8827948ebfd1` |
+| IPA | 25,901,352 | `e3ceff8c3d85798f5c877e895caa8b49eb11188a4ac3632003c50d7e245d2fc6` |
+
+The Android signer remains `e6d106fccc6c0e77e04a46c64f8edffdafb11b502d4857e51606c725086581dd`.
+The exact public APK installed over build 9 on an emulator; its request-button
+and card-profile flows were checked in demo. No real request was sent. The
+existing delivered invite now downloads build 10 through the same URL.
+
+Apple build `63747bc9-e640-46f0-810c-b1aeb6ea1a74` is VALID with exact
+561-character notes and both tester groups. Internal state is
+IN_BETA_TESTING; external state is READY_FOR_BETA_SUBMISSION. Build 2 remains in
+review; no new external submission was attempted. Physical-device and real
+customer mailbox proof remain unverified.
+
+The following build-9 record is historical; its source, hashes and QA have not
+been relabeled as build-10 evidence.
 
 ## Android 0.1.0 (9)
 
@@ -10,7 +36,7 @@ Current release evidence is in [build 9](releases/2026-09-14-build9.json).
 [Current build and hash](https://estimoto-plus-api.fly.dev/android/current) ·
 [Build-9 assets](https://github.com/JamesMcDaniel04/Estimoto-/releases/tag/v0.1.0-beta.9)
 
-The permanent URL serves signed build 9 from
+At build-9 delivery, the permanent URL served signed build 9 from
 `9dc9e750f63b73cbbd920c27b5f6d14534e4c5e8`. Tapping a shop card opens the profile,
 which holds Call, Website, Google Maps/reviews and available request/save actions.
 See the [build-9 notes](releases/0.1.0-9-beta-notes.md).
@@ -31,7 +57,7 @@ saved-shop outcome, real mailbox/code entry or a physical-device install.
 
 The fresh invite was sent once for build 8, accepted at 06:16:05 UTC and confirmed
 `delivered` by Resend readback at 06:16:26 UTC, September 14. Its permanent URL
-now serves build 9. No duplicate email was sent. Recipient details, the provider
+now serves build 10. No duplicate email was sent. Recipient details, the provider
 message ID and send journal stay private. Delivery does not prove that the
 recipient opened the email or installed the APK.
 

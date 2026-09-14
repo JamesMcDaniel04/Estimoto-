@@ -1,5 +1,11 @@
 # Launch audit follow-up — builds 8 and 9
 
+Current delivery: [build 10](../releases/2026-09-14-build10.json) restores the
+network request button and includes Settings. Its 217 app tests/analysis and
+published artifact checks are recorded separately. The build-8/9 audit evidence
+below remains historical; build 10 changes no backend code.
+
+
 The September 13 audit examined Plus build 7 (`ebb7f47275b018f276744322bbb2c191438e4f7a`).
 Build 8 was published from `e5d0e4ad40ba93866e1905f55c6046d6b4824588`; the full
 integration gate ran on its parent `47f8eedfb749509d8540e8468b1cf0eada639308`.
