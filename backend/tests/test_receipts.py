@@ -197,3 +197,37 @@ def test_worker_erases_abandoned_staging_and_retries_failed_file_delete(clients,
     reconcile_receipts(client.app.state.session_factory, client.app.state.settings)
     assert not target.exists() and not target.with_suffix(".pending").exists()
     assert upload(client, rid, key).status_code == 410
+
+
+def _linked_pdf(action):
+    from pypdf.generic import ArrayObject, DictionaryObject, NameObject, NumberObject
+    writer = PdfWriter()
+    page = writer.add_blank_page(width=200, height=200)
+    annotation = DictionaryObject({NameObject("/Type"): NameObject("/Annot"), NameObject("/Subtype"): NameObject("/Link"),
+        NameObject("/Rect"): ArrayObject([NumberObject(v) for v in (0, 0, 100, 100)]), NameObject("/A"): action})
+    page[NameObject("/Annots")] = ArrayObject([writer._add_object(annotation)])
+    out = BytesIO()
+    writer.write(out)
+    return out.getvalue()
+
+
+def test_receipt_pdf_web_links_are_accepted_and_active_links_rejected(clients):
+    from pypdf.generic import DictionaryObject, NameObject, TextStringObject
+    client, _ = clients
+    rid = add(client, create_vehicle(client)).json()["id"]
+    def uri(target):
+        return DictionaryObject({NameObject("/Type"): NameObject("/Action"), NameObject("/S"): NameObject("/URI"),
+                                 NameObject("/URI"): TextStringObject(target)})
+    # Receipts exported from shop software and email carry plain web links.
+    assert upload(client, rid, data=_linked_pdf(uri("https://services.example.com/invoice/1")),
+                  mime="application/pdf", filename="shop-receipt.pdf").status_code == 201
+    assert upload(client, rid, data=_linked_pdf(uri("mailto:service@example.com")),
+                  mime="application/pdf", filename="mail.pdf").status_code == 201
+    # Anything that could run or open something else stays rejected.
+    assert upload(client, rid, data=_linked_pdf(uri("javascript:alert(1)")), mime="application/pdf").status_code == 415
+    assert upload(client, rid, data=_linked_pdf(uri("file:///etc/passwd")), mime="application/pdf").status_code == 415
+    launch = DictionaryObject({NameObject("/S"): NameObject("/Launch"), NameObject("/F"): TextStringObject("calc.exe")})
+    assert upload(client, rid, data=_linked_pdf(launch), mime="application/pdf").status_code == 415
+    chained = uri("https://example.com")
+    chained[NameObject("/Next")] = launch
+    assert upload(client, rid, data=_linked_pdf(chained), mime="application/pdf").status_code == 415
