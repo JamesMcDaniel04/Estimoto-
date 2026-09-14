@@ -1,5 +1,4 @@
 import 'dart:async';
-import 'dart:typed_data';
 import 'package:estimoto_plus/services/receipt_pending_types.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';

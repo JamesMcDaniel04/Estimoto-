@@ -233,4 +233,36 @@ void main() {
       expect(find.textContaining('Sign in again'), findsOneWidget);
     },
   );
+
+  testWidgets(
+    'past lookups load on open, newest first, and rows can be removed',
+    (t) async {
+      final repo = _Repository();
+      final c = await _setup(repo);
+      await mount(t, c);
+      expect(find.text('Past lookups'), findsOneWidget);
+      final seeded =
+          (await repo.listVehicleValuations(
+                c.selectedVehicle!.id,
+              ))['valuations']
+              as List;
+      expect(seeded.length, greaterThan(1));
+      expect(
+        find.byTooltip('Remove past lookup'),
+        findsNWidgets(seeded.length),
+      );
+      expect(find.textContaining('Latest'), findsOneWidget);
+      await t.ensureVisible(find.byTooltip('Remove past lookup').first);
+      await t.tap(find.byTooltip('Remove past lookup').first);
+      await t.pumpAndSettle();
+      expect(find.text('Remove this past lookup?'), findsOneWidget);
+      await t.tap(find.widgetWithText(TextButton, 'Remove'));
+      await t.pumpAndSettle();
+      expect(
+        find.byTooltip('Remove past lookup'),
+        findsNWidgets(seeded.length - 1),
+      );
+      expect(t.takeException(), isNull);
+    },
+  );
 }

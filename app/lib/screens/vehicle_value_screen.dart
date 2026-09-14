@@ -39,6 +39,7 @@ class _VehicleValueScreenState extends State<VehicleValueScreen> {
   String condition = 'average';
   String? error, requestFingerprint;
   Json? result;
+  List<Json> pastLookups = [];
   bool busy = false, historyOutdated = false;
   int historyRevision = 0;
   int epoch = 0;
@@ -58,7 +59,58 @@ class _VehicleValueScreenState extends State<VehicleValueScreen> {
     id = widget.vehicleId;
     historyRevision = controller.historyRevision;
     controller.addListener(changed);
+    loadPastLookups();
   }
+
+  Future<void> loadPastLookups() async {
+    if (!current || vehicle == null) return;
+    try {
+      final data = await controller.repository.listVehicleValuations(id);
+      if (!current) return;
+      setState(() => pastLookups = rowsOf(data, 'valuations'));
+    } catch (e) {
+      // A vanished vehicle is already shown by the record fallback; other
+      // failures surface once the customer looks up a value.
+      if (current && e is PlusApiException && e.statusCode != 404) {
+        setState(() => error = PlusController.readableError(e));
+      }
+    }
+  }
+
+  Future<void> removePastLookup(Json row) async {
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: const Text('Remove this past lookup?'),
+        content: const Text('Only your saved copy is removed.'),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context, false),
+            child: const Text('Keep'),
+          ),
+          TextButton(
+            onPressed: () => Navigator.pop(context, true),
+            child: const Text('Remove'),
+          ),
+        ],
+      ),
+    );
+    if (confirmed != true || !current) return;
+    try {
+      await controller.repository.deleteVehicleValuation(
+        id,
+        row['id'] as String,
+      );
+      await loadPastLookups();
+    } catch (e) {
+      if (current) setState(() => error = PlusController.readableError(e));
+    }
+  }
+
+  String _bucketSummary(Json payload) => [
+    for (final bucket in rowsOf(payload, 'buckets'))
+      '${textOf(bucket, 'kind') == 'wholesale' ? 'Wholesale' : 'Retail'} ${receiptCost(intOf(bucket, 'amount_cents'))}',
+  ].join(' · ');
 
   @override
   void dispose() {
@@ -131,6 +183,7 @@ class _VehicleValueScreenState extends State<VehicleValueScreen> {
             ? {...value, 'history': <String, dynamic>{}}
             : value;
       });
+      await loadPastLookups();
     } catch (e) {
       if (valid()) {
         setState(
@@ -401,6 +454,27 @@ class _VehicleValueScreenState extends State<VehicleValueScreen> {
               ),
             ],
           ],
+          const SectionHeading('Past lookups'),
+          if (pastLookups.isEmpty)
+            const Text('Lookups you run are kept here for this vehicle.')
+          else
+            for (final (index, row) in pastLookups.indexed)
+              Card(
+                child: ListTile(
+                  title: Text(
+                    '${index == 0 ? 'Latest · ' : ''}${dateText(textOf(row, 'created_at').substring(0, 10))}',
+                  ),
+                  subtitle: Text(
+                    '${textOf(row, 'state')} · ${textOf(row, 'condition')} · ${mileageText(intOf(row, 'mileage'))} miles\n${_bucketSummary(row['payload'] as Json? ?? const {})}',
+                  ),
+                  isThreeLine: true,
+                  trailing: IconButton(
+                    tooltip: 'Remove past lookup',
+                    icon: const Icon(Icons.delete_outline),
+                    onPressed: busy ? null : () => removePastLookup(row),
+                  ),
+                ),
+              ),
           const SizedBox(height: 20),
           OutlinedButton.icon(
             onPressed: () => openVehicleHistory(context, controller),
