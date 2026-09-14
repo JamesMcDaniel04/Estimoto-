@@ -12,6 +12,7 @@ import sys
 import tempfile
 import threading
 import time
+from unittest.mock import patch
 
 import httpx
 import uvicorn
@@ -23,6 +24,8 @@ from estimoto_plus.config import Settings
 from estimoto_plus.discovery_models import DirectoryBudget
 from estimoto_plus.models import now
 from test_discovery import DirectoryStub
+from estimoto_plus import reviewed_shops
+from estimoto_plus.discovery_provider import normalize_listing
 
 
 def run():
@@ -44,6 +47,20 @@ def run():
         app = create_app(settings, auth_verifier=identity, bridge_transport=httpx.MockTransport(bridge))
         stub = DirectoryStub()
         stub.elements += [stub.shop(i, f'Synthetic public garage {i}') for i in range(3, 120)]
+        approved = {}
+        for element in stub.elements:
+            row = normalize_listing(element)
+            approved[row['source_id']] = {
+                'source_id': row['source_id'], 'name': row['name'], 'address': row['address'],
+                'source_point': row['point'], 'business_verified': True,
+                'verified_address': '1 Fixture Street Denver CO 80204',
+                'website': 'https://fixture.example/', 'phone': row['phone'],
+                'verification_url': 'https://fixture.example/contact', 'checked_at': now().date().isoformat(),
+                'description': 'Fixture repair services', 'specialties': row['specialties'],
+                'evidence': 'Synthetic reviewed business fixture.',
+            }
+        reviews = patch.object(reviewed_shops, 'catalog', return_value=approved)
+        reviews.start()
         app.state.discovery_transport = httpx.MockTransport(stub)
         bound = socket.socket()
         bound.bind(('127.0.0.1', 0))
@@ -70,7 +87,7 @@ def run():
                 assert result.status_code == 200, result.text
                 data = result.json()
                 assert data['providers'] == [] and data['shop_visit_alternatives'][0]['id'] == provider
-                assert len(data['shop_visit_alternatives']) == 100 and data['truncated'] and not data['exhaustive']
+                assert len(data['shop_visit_alternatives']) == 30 and data['truncated'] and not data['exhaustive']
                 assert data['shop_visit_alternatives'][0]['request_modes'] == ['shop_visit']
                 assert client.get('/v1/discovery', headers=foreign, params=params).status_code == 404
                 favorite = {'vehicle_id': vehicle, 'source': 'estimoto', 'source_id': 'synthetic-partner'}
@@ -95,7 +112,7 @@ def run():
                     assert budget.attempts == 1 and budget.body_bytes > 0
                 assert len([r for r in stub.calls if r.url.host == 'overpass-api.de']) == 1
                 print(json.dumps({'status': 'passed', 'evidence': 'localhost uvicorn HTTP; synthetic directory, Auth and bridge',
-                                  'combined_listings': 100, 'upstream_fixture_fetches': 1, 'synthetic_bridge_deliveries': 1,
+                                  'combined_listings': 30, 'upstream_fixture_fetches': 1, 'synthetic_bridge_deliveries': 1,
                                   'checks': ['mobile shop-visit fallback', 'cap and source evidence', 'owned dedicated shop',
                                              'Estibot shared search', 'reviewed request replay and status', 'customer isolation', 'shared daily budget']}))
         finally:
@@ -103,6 +120,7 @@ def run():
             thread.join(timeout=10)
             bound.close()
             app.state.engine.dispose()
+            reviews.stop()
             assert not thread.is_alive()
 
 

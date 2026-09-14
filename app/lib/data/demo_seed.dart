@@ -18,7 +18,8 @@ Json demoSeed() {
         'year': 2022,
         'make': 'Audi',
         'model': 'Q5',
-        'vin': '',
+        // Synthetic identifier with a valid check digit; never sent to a provider.
+        'vin': 'ZZZDEMAA3N0000001',
         'mileage': 28450,
         'insurer': '',
         'policy_number': '',

@@ -34,7 +34,11 @@ class _WelcomeScreenState extends State<WelcomeScreen> {
 
   Future<void> signIn() async {
     if (!RegExp(r'^[^\s@]+@[^\s@]+\.[^\s@]+$').hasMatch(email.text.trim())) {
-      setState(() => error = 'Enter your email address.');
+      setState(
+        () => error = email.text.trim().isEmpty
+            ? 'Enter your email address.'
+            : 'Enter a valid email address, such as name@example.com.',
+      );
       return;
     }
     if (sent && !RegExp(r'^[0-9]{8}$').hasMatch(code.text.trim())) {

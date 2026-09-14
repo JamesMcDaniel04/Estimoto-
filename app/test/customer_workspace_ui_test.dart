@@ -1,5 +1,6 @@
 import 'dart:async';
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:estimoto_plus/data/demo_repository.dart';
 import 'package:estimoto_plus/data/repository.dart';
@@ -96,6 +97,66 @@ Future<void> _tap(WidgetTester tester, Finder finder) async {
 }
 
 void main() {
+  testWidgets(
+    'actual demo phone-only authorization exposes reviewed call link',
+    (tester) async {
+      final launches = <String>[];
+      const launcher = MethodChannel('plugins.flutter.io/url_launcher');
+      tester.binding.defaultBinaryMessenger.setMockMethodCallHandler(launcher, (
+        call,
+      ) async {
+        if (call.method == 'launch') {
+          launches.add((call.arguments as Map)['url'] as String);
+        }
+        return true;
+      });
+      addTearDown(
+        () => tester.binding.defaultBinaryMessenger.setMockMethodCallHandler(
+          launcher,
+          null,
+        ),
+      );
+      final repository = DemoPlusRepository();
+      final controller = await _controller(repository);
+      final shop = await repository.saveMyShop({
+        'name': 'Sample phone shop',
+        'phone': '(303) 555-0123',
+      });
+      final draft = await repository.createShopOutreach({
+        'shop_id': shop['id'],
+        'service_summary': 'Inspect brakes',
+        'proposed_slots': [
+          offsetTimestamp(DateTime.now().add(const Duration(days: 2))),
+        ],
+      }, 'demo-phone-draft');
+      await _mount(
+        tester,
+        ShopOutreachReview(controller: controller, draftId: draft['id']),
+      );
+      expect(
+        tester
+            .widget<FilledButton>(
+              find.widgetWithText(FilledButton, 'Continue to call'),
+            )
+            .onPressed,
+        isNull,
+      );
+      await _tap(tester, find.byKey(const Key('outreach-consent')));
+      await _tap(tester, find.widgetWithText(FilledButton, 'Continue to call'));
+      expect(find.text('Call Sample phone shop'), findsOneWidget);
+      expect(find.text('Call the shop • not sent'), findsOneWidget);
+      final saved = await repository.getShopOutreach(draft['id']);
+      expect(saved['call_link'], 'tel:3035550123');
+      expect(saved['delivery_status'], 'local_preview');
+      expect(launches, isEmpty);
+      await _tap(tester, find.text('Call Sample phone shop'));
+      expect(launches, ['tel:3035550123']);
+      expect(find.text('Shop confirmed'), findsNothing);
+      expect(find.text('Waiting for shop response'), findsNothing);
+      controller.dispose();
+    },
+  );
+
   testWidgets(
     'immutable outreach review requires explicit consent at 320px large text',
     (tester) async {

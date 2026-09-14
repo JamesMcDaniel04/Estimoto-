@@ -8,6 +8,8 @@ locations and calendar labels are never supplied to the assistant or graph.
 
 ## Configuration and launch gate
 
+This documents current source behavior; deployment and real Google connection
+evidence are recorded separately in [release status](../../docs/release-status.md).
 The default is disabled. After independently verifying the owned Google OAuth
 client, Calendar API, Nango redirect, consent audience and scopes, configure:
 
@@ -51,7 +53,12 @@ All routes below require verified customer authentication under
   At most five pages of 100; truncation and incomplete responses fail closed.
 - `PUT /preferences`: `{selected_calendar_ids,time_zone,sync_confirmed}`.
   Select 1–10 accessible IDs and a valid IANA zone; changed preferences increment
-  generation. Default display zone is `Etc/UTC`.
+  generation. New connections return an empty, unconfigured `time_zone`. The
+  customer UI suggests a validated device IANA zone only for that empty state;
+  the value is persisted only on explicit preference save. Existing saved zones,
+  including `Etc/UTC`, survive disconnect/reconnect. If device resolution fails
+  or yields an ambiguous abbreviation, the user must select a valid IANA zone.
+  The local demo uses `America/Denver` and never connects to Google.
 - `POST /availability`: `{time_min,time_max,duration_minutes,time_zone,
   day_start_hour,day_end_hour}`. Returns slots, checked_at, generation,
   time_zone, duration_minutes. Query zone must match saved preferences.

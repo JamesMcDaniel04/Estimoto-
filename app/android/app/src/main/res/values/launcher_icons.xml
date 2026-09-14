@@ -1,6 +1,6 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
-    <color name="ic_launcher_background">#0D3F7A</color>
+    <color name="ic_launcher_background">#58A4E5</color>
     <!-- Both entry points resolve to the round legacy or adaptive resource. -->
     <item type="mipmap" name="ic_launcher_round">@mipmap/ic_launcher</item>
 </resources>

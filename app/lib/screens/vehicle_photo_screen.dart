@@ -8,6 +8,7 @@ import '../state/plus_controller.dart';
 import '../theme.dart';
 import '../widgets/common.dart';
 import '../widgets/vehicle_photo.dart';
+import '../widgets/workspace_widgets.dart';
 
 void openVehiclePhoto(
   BuildContext context,
@@ -194,10 +195,11 @@ class _VehiclePhotoScreenState extends State<VehiclePhotoScreen> {
   @override
   Widget build(BuildContext context) {
     if (!current) {
-      return const Scaffold(
-        body: SafeArea(
-          child: Center(child: Text('Sign in to view this vehicle.')),
-        ),
+      return UnavailableRecordScreen(
+        title: 'Vehicle photo',
+        message: widget.controller.isCurrentCustomer(owner)
+            ? 'This vehicle is no longer available.'
+            : 'Sign in to view this vehicle.',
       );
     }
     return Scaffold(

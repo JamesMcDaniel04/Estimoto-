@@ -20,6 +20,21 @@ Json logo() => {
   'source_url': 'https://www.estimoto.io',
 };
 
+Json reviewedLogo() => {
+  'url':
+      'https://estimoto-plus-api.fly.dev/public/shop-media/node/123/${'a' * 64}.png',
+  'kind': 'logo',
+  'attribution': 'Synthetic repair shop · Official website',
+  'source_url': 'https://shop.example/',
+};
+
+ProviderProfile mergedShop({
+  Object? identity = const {'source': 'openstreetmap', 'source_id': 'node:123'},
+}) => ProviderProfile.fromJson({
+  ...shop(media: reviewedLogo()).json,
+  'media_identity': identity,
+});
+
 ProviderProfile shop({Object? media, String name = 'Synthetic Dent Shop'}) =>
     ProviderProfile.fromJson({
       'id': 'synthetic-provider',
@@ -223,6 +238,141 @@ void main() {
     }
   });
 
+  test('reviewed artwork binds the fixed Plus route to the public listing', () {
+    final digest = 'a' * 64;
+    final url =
+        'https://estimoto-plus-api.fly.dev/public/shop-media/way/123/$digest.png';
+    final media = {
+      'url': url,
+      'kind': 'logo',
+      'attribution': 'Example Auto · Official website',
+      'source_url': 'https://example-auto.test/',
+    };
+    ProviderMedia? parse(Object? value, {String source = 'way:123'}) =>
+        ProviderMedia.fromJson(
+          value,
+          providerSource: 'openstreetmap',
+          providerSourceId: source,
+        );
+    expect(parse(media)?.kind, 'logo');
+    expect(parse({...media, 'background': 'dark'})?.darkBackground, isTrue);
+    expect(parse(media)?.darkBackground, isFalse);
+    expect(parse({...media, 'kind': 'photo'})?.kind, 'photo');
+    expect(parse(media, source: 'node:123'), isNull);
+    expect(parse(media, source: 'way:124'), isNull);
+    for (final badUrl in [
+      '$url?url=https://private.test',
+      '$url#fragment',
+      url.replaceFirst('estimoto-plus-api.fly.dev', 'evil.test'),
+      url.replaceFirst('/shop-media/', '/private/'),
+      url.replaceFirst(digest, 'not-a-content-hash'),
+      url.replaceFirst('.png', '.svg'),
+      url.replaceFirst('/123/', '/0123/'),
+      url.replaceFirst('https:', 'http:'),
+    ]) {
+      expect(parse({...media, 'url': badUrl}), isNull);
+    }
+  });
+
+  test(
+    'merged artwork uses its preserved listing identity without overriding other providers',
+    () {
+      expect(mergedShop().media?.kind, 'logo');
+      expect(mergedShop().sourceId, sourceId);
+      expect(mergedShop().requestModes, ['shop_visit']);
+      expect(
+        ProviderProfile.fromJson({
+          ...mergedShop().json,
+          'media': publicShop().json['media'],
+        }).media?.kind,
+        'photo',
+      );
+      for (final invalid in [
+        null,
+        'node:123',
+        {},
+        {'source': 'openstreetmap'},
+        {'source': 'openstreetmap', 'source_id': 'node:124'},
+        {'source': 'openstreetmap', 'source_id': 'node:0123'},
+        {'source': 'openstreetmap', 'source_id': '../123'},
+        {'source': 'estimoto', 'source_id': sourceId},
+        {'source': 'other', 'source_id': 'node:123'},
+      ]) {
+        expect(mergedShop(identity: invalid).media, isNull, reason: '$invalid');
+      }
+      expect(
+        ProviderProfile.fromJson({
+          ...mergedShop().json,
+          'source': 'openstreetmap',
+          'source_id': 'node:124',
+        }).media,
+        isNull,
+      );
+      expect(
+        ProviderProfile.fromJson({
+          ...mergedShop().json,
+          'source': 'untrusted',
+        }).media,
+        isNull,
+      );
+      expect(
+        ProviderProfile.fromJson({
+          ...shop(media: logo()).json,
+          'media_identity': {
+            'source': 'estimoto',
+            'source_id': '00000000-0000-0000-0000-000000000000',
+          },
+        }).media,
+        isNull,
+      );
+    },
+  );
+
+  imageTest(
+    'merged reviewed logo renders anonymously and preserves request and save actions',
+    (tester) async {
+      var requested = false, saved = false;
+      await mount(
+        tester,
+        DiscoveryProviderCard(
+          provider: mergedShop(),
+          onRequest: () => requested = true,
+          onSave: () => saved = true,
+        ),
+      );
+      await tester.pump();
+      expect(client.calls, [Uri.parse(reviewedLogo()['url'] as String)]);
+      final image = tester.widget<Image>(find.byType(Image));
+      final decoded = Completer<void>();
+      final stream = image.image.resolve(ImageConfiguration.empty);
+      final listener = ImageStreamListener(
+        (_, _) => decoded.complete(),
+        onError: (Object error, StackTrace? stack) =>
+            decoded.completeError(error, stack),
+      );
+      stream.addListener(listener);
+      client.responses.single.complete(ImageResponse());
+      for (var i = 0; i < 100 && !decoded.isCompleted; i++) {
+        await tester.runAsync(
+          () => Future<void>.delayed(const Duration(milliseconds: 10)),
+        );
+        await tester.pump();
+      }
+      expect(decoded.isCompleted, isTrue);
+      stream.removeListener(listener);
+      await tester.pumpAndSettle();
+      expect(find.byKey(const Key('shop-media-fallback')), findsNothing);
+      expect(client.headers, isNot(contains('authorization')));
+      expect(client.headers, isNot(contains('referer')));
+      await tester.ensureVisible(find.text('Request help'));
+      await tester.tap(find.text('Request help'));
+      await tester.ensureVisible(find.text('Save as my dedicated shop'));
+      await tester.tap(find.text('Save as my dedicated shop'));
+      expect(requested && saved, isTrue);
+      expect(tester.takeException(), isNull);
+    },
+  );
+
   imageTest('missing or rejected media never starts an image request', (
     tester,
   ) async {
@@ -257,12 +407,18 @@ void main() {
     expect(client.calls, [Uri.parse(logoUrl)]);
     expect(client.headers, isNot(contains('authorization')));
     expect(client.headers, isNot(contains('referer')));
+    await tester.ensureVisible(find.text('View shop profile'));
+    await tester.tap(find.text('View shop profile'));
+    await tester.pumpAndSettle();
     await tester.ensureVisible(find.text('Logo credit'));
     await tester.tap(find.text('Logo credit'));
     await tester.pumpAndSettle();
     expect(find.text('Synthetic shop owner'), findsOneWidget);
     expect(find.text('View image source'), findsOneWidget);
     await tester.tap(find.text('Close'));
+    await tester.pumpAndSettle();
+    await tester.ensureVisible(find.byTooltip('Close shop profile'));
+    await tester.tap(find.byTooltip('Close shop profile'));
     await tester.pumpAndSettle();
     await tester.ensureVisible(find.text('Request help'));
     await tester.tap(find.text('Request help'));

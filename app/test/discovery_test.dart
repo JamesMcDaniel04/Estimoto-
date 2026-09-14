@@ -455,7 +455,7 @@ void main() {
         ..response = envelope(
           status: 'unavailable',
           providers: [
-            for (var i = 0; i < 99; i++)
+            for (var i = 0; i < 29; i++)
               partner(name: 'Shop $i', id: 'shop-$i'),
           ],
           alternatives: [
@@ -467,14 +467,14 @@ void main() {
       final c = await discoveryController(repo);
       await mountDiscovery(tester, c);
       await tester.pumpAndSettle();
-      expect(find.byType(DiscoveryProviderCard), findsNWidgets(100));
+      expect(find.byType(DiscoveryProviderCard), findsNWidgets(30));
       expect(find.text('Alternative 1'), findsOneWidget);
       expect(find.text('Alternative 2'), findsNothing);
       expect(
         find.textContaining('Live directory search is unavailable'),
         findsOneWidget,
       );
-      expect(find.textContaining('100 listings total'), findsOneWidget);
+      expect(find.textContaining('up to 30 shops'), findsOneWidget);
     },
   );
   testWidgets(

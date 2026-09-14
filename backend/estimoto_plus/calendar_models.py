@@ -15,7 +15,7 @@ class CalendarConnection(Base):
     environment: Mapped[str] = mapped_column(String(30))
     attempt_id: Mapped[str | None] = mapped_column(String(36), nullable=True)
     selected_calendar_ids: Mapped[list] = mapped_column(JSON, default=list)
-    time_zone: Mapped[str] = mapped_column(String(100), default="Etc/UTC")
+    time_zone: Mapped[str] = mapped_column(String(100), default="")
     sync_confirmed: Mapped[bool] = mapped_column(Boolean, default=False)
 
 

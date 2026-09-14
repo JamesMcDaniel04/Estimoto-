@@ -12,5 +12,13 @@ import UIKit
 
   func didInitializeImplicitFlutterEngine(_ engineBridge: FlutterImplicitEngineBridge) {
     GeneratedPluginRegistrant.register(with: engineBridge.pluginRegistry)
+    FlutterMethodChannel(name: "io.estimoto.plus/device_time_zone", binaryMessenger: engineBridge.applicationRegistrar.messenger())
+      .setMethodCallHandler { call, result in
+        if call.method == "getTimeZone" {
+          result(TimeZone.current.identifier)
+        } else {
+          result(FlutterMethodNotImplemented)
+        }
+      }
   }
 }

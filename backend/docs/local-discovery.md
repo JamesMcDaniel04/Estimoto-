@@ -1,10 +1,12 @@
 # Local customer shop discovery
 
 The authenticated `GET /v1/discovery` endpoint combines explicitly published
-Estimoto providers with a bounded public OpenStreetMap index. Set
-`DISCOVERY_ENABLED=true` only after deploying migration `e96b17c4d502` and its
-current descendants. The default is disabled. No Maps credentials are needed.
-The bootstrap capability is `live_discovery`.
+Estimoto providers with reviewed businesses from a bounded public OpenStreetMap
+index. `DISCOVERY_ENABLED` controls the bootstrap `live_discovery` capability;
+the default is disabled. Run `alembic upgrade head` before deploying the feature;
+current head is `a63e90b72d14`. No Maps credentials are needed. This describes
+current source behavior; [release status](../../docs/release-status.md) records
+which revision and catalog have actually been deployed.
 
 ## API and identity
 
@@ -16,57 +18,78 @@ optional `specialty` (`pdr`, `collision`, `maintenance`, `mechanical`) and
 The envelope has `postal_code`, `radius_miles`, `distance_basis:zip_centroid`,
 `status:ready|stale|unavailable`, `exhaustive:false`, `truncated`, `checked_at`,
 `source_attributions`, `providers`, `shop_visit_alternatives`, and `message`.
-At most **100 total** listings are returned after filtering, ranking and dedupe.
+A completed search adds `result_limit:30` and `selection:reviewed_businesses`;
+early unavailable responses may omit those selection fields. At most **30 total**
+listings are returned across the two arrays after filtering, ranking and dedupe.
 Distances are approximate straight-line miles from the ZIP center, not travel
 distance or a claim that mobile service reaches the ZIP.
 
-Each listing preserves provider display fields and adds `source`, `source_id`,
+Each listing preserves display fields and adds `source`, `source_id`,
 `source_url`, `distance_miles`, `mobile_status`, `specialty_evidence`,
-`vehicle_match`, `request_modes`, `favorite`, and optional public `website` and
-`email`. Every listing also has `media:null` or
-`{url,kind:"logo"|"photo",attribution,source_url}`. The same nullable media and
-`source_id` appear on bootstrap and `/v1/providers` participant rows. Source
-identities are intentionally distinct:
+`vehicle_match`, `request_modes`, `favorite`, `favorite_references`, and public
+contact fields where available. `media` is nullable or
+`{url,kind:"logo"|"photo",attribution,source_url,background?}`; `background` can
+be `light` or `dark`. The same nullable media and `source_id` appear on bootstrap
+and `/v1/providers` participant rows. Source identities remain distinct:
 
 | Source | Listing `id` | Favorite `source_id` | Booking |
 | --- | --- | --- | --- |
 | `estimoto` | Plus provider UUID | Original published provider source ID | Only declared `request_modes` |
 | `openstreetmap` | `osm:node:123` (or way/relation) | `node:123` (or way/relation) | Call, website or saved contact flow; no bridge request |
-| `my_shop` | Existing private MyShop ID | Existing private MyShop ID | Existing reviewed outreach flow |
+| `my_shop` | Existing private MyShop ID | Existing private MyShop ID | Existing reviewed outreach flow; not a public-directory row |
 
 External listings have `accepting_requests:false` and empty `request_modes`.
-Participating shop logos come only from the original owner's authenticated
-catalog, and the image URL must be the configured bridge origin's exact
-`/public/plus/providers/{source_id}/logo` route. The original route checks
-current public opt-in and current logo before returning bounded raster bytes;
-Plus never republishes a private stored-object URL or signed media reference.
-Removed logos clear on the next catalog pull. Public OSM photos require a
-source-declared Commons `File:` tag and a successful fixed-origin Commons
-imageinfo check with a raster MIME, creator and license. Plus constructs the
-320-pixel Commons image URL and linked file page, never follows a mapper's
-arbitrary `image` or website URL. At most 20 distinct files are checked in one
-bounded Commons request per daily OSM refresh; metadata failure leaves media
-null without dropping the listing. The existing 24-hour/7-day public cache
-also applies to photo metadata. Clients display image credit and its source
-link, suppress referrers, and fall back to a neutral placeholder on image load
-failure. An OSM photo on an exact-location duplicate may accompany a
-participating card if that card has no published logo; its Commons credit stays
-attached. Media never changes source identity, ranking, the 100-result cap or
-request admission.
-Mobile results require an explicitly mobile participating provider that covers
-the exact service ZIP. Nearby fixed shops appear separately as shop visits.
-Estibot calls the same search: its `providers` field flattens the two listing
-arrays, while `discovery` contains the rest of the envelope. Each card must use
-its own `request_modes` and the original search context when reviewing a request.
+Mobile results require an explicitly mobile participating provider covering the
+exact service ZIP. Nearby fixed shops appear separately as shop visits.
+Estibot uses the same search: its `providers` field flattens the two listing
+arrays, while `discovery` contains the rest of the envelope. Each card uses its
+own `request_modes` and the original search context when reviewing a request.
 
-`specialty_evidence` is owner-declared or an explicit OSM tag, never certification.
-Only `service:vehicle:brand` can establish `vehicle_match.status:listed_make`.
-Chain `brand`, `operator`, a shop name and AI suggestions cannot establish make
-expertise. A general `shop=car_repair` tag establishes only a general mechanical
-listing. Private/fleet/access=no, closed/disused/demolished and unnamed records
-are excluded. Published partner location comes from a ZIP at the end of its
-business address, never its first service coverage ZIP. Unknown locations are
-excluded with a clear message.
+## Reviewed business profiles and artwork
+
+The versioned `estimoto_plus/shop_media/catalog.json` records business/contact
+verification separately from artwork. A public result must match its reviewed
+OSM source ID, name, address and exact map point. Its review date must be within
+90 days and cannot be in the future. A logo or matching chain name alone does
+not admit a shop. Moved, renamed or expired entries require renewed review.
+The server does not perform runtime business-site searches to fill gaps.
+
+Mini profiles expose official `website`, `phone`, `description`, `service_details`
+and `phone_kind` where recorded. `verification` contains `status:contact_confirmed`,
+`checked_at`, official `source_url`, formatted `address` and review `scope`.
+This records published business location, repair services and contact details;
+it does not certify workmanship or availability. Google ratings are not inferred.
+
+`specialty_evidence` distinguishes official-website support, owner declaration
+and supported map tags. An explicit official make listing or `service:vehicle:brand`
+tag can establish `vehicle_match.status:listed_make`; chain branding, shop names
+and AI suggestions cannot. Private/fleet/access=no, closed/disused/demolished and
+unnamed map records are excluded. Partner location comes from the ZIP at the end
+of its business address, never its first service coverage ZIP. Unknown locations
+are excluded with a clear message.
+
+Participating logos come from the original owner's authenticated catalog and use
+the configured bridge origin's exact `/public/plus/providers/{source_id}/logo`
+route. That route rechecks current public opt-in and logo status. Plus never
+publishes a private stored-object URL or signed media reference.
+
+Reviewed official logos or owner-published shop photos are stored as PNGs under
+`estimoto_plus/shop_media/`. Their public route is
+`/public/shop-media/{node|way|relation}/{number}/{sha256}.png`. The handler checks
+the current directory row, business review, exact identity and content digest;
+it serves only valid PNGs up to 512×512 and 512 KiB, with a one-day public cache
+and digest ETag. These fixed catalog routes do not accept arbitrary fetch URLs.
+Artwork provenance and optional dark-tile hints remain attached to the image.
+
+A fallback OSM photo requires an explicit Commons `File:` tag and fixed-origin
+Commons metadata with creator, license and raster MIME. A bounded metadata lookup
+constructs the thumbnail/file-page URLs; it does not follow arbitrary mapper
+image URLs. Failure leaves media null. Public-cache freshness/staleness limits
+apply to this metadata. Clients show image credit/source, suppress referrers and
+use a neutral fallback. An exact-location duplicate can retain source-bound
+artwork while preserving the participating provider's handoff identity. Artwork
+never changes request admission or proves specialty, and customer photos and
+receipts never enter this public catalog.
 
 ## Private dedicated shops
 
@@ -154,7 +177,7 @@ DISCOVERY_TEST_POSTGRES_URL='postgresql+psycopg://plus_test@127.0.0.1:55439/esti
 PLUS_TEST_POSTGRES_URL='postgresql+psycopg://plus_test@127.0.0.1:55439/estimoto_scope_test_plus?client_encoding=utf8' ESTIMOTO_BRIDGE_BACKEND='/Users/jamesmcdaniel/Estimoto/.worktrees/plus-launch-integration-20260913/backend' ESTIMOTO_BRIDGE_PYTHON='/Users/jamesmcdaniel/Estimoto/backend/.venv/bin/python' .venv/bin/python -m pytest -q
 ```
 
-Candidate results on 2026-09-13: 17 discovery tests passed on PostgreSQL in
+Historical results before the current reviewed-catalog change, on 2026-09-13: 17 discovery tests passed on PostgreSQL in
 3.02 seconds; 266 full-suite tests passed with zero skips in 36.68 seconds.
 The integrated worktree was based on `a0f43da`; root-owned capture hardening
 continued afterward, so the final integration commit requires its own full run.
@@ -166,7 +189,7 @@ check, and ten-table RLS denial for an untrusted SQL role. Tests never use the
 production database URL.
 
 From the repository root, `backend/.venv/bin/python scripts/smoke_discovery.py`
-starts a temporary uvicorn socket and verifies the combined100 cap, separate
+starts a temporary uvicorn socket and verifies the combined 30-result cap, separate
 mobile/visit results, owned favorites, Estibot parity, reviewed request replay,
 synthetic delivery/status and customer isolation. It checks one directory fetch
 and one handoff, then stops its server and removes its database.

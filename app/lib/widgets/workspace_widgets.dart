@@ -51,9 +51,26 @@ abstract class WorkspaceState<T extends StatefulWidget> extends State<T> {
     }
   }
 
-  Widget get unavailable => const Scaffold(
+  Widget get unavailable => const UnavailableRecordScreen(
+    message: 'Sign in to view your saved details.',
+  );
+}
+
+class UnavailableRecordScreen extends StatelessWidget {
+  const UnavailableRecordScreen({
+    super.key,
+    this.title = 'Saved details',
+    this.message = 'This item is no longer available.',
+  });
+  final String title, message;
+
+  @override
+  Widget build(BuildContext context) => Scaffold(
+    appBar: AppBar(title: Text(title)),
     body: SafeArea(
-      child: Center(child: Text('Sign in to view your saved details.')),
+      child: Center(
+        child: Padding(padding: const EdgeInsets.all(24), child: Text(message)),
+      ),
     ),
   );
 }

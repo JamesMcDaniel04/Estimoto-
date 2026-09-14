@@ -61,6 +61,26 @@ void main() {
     },
   );
 
+  for (final (email, message) in [
+    ('', 'Enter your email address.'),
+    ('notanemail', 'Enter a valid email address, such as name@example.com.'),
+  ]) {
+    testWidgets('email validation distinguishes empty from invalid: $email', (
+      tester,
+    ) async {
+      await showWelcome(tester);
+      await tester.enterText(
+        find.widgetWithText(TextField, 'Email address'),
+        email,
+      );
+      await tester.ensureVisible(find.text('Continue with email'));
+      await tester.tap(find.text('Continue with email'));
+      await tester.pumpAndSettle();
+      expect(find.text(message), findsOneWidget);
+      expect(authRequests, isEmpty);
+    });
+  }
+
   testWidgets(
     'existing code requires eight digits and verifies without sending',
     (tester) async {

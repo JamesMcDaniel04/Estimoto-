@@ -35,8 +35,8 @@ Open `http://127.0.0.1:4318`. Production customer sessions use the dedicated aut
 | Garage | Saved contact details, multiple vehicles, mileage and optional insurance; date/mileage reminders; representative CarsXE photos or private camera/gallery uploads |
 | Estimates | PDR/Collision tabs, guided required-photo capture, private readback, durable handoff to a selected Estimoto shop and reviewed estimate status |
 | Repairs | Shop-supplied timelines and update dates, request delivery/response status, cancellation |
-| Find Help | Opt-in shops and technicians filtered by service ZIP, specialty and mobile service; maps for published addresses |
-| Estibot | Bounded AI guidance, technician matching, saved-shop scheduling, private GraphRAG over service history, and labeled YouTube search links |
+| Find Help | Participating shops/techs and reviewed local businesses within 30 miles; up to 30 results, real shop artwork, contact details, mini profiles and vehicle-specific dedicated shops |
+| Estibot | Guided estimate and routine-care topics, technician matching, saved-shop scheduling, private graph retrieval over service history, and labeled YouTube search links |
 | My shops | Private shop contacts, reviewed customer-authorized scheduling requests and explicit shop acceptance |
 | Service history | Customer-reported service, shop and parts-source records; optional aggregated contributions |
 | Foundation | Separate `io.estimoto.plus` iOS/Android app, Supabase Auth client, customer ownership checks, migrations, durable request outbox and bridge contract |
@@ -61,9 +61,12 @@ From the repository root:
 (cd backend && .venv/bin/python -m pytest -q)
 (cd app && flutter analyze && flutter test)
 backend/.venv/bin/python scripts/smoke_api.py --flutter-client
+bash scripts/build_capture.sh
 ```
 
 The socket smoke creates a temporary migrated database and a local fictional identity/provider server, exercises customer isolation and the Dart HTTP client, then restarts the API to verify persistence. It cleans up its temporary files and makes no production calls.
+
+Before releasing a clean commit, run `python3 scripts/check_release.py --integration --output /tmp/plus-release-checks-<unique-name>` with the disposable PostgreSQL and original bridge environment described in [the audit closure record](docs/qa/2026-09-13-audit-closure.md). This runs the full backend suite with zero skipped tests, Flutter analysis/tests, capture-web tests/build, and all three socket smokes. GitHub Actions remains a separate check: its account billing lock must be resolved by the account owner before hosted CI can run.
 
 ## Customer launch
 

@@ -150,6 +150,23 @@ def select_calendar(client, sync=False):
     return response.json()
 
 
+def test_new_zone_is_unconfigured_and_explicit_utc_survives_reconnect(calendar):
+    client, app = calendar
+    assert client.get('/v1/calendar/google/status', headers=auth()).json()['time_zone'] == ''
+    _, status = connect(client, app)
+    assert status['time_zone'] == ''
+    preferences = {'selected_calendar_ids': ['primary@example.test'],
+                   'time_zone': 'Etc/UTC', 'sync_confirmed': False}
+    saved = client.put('/v1/calendar/google/preferences', headers=auth(), json=preferences)
+    assert saved.status_code == 200
+    assert saved.json()['time_zone'] == 'Etc/UTC'
+    assert client.delete('/v1/calendar/google/connection', headers=auth()).status_code == 200
+    assert client.get('/v1/calendar/google/status', headers=auth()).json()['time_zone'] == 'Etc/UTC'
+    _, reconnected = connect(client, app)
+    assert reconnected['selected_calendar_ids'] == []
+    assert reconnected['time_zone'] == 'Etc/UTC'
+
+
 def test_connect_tags_are_server_owned_and_reconcile_rejects_foreign_attempt(calendar):
     client, app = calendar
     stub = enable(app)

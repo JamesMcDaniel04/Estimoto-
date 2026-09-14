@@ -147,8 +147,9 @@ class _VehicleValueScreenState extends State<VehicleValueScreen> {
   @override
   Widget build(BuildContext context) {
     if (!current) {
-      return const Scaffold(
-        body: Center(child: Text('Sign in again to view your vehicle value.')),
+      return const UnavailableRecordScreen(
+        title: 'Vehicle value',
+        message: 'Sign in again to view your vehicle value.',
       );
     }
     final car = vehicle;
@@ -169,8 +170,10 @@ class _VehicleValueScreenState extends State<VehicleValueScreen> {
             'A market view of your car.',
             car?.title ?? 'This vehicle is no longer available.',
           ),
-          const Text(
-            'Get a CarsXE estimate using your saved VIN and mileage, plus your state and the condition you select.',
+          Text(
+            widget.controller.isDemo
+                ? 'Preview a fictional valuation with a synthetic demo VIN. Live valuations use your saved VIN and mileage, plus your state and selected condition.'
+                : 'Get a CarsXE estimate using your saved VIN and mileage, plus your state and the condition you select.',
           ),
           const SizedBox(height: 18),
           if (car != null)
@@ -253,6 +256,11 @@ class _VehicleValueScreenState extends State<VehicleValueScreen> {
           ),
           if (error != null) WorkspaceError(error!),
           if (result != null) ...[
+            if (result!['sample'] == true) ...[
+              const StatusPill('Sample valuation • fictional amounts'),
+              const SizedBox(height: 12),
+              Text(textOf(result!, 'message')),
+            ],
             const SectionHeading('Estimated market value'),
             if (!available)
               Card(
@@ -293,7 +301,7 @@ class _VehicleValueScreenState extends State<VehicleValueScreen> {
                         const Text('USD'),
                         const SizedBox(height: 8),
                         Text(
-                          'CarsXE · ${textOf(result!, 'condition')} condition',
+                          '${result!['sample'] == true ? 'Demo sample' : 'CarsXE'} · ${textOf(result!, 'condition')} condition',
                         ),
                         if (textOf(result!, 'provider_region').isNotEmpty &&
                             result!['provider_region'] != state)
@@ -305,7 +313,9 @@ class _VehicleValueScreenState extends State<VehicleValueScreen> {
                           title: const Text('How this estimate is presented'),
                           children: [
                             ReviewBlock(
-                              'Provider base',
+                              result!['sample'] == true
+                                  ? 'Sample base'
+                                  : 'Provider base',
                               receiptCost(intOf(bucket, 'base_cents')),
                             ),
                             ReviewBlock(
@@ -327,7 +337,10 @@ class _VehicleValueScreenState extends State<VehicleValueScreen> {
                               ),
                             ),
                             Text(
-                              bucket['amount_basis'] == 'provider_adjusted'
+                              result!['sample'] == true
+                                  ? 'These fixed fictional amounts demonstrate the display only. They are not calculated from this vehicle.'
+                                  : bucket['amount_basis'] ==
+                                        'provider_adjusted'
                                   ? 'The displayed amount is the provider’s adjusted estimate. Component details may not add to the same total.'
                                   : 'The displayed amount combines the provider’s base and listed adjustments.',
                             ),
@@ -338,7 +351,9 @@ class _VehicleValueScreenState extends State<VehicleValueScreen> {
                   ),
                 ),
               Text(
-                '${result!['cached'] == true ? 'Saved provider result' : 'Provider lookup'}${textOf(result!, 'fetched_at').isNotEmpty ? ' · ${dateText(textOf(result!, 'fetched_at'))}' : ''}',
+                result!['sample'] == true
+                    ? 'Local demo sample'
+                    : '${result!['cached'] == true ? 'Saved provider result' : 'Provider lookup'}${textOf(result!, 'fetched_at').isNotEmpty ? ' · ${dateText(textOf(result!, 'fetched_at'))}' : ''}',
               ),
               if (textOf(result!, 'provider_publish_date').isNotEmpty)
                 Text(

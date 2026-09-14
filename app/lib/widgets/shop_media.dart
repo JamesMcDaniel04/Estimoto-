@@ -4,7 +4,7 @@ import '../theme.dart';
 import 'common.dart';
 
 /// Anonymous public media. The model accepts only published provider routes
-/// and verified Commons file references; it never receives customer credentials.
+/// reviewed local artwork and Commons files; no customer credentials are sent.
 class ShopMediaThumbnail extends StatelessWidget {
   const ShopMediaThumbnail({super.key, required this.provider, this.size = 76});
   final ProviderProfile provider;
@@ -32,7 +32,11 @@ class ShopMediaThumbnail extends StatelessWidget {
       child: ClipRRect(
         borderRadius: BorderRadius.circular(12),
         child: ColoredBox(
-          color: media?.kind == 'logo' ? Colors.white : PlusColors.canvas,
+          color: media?.darkBackground == true
+              ? PlusColors.ink
+              : media?.kind == 'logo'
+              ? Colors.white
+              : PlusColors.canvas,
           child: media == null
               ? fallback()
               : Padding(

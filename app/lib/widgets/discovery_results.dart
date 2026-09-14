@@ -8,6 +8,7 @@ import 'dedicated_shop_choice.dart';
 import 'common.dart';
 import 'workspace_widgets.dart';
 import 'shop_media.dart';
+import 'shop_profile.dart';
 
 String serviceModeLabel(String mode) => mode == 'mobile'
     ? 'Mobile service · provider comes to you'
@@ -16,7 +17,7 @@ String serviceModeLabel(String mode) => mode == 'mobile'
 List<ProviderProfile> discoveryProviders(
   Json data,
   String key, {
-  int limit = 100,
+  int limit = 30,
 }) => rowsOf(data, key)
     .where((p) => p['public_visible'] != false)
     .take(limit)
@@ -38,7 +39,7 @@ class DiscoveryNotice extends StatelessWidget {
         ),
         if (data['truncated'] == true)
           const Text(
-            'Showing 100 listings total, including alternatives. Refine your service to narrow results.',
+            'Showing up to 30 shops, including alternatives. Refine your service to narrow results.',
           ),
         if (data['status'] == 'stale')
           const Padding(
@@ -70,7 +71,7 @@ class DiscoveryDetails extends StatelessWidget {
     expandedCrossAxisAlignment: CrossAxisAlignment.start,
     children: [
       const Text(
-        'Distances are approximate straight-line distances from your ZIP center, not driving distance or mobile coverage. Listings may not include every nearby business. Confirm services and availability directly.',
+        'A curated selection of shops with checked business contact details and participating Estimoto providers. Distances are approximate straight-line distances from your ZIP center, not driving distance or mobile coverage. Confirm services and availability directly.',
       ),
       if (textOf(data, 'checked_at').isNotEmpty)
         Padding(
@@ -176,7 +177,7 @@ class _DiscoveryResultsState extends WorkspaceState<DiscoveryResults> {
             'name': provider.name,
             'email': textOf(provider.json, 'email'),
             'phone': provider.phone,
-            'address': provider.address,
+            'address': provider.displayAddress,
             'website': textOf(provider.json, 'website'),
             'vehicle_id': widget.vehicleId,
             'notes': textOf(provider.json, 'source_url').isEmpty
@@ -202,7 +203,7 @@ class _DiscoveryResultsState extends WorkspaceState<DiscoveryResults> {
     final alternatives = discoveryProviders(
       widget.data,
       'shop_visit_alternatives',
-      limit: 100 - providers.length,
+      limit: 30 - providers.length,
     );
     Widget card(ProviderProfile provider, bool alternative) => Padding(
       padding: const EdgeInsets.symmetric(vertical: 8),
@@ -307,7 +308,10 @@ class DiscoveryProviderCard extends StatelessWidget {
     final match = provider.json['vehicle_match'] as Map? ?? {};
     final listedMake =
         match['status'] == 'listed_make' &&
-        match['basis'] == 'service:vehicle:brand' &&
+        const [
+          'service:vehicle:brand',
+          'official_website',
+        ].contains(match['basis']) &&
         vehicleMake != null &&
         '${match['make']}'.toLowerCase() == vehicleMake!.toLowerCase();
     final phone = provider.phone.replaceAll(RegExp(r'[^+\d]'), '');
@@ -317,7 +321,6 @@ class DiscoveryProviderCard extends StatelessWidget {
         const ['https', 'http'].contains(website.scheme) &&
         website.host.isNotEmpty &&
         website.userInfo.isEmpty;
-    final media = provider.media;
     final identity = Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
@@ -334,7 +337,11 @@ class DiscoveryProviderCard extends StatelessWidget {
           padding: const EdgeInsets.only(top: 4),
           child: Text(
             provider.independent
-                ? 'Independent listing · OpenStreetMap'
+                ? provider.json['verification'] is Map &&
+                          provider.json['verification']['status'] ==
+                              'contact_confirmed'
+                      ? 'Business contact details checked'
+                      : 'Independent listing · OpenStreetMap'
                 : 'Participating Estimoto provider',
             style: Theme.of(context).textTheme.bodySmall,
           ),
@@ -371,11 +378,11 @@ class DiscoveryProviderCard extends StatelessWidget {
                 );
               },
             ),
-            if (provider.address.isNotEmpty)
+            if (provider.displayAddress.isNotEmpty)
               Padding(
                 padding: const EdgeInsets.only(top: 10),
                 child: Text(
-                  provider.address,
+                  provider.displayAddress,
                   style: Theme.of(context).textTheme.bodySmall,
                 ),
               ),
@@ -436,6 +443,11 @@ class DiscoveryProviderCard extends StatelessWidget {
             Wrap(
               spacing: 10,
               children: [
+                TextButton.icon(
+                  onPressed: () => showShopProfile(context, provider),
+                  icon: const Icon(Icons.storefront_outlined),
+                  label: const Text('View shop profile'),
+                ),
                 if (RegExp(r'^\+?\d{7,15}$').hasMatch(phone))
                   TextButton.icon(
                     onPressed: () =>
@@ -449,15 +461,6 @@ class DiscoveryProviderCard extends StatelessWidget {
                     icon: const Icon(Icons.open_in_new),
                     label: const Text('Website'),
                   ),
-                if (textOf(provider.json, 'source_url').isNotEmpty)
-                  TextButton(
-                    onPressed: () => openExternal(
-                      context,
-                      textOf(provider.json, 'source_url'),
-                    ),
-                    child: const Text('Listing source'),
-                  ),
-                if (media != null) ShopMediaCredit(media: media),
               ],
             ),
             OutlinedButton.icon(

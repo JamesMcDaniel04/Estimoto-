@@ -15,6 +15,8 @@ from .discovery_provider import ATTRIBUTIONS, DirectoryUnavailable, RADIUS_MILES
 from .models import Customer, Provider, Vehicle, now
 from .postal import canonical_zip
 from .shop_models import MyShop
+from .shop_media_catalog import listing_media
+from .reviewed_shops import RESULT_LIMIT, enrich_partner, verified_listing
 
 Specialty = Literal['pdr', 'collision', 'maintenance', 'mechanical']
 router = APIRouter(prefix='/v1/discovery', tags=['customer discovery'])
@@ -123,7 +125,7 @@ def search(db, request, customer, postal, vehicle=None, specialty=None, mobile_o
             continue
         if place_state == 'stale' and status == 'ready':
             status = 'stale'
-        row = _public_provider(p)
+        row = enrich_partner(_public_provider(p))
         row['distance_miles'] = round(miles, 1)
         if p.accepting_requests and (not specialty or specialty in p.specialties):
             if p.kind == 'shop':
@@ -132,8 +134,11 @@ def search(db, request, customer, postal, vehicle=None, specialty=None, mobile_o
                 row['request_modes'].append('mobile')
         candidates.append(row)
     for public_row in (public or {}).get('listings', []):
-        row = dict(public_row)
+        row = verified_listing(public_row)
+        if row is None:
+            continue
         row.setdefault('media', None)  # Pre-upgrade cache rows remain readable.
+        row['media'] = listing_media(row) or row['media']
         row['distance_miles'] = round(distance_miles(center['point'], row['point']), 1)
         candidates.append(row)
     for row in candidates:
@@ -142,7 +147,7 @@ def search(db, request, customer, postal, vehicle=None, specialty=None, mobile_o
                                      if (f.source, f.source_id) == (row['source'], row['source_id'])]
         makes = row.pop('listed_makes', [])
         if vehicle and vehicle.make.casefold().strip() in {m.casefold() for m in makes}:
-            row['vehicle_match'] = {'status': 'listed_make', 'make': vehicle.make, 'basis': 'service:vehicle:brand'}
+            row['vehicle_match'] = {'status': 'listed_make', 'make': vehicle.make, 'basis': row.get('make_evidence_basis', 'service:vehicle:brand')}
         row.pop('point', None)
     def rank(row):
         matching = not specialty or specialty in row['specialties']
@@ -172,9 +177,15 @@ def search(db, request, customer, postal, vehicle=None, specialty=None, mobile_o
                 unique[position] = row
             unique[position]['favorite'] = favorite
             unique[position]['favorite_references'] = [references[key] for key in sorted(references)]
-            # A matching physical business may have an OSM photo but no
-            # published partner logo. Keep the source credit with that photo.
-            unique[position]['media'] = unique[position]['media'] or previous['media'] or row['media']
+            # Keep artwork bound to its original listing when a participating
+            # provider supplies the request/favorite identity of the merged row.
+            selected = unique[position]
+            if not selected['media']:
+                donor = previous if previous['media'] else row
+                selected['media'] = donor['media']
+                if donor['media']:
+                    selected['media_identity'] = donor.get('media_identity') or {
+                        'source': donor['source'], 'source_id': donor['source_id']}
             continue
         seen[key] = len(unique)
         unique.append(row)
@@ -184,10 +195,10 @@ def search(db, request, customer, postal, vehicle=None, specialty=None, mobile_o
         alternatives = [r for r in unique if r['kind'] == 'shop' and r not in primary]
     else:
         primary, alternatives = unique, []
-    truncated = partner_limit or len(primary) + len(alternatives) > 100
-    primary = primary[:100]
-    alternatives = alternatives[:100 - len(primary)]
-    message = 'Approximate distance from your ZIP center. Confirm services and availability with the shop.'
+    truncated = partner_limit or len(primary) + len(alternatives) > RESULT_LIMIT
+    primary = primary[:RESULT_LIMIT]
+    alternatives = alternatives[:RESULT_LIMIT - len(primary)]
+    message = 'Curated shops with confirmed business contact details, plus participating Estimoto providers. Approximate distance from your ZIP center. Confirm services and availability with the shop.'
     if mobile_only and not primary and alternatives:
         message = 'No mobile provider lists coverage here. These nearby shops require a shop visit.'
     if status == 'stale':
@@ -197,8 +208,8 @@ def search(db, request, customer, postal, vehicle=None, specialty=None, mobile_o
     if unknown_locations:
         message += ' Some participating shops could not be located from their published address.'
     if truncated:
-        message += ' Showing the first 100 listings; coverage is not exhaustive.'
-    return {**empty, 'status': status, 'checked_at': (checked or geo_checked).isoformat(), 'providers': primary,
+        message += ' Showing up to 30 shops; coverage is not exhaustive.'
+    return {**empty, 'status': status, 'result_limit': RESULT_LIMIT, 'selection': 'reviewed_businesses', 'checked_at': (checked or geo_checked).isoformat(), 'providers': primary,
             'shop_visit_alternatives': alternatives, 'truncated': truncated, 'message': message}
 
 
@@ -250,6 +261,8 @@ def set_favorite(specialty: Specialty, body: FavoriteWrite, c: Customer = Depend
     else:
         source = db.get(PublicListing, body.source_id)
         if source and utc(source.fetched_at) < now() - timedelta(days=7):
+            source = None
+        if source and verified_listing(source.value) is None:
             source = None
     if source is None:
         raise HTTPException(422, 'Choose an available listing or one of your saved shops.')
