@@ -1,3 +1,10 @@
+# Find Help update — September 14, 2026
+
+Web/API source `1e199ac` is deployed with dynamic vehicle matching, separate
+ZIP/name search, expanded public listings and official Bluewater/EuroWerkz
+profiles. [Verification and remaining coverage blocker](qa/2026-09-14-discovery-coverage.md).
+Public-provider nationwide reliability remains open; native UI builds are pending.
+
 # Current web/API release — September 14, 2026
 
 The approved CRUD closure is deployed from `a01ee14` and the service is healthy
