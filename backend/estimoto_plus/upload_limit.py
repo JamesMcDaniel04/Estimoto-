@@ -17,6 +17,10 @@ class PhotoBodyLimit:
         bounded_upload = (len(parts) == 5 and parts[1] == "v1" and
                           ((parts[2] == "estimates" and parts[4] == "photos") or
                            (parts[2] == "vehicles" and parts[4] == "image")))
+        capture_upload = (len(parts) == 6 and parts[1:3] == ['v1', 'estimates']
+                          and parts[4] == 'capture' and parts[5] in {'photos', 'guidance'})
+        bounded_upload = bounded_upload or capture_upload
+        body_limit = 8 * 1024 * 1024 + 4096 if capture_upload else MAX_PHOTO_BODY
         if scope["type"] != "http" or scope["method"] != "POST" or not bounded_upload:
             await self.app(scope, receive, send)
             return
@@ -24,7 +28,7 @@ class PhotoBodyLimit:
         declared = headers.get(b"content-length")
         if declared is not None:
             try:
-                if int(declared) > MAX_PHOTO_BODY:
+                if int(declared) > body_limit:
                     await JSONResponse({"detail": "Photo upload is too large."}, status_code=413)(scope, receive, send)
                     return
             except ValueError:
@@ -38,7 +42,7 @@ class PhotoBodyLimit:
             message = await receive()
             if message["type"] == "http.request":
                 consumed += len(message.get("body", b""))
-                if consumed > MAX_PHOTO_BODY:
+                if consumed > body_limit:
                     raise BodyTooLarge()
             return message
 

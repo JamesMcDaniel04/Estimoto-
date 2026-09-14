@@ -13,7 +13,7 @@ from estimoto_plus.app import create_app
 from estimoto_plus.config import Settings
 
 
-KEYS = ("odometer", "engine_bay", "interior", "tire_tread", "front", "driver", "rear", "passenger")
+KEYS = ("vin", "odometer", "engine_bay", "interior", "tire_tread", "front", "driver", "rear", "passenger")
 BRIDGE = {"X-Bridge-Key": "test-bridge-key"}
 
 
@@ -91,7 +91,7 @@ def submit(client, estimate, provider, *, body=None, key=None):
                        json=body or {"provider_id": provider, "share_contact": True})
 
 
-def test_submit_requires_owned_eight_photos_provider_consent_and_contact(plus):
+def test_submit_requires_owned_nine_photos_provider_consent_and_contact(plus):
     client, _, _, _ = plus
     _, provider, estimate = setup_draft(client)
     assert client.get("/v1/bootstrap", headers=auth()).json()["capabilities"]["required_estimate_photo_keys"] == list(KEYS)
@@ -161,6 +161,19 @@ def test_estimate_payload_private_import_and_authoritative_status(plus):
         db.commit()
     assert client.post("/v1/bridge/outbox/deliver", headers=BRIDGE).json()["failed"] == 1
     assert client.get("/v1/bootstrap", headers=auth()).json()["estimates"][0]["amount_cents"] == 12345
+
+
+def test_guided_pdr_pair_supersedes_legacy_photo_for_same_area(plus):
+    client, app, sent, state = plus
+    _, provider, estimate = setup_draft(client)
+    upload_keys(client, estimate, (*KEYS, 'panel_hood', 'hail_close_hood'))
+    assert submit(client, estimate, provider).status_code == 422
+    upload_keys(client, estimate, ('hail_raking_hood',))
+    assert submit(client, estimate, provider).status_code == 200
+    assert client.post('/v1/bridge/outbox/deliver', headers=BRIDGE).json()['delivered'] == 1
+    payload = json.loads(sent[0].content)
+    assert payload['capture_version'] == 2
+    assert {p['label'] for p in payload['photos']} == {*KEYS, 'hail_close_hood', 'hail_raking_hood'}
 
 
 def test_health_readiness_and_production_configuration_fail_closed(tmp_path):

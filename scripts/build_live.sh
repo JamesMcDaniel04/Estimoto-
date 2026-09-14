@@ -31,6 +31,9 @@ cd app
 flutter pub get --enforce-lockfile
 if [ "$PLUS_TARGET" = web ] || [ "$PLUS_TARGET" = all ]; then
   flutter build web --release --no-pub --dart-define-from-file=config/local.json --dart-define=SOURCE_SHA="$PLUS_SHA"
+  sh "$PLUS_ROOT/scripts/build_capture.sh"
+  mkdir -p "$PLUS_ROOT/app/build/web/capture"
+  cp -R "$PLUS_ROOT/capture-web/dist/." "$PLUS_ROOT/app/build/web/capture/"
 fi
 if [ "$PLUS_TARGET" = mobile ] || [ "$PLUS_TARGET" = all ]; then
   test -f android/key.properties || { echo 'Configure owner-controlled Android release signing first.' >&2; exit 1; }

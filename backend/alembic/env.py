@@ -6,6 +6,8 @@ from estimoto_plus.models import Base
 from estimoto_plus import shop_models  # noqa: F401 - include saved-shop metadata
 from estimoto_plus import graph_models  # noqa: F401 - include graph metadata
 from estimoto_plus import calendar_models  # noqa: F401 - include calendar metadata
+from estimoto_plus import capture_models  # noqa: F401 - include private capture metadata
+from estimoto_plus import discovery_models  # noqa: F401 - public directory and private preferences
 
 config = context.config
 if config.config_file_name:

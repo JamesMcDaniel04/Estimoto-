@@ -1,5 +1,4 @@
 import hashlib
-from io import BytesIO
 import json
 import os
 import re
@@ -9,8 +8,8 @@ from urllib.parse import quote
 
 from fastapi import APIRouter, Depends, Header, HTTPException, Request
 from starlette.datastructures import UploadFile
+from starlette.concurrency import run_in_threadpool
 from fastapi.responses import Response, JSONResponse
-from PIL import Image, UnidentifiedImageError
 from sqlalchemy import select, update
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
@@ -24,10 +23,11 @@ from .postal import canonical_zip
 from .schemas import AssistantInput, EstimateCreate, EstimateSubmit, ProfileWrite, ReminderCreate, RequestCreate, VehicleCreate, VehicleUpdate
 from .workflow import bridge_details, creation_payload, payload_hash, queue_cancellation
 
-from .calendar_scheduling import check_slots, legacy_payload, sync_view, preferred_times
+from .calendar_scheduling import check_slots, legacy_payload, sync_view, preferred_times, lock_customer
+from .capture_contract import DOCUMENT_KEYS, allowed_keys, PDR_PANELS
 
 router = APIRouter(prefix="/v1")
-ESTIMATE_PHOTO_KEYS = ("odometer", "engine_bay", "interior", "tire_tread", "front", "driver", "rear", "passenger")
+ESTIMATE_PHOTO_KEYS = DOCUMENT_KEYS
 PDR_PANEL_TYPES = ("hood", "fender_left", "front_door_left", "rear_door_left", "quarter_left", "trunk",
                    "quarter_right", "rear_door_right", "front_door_right", "fender_right", "roof")
 MAX_PHOTOS_PER_ESTIMATE = 40
@@ -68,7 +68,7 @@ def provider(p):
 
 def request_view(db, r):
     events = db.scalars(select(RequestEvent).where(RequestEvent.request_id == r.id).order_by(RequestEvent.created_at, RequestEvent.id)).all()
-    return {"id": r.id, "vehicle_id": r.vehicle_id, "provider_id": r.provider_id, "specialty": r.specialty,
+    return {"id": r.id, "vehicle_id": r.vehicle_id, "provider_id": r.provider_id, "specialty": r.specialty, "service_mode": r.service_mode,
             "description": r.description, "preferred_time": r.preferred_time, "status": r.status,
             "delivery_status": r.delivery_status, "created_at": iso(r.created_at), "updated_at": iso(r.updated_at),
             "scheduled_at": iso(r.scheduled_at), "proposed_slots": r.proposed_slots, **sync_view(r), "events": [{"status": e.status, "message": e.message, "created_at": iso(e.created_at)} for e in events]}
@@ -76,7 +76,7 @@ def request_view(db, r):
 
 def estimate_view(db, e):
     photos = db.scalars(select(Photo).where(Photo.estimate_id == e.id)).all()
-    return {"id": e.id, "vehicle_id": e.vehicle_id, "discipline": e.discipline, "description": e.description,
+    return {"id": e.id, "vehicle_id": e.vehicle_id, "discipline": e.discipline, "description": e.description, "service_mode": e.service_mode,
             "claim_number": e.claim_number, "date_of_loss": e.date_of_loss, "status": e.status,
             "amount_cents": e.amount_cents, "provider_name": e.provider_name, "provider_id": e.provider_id,
             "delivery_status": e.delivery_status, "processing_state": e.processing_state,
@@ -117,6 +117,7 @@ def bootstrap(request: Request, c: Customer = Depends(current_customer), db: Ses
             "requests": [request_view(db, r) for r in db.scalars(select(ServiceRequest).where(ServiceRequest.customer_id == ids)).all()],
             "reminders": [reminder_view(r) for r in db.scalars(select(Reminder).where(Reminder.customer_id == ids)).all()],
             "capabilities": {"live_requests": bool(request.app.state.settings.bridge_url and request.app.state.settings.bridge_key and not c.demo),
+                             "live_discovery": bool(request.app.state.settings.discovery_enabled and not c.demo),
                              "live_estimates": bool(request.app.state.settings.estimate_bridge_url and request.app.state.settings.bridge_key and not c.demo),
                              "required_estimate_photo_keys": list(ESTIMATE_PHOTO_KEYS),
                              "pdr_damage_panel_types": list(PDR_PANEL_TYPES),
@@ -183,12 +184,33 @@ def create_request(body: RequestCreate, request: Request, idempotency_key: str |
     if not idempotency_key or len(idempotency_key) > 200:
         raise HTTPException(422, "Idempotency-Key is required.")
     payload = legacy_payload(body, directory=True)
+    if 'service_mode' not in body.model_fields_set:
+        payload.pop('service_mode', None)
     digest = hashlib.sha256(json.dumps(payload, sort_keys=True, separators=(",", ":")).encode()).hexdigest()
+    from .discovery import admission, valid_admission
+    distance_proof = {}
+    if body.service_mode == 'shop_visit':
+        # Replays do not depend on current geography/provider availability.
+        prior = db.scalar(select(ServiceRequest).where(ServiceRequest.customer_id == c.id, ServiceRequest.idempotency_key == idempotency_key))
+        rejected = db.get(RequestRejection, (c.id, idempotency_key))
+        if prior or rejected:
+            result = prior or rejected
+            if result.payload_hash != digest:
+                raise HTTPException(409, 'Idempotency key was used for another request.')
+            return request_view(db, prior) if prior else JSONResponse(status_code=rejected.status_code, content={'detail': rejected.detail, 'code': rejected.code})
+        preliminary = db.get(Provider, body.provider_id)
+        car = db.get(Vehicle, body.vehicle_id)
+        initial_zip = canonical_zip(c.postal_code)
+        if preliminary and preliminary.public_visible and preliminary.accepting_requests and car and car.customer_id == c.id and initial_zip:
+            # Cache/provider I/O precedes the source transaction. Its frozen proof
+            # is checked again after taking the customer lock below.
+            distance_proof = admission(request, preliminary, initial_zip, body.service_mode)
     # Serialize request outcomes across API workers before reading either outcome
     # table. A no-op UPDATE takes a PostgreSQL row lock and a SQLite write lock;
     # SELECT FOR UPDATE alone would not protect the local SQLite deployment.
     db.execute(update(Customer).where(Customer.id == c.id).values(id=Customer.id))
     db.refresh(c)
+    db.expire_all()
     existing = db.scalar(select(ServiceRequest).where(ServiceRequest.customer_id == c.id, ServiceRequest.idempotency_key == idempotency_key))
     if existing:
         if existing.payload_hash != digest:
@@ -215,8 +237,10 @@ def create_request(body: RequestCreate, request: Request, idempotency_key: str |
     if not service_zip:
         return reject(422, "Save a valid ZIP code before requesting service.")
     p = db.get(Provider, body.provider_id)
-    if not p or not p.public_visible or p.demo_only != c.demo or not p.accepting_requests or body.specialty not in p.specialties or service_zip not in p.postal_codes:
+    if not p or not p.public_visible or p.demo_only != c.demo or not p.accepting_requests or body.specialty not in p.specialties:
         return reject(409, "Provider is not accepting this request.")
+    if not valid_admission(p, service_zip, body.service_mode, distance_proof):
+        return reject(422 if body.service_mode else 409, 'Provider does not support this location and service mode.')
     if not c.demo and not (request.app.state.settings.bridge_url and request.app.state.settings.bridge_key):
         raise HTTPException(503, "Requests are unavailable right now. Please try again later.")
     if not body.description.strip():
@@ -240,6 +264,7 @@ def create_request(body: RequestCreate, request: Request, idempotency_key: str |
         return reject(422, "Choose and check Calendar times before including structured slots.")
     status = "local_preview" if c.demo else "queued"
     r = ServiceRequest(id=uid(), customer_id=c.id, vehicle_id=body.vehicle_id, provider_id=body.provider_id,
+                       service_mode=body.service_mode, discovery_admission=distance_proof or {},
                        specialty=body.specialty, description=body.description.strip(), preferred_time=body.preferred_time.strip(),
                        idempotency_key=idempotency_key, payload_hash=digest, service_postal_code=service_zip,
                        delivery_status=status, created_at=now(), updated_at=now(),
@@ -309,8 +334,18 @@ def submit_estimate(estimate_id: str, body: EstimateSubmit, request: Request,
                     c: Customer = Depends(current_customer), db: Session = Depends(db_session)):
     if not idempotency_key or len(idempotency_key) > 200:
         raise HTTPException(422, "Idempotency-Key is required.")
-    input_hash = payload_hash(body.model_dump())
-    owned(db, Estimate, estimate_id, c)
+    submitted = body.model_dump()
+    if 'service_mode' not in body.model_fields_set:
+        submitted.pop('service_mode', None)
+    input_hash = payload_hash(submitted)
+    preliminary_estimate = owned(db, Estimate, estimate_id, c)
+    from .discovery import admission, valid_admission
+    distance_proof = {}
+    if body.service_mode == 'shop_visit' and preliminary_estimate.status == 'draft':
+        preliminary = db.get(Provider, body.provider_id)
+        initial_zip = canonical_zip(c.postal_code)
+        if preliminary and preliminary.public_visible and preliminary.accepting_requests and initial_zip:
+            distance_proof = admission(request, preliminary, initial_zip, body.service_mode)
     db.execute(update(Customer).where(Customer.id == c.id).values(id=Customer.id))
     db.refresh(c)
     db.execute(update(Estimate).where(Estimate.id == estimate_id, Estimate.customer_id == c.id)
@@ -336,23 +371,33 @@ def submit_estimate(estimate_id: str, body: EstimateSubmit, request: Request,
     except ValueError as exc:
         raise HTTPException(422, str(exc))
     p = db.get(Provider, body.provider_id)
-    if not p or p.demo_only or not p.public_visible or not p.accepting_requests or p.kind != "shop" or e.discipline not in p.specialties or service_zip not in p.postal_codes:
+    if not p or p.demo_only or not p.public_visible or not p.accepting_requests or p.kind != "shop" or e.discipline not in p.specialties:
         raise HTTPException(409, "Provider is not accepting this estimate.")
+    if not valid_admission(p, service_zip, body.service_mode, distance_proof):
+        raise HTTPException(422 if body.service_mode else 409, 'Provider does not support this location and service mode.')
     photos = db.scalars(select(Photo).where(Photo.estimate_id == e.id).order_by(Photo.label, Photo.id)).all()
     by_label = {photo.label: photo for photo in photos}
     missing = [key for key in ESTIMATE_PHOTO_KEYS if key not in by_label]
     if missing:
         raise HTTPException(422, "Add required photos: " + ", ".join(missing) + ".")
-    if e.discipline == "pdr" and not any("panel_" + panel in by_label for panel in PDR_PANEL_TYPES):
-        raise HTTPException(422, "Add a damage photo for a selected PDR panel.")
+    if e.discipline == "pdr":
+        close = {label.removeprefix('hail_close_') for label in by_label if label.startswith('hail_close_')}
+        raking = {label.removeprefix('hail_raking_') for label in by_label if label.startswith('hail_raking_')}
+        if close != raking or not raking <= set(PDR_PANELS):
+            raise HTTPException(422, "Add both close-up and raking-angle photos for each selected PDR area.")
+        if not any("panel_" + panel in by_label for panel in PDR_PANEL_TYPES) and not raking:
+            raise HTTPException(422, "Add a damage photo or complete angle pair for a selected PDR panel.")
     if len(photos) > MAX_PHOTOS_PER_ESTIMATE or len(by_label) != len(photos):
         raise HTTPException(422, "Resolve duplicate or excess photos before submitting.")
+    if e.discipline == "pdr":
+        # Existing drafts can contain the former single-photo intake. A full
+        # guided angle pair supersedes that view; never price the area twice.
+        for panel in raking:
+            by_label.pop('panel_' + panel, None)
     evidence = []
     for label in (*ESTIMATE_PHOTO_KEYS, *sorted(set(by_label) - set(ESTIMATE_PHOTO_KEYS))):
         photo = by_label[label]
-        permitted_extra = ({"panel_" + panel for panel in PDR_PANEL_TYPES} if e.discipline == "pdr" else
-                           {"corner_fl", "corner_fr", "corner_rl", "corner_rr", "roof"})
-        if photo.label not in ESTIMATE_PHOTO_KEYS and photo.label not in permitted_extra:
+        if photo.label not in allowed_keys(e.discipline):
             raise HTTPException(422, "Unsupported photo label: " + photo.label)
         photo_path = Path(settings.photo_dir) / photo.storage_name
         if not photo_path.is_file():
@@ -371,9 +416,12 @@ def submit_estimate(estimate_id: str, body: EstimateSubmit, request: Request,
                          "byte_size": photo.byte_size, "mime_type": photo.mime_type})
     payload = {"event": "submitted", "estimate_id": e.id, "customer_id": c.id, "vehicle_id": v.id,
                "provider_source_id": p.source_id, "service_postal_code": service_zip,
-               "discipline": e.discipline, "description": e.description,
+               "discipline": e.discipline, "description": e.description, "capture_version": 2,
                "claim_number": e.claim_number, "date_of_loss": e.date_of_loss,
                "contact": contact, "vehicle": car, "photos": evidence}
+    if body.service_mode is not None:
+        payload['service_mode'] = body.service_mode
+    e.service_mode, e.discovery_admission = body.service_mode, distance_proof or {}
     e.provider_id = p.id
     e.provider_name = p.name
     e.status = "submitted"
@@ -403,64 +451,16 @@ async def upload_photo(estimate_id: str, request: Request,
             raise HTTPException(422, "Photo label is required.")
         data = await file.read(10 * 1024 * 1024 + 1)
         mime = file.content_type
-    valid = ((mime == "image/jpeg" and data.startswith(b"\xff\xd8\xff")) or
-             (mime == "image/png" and data.startswith(b"\x89PNG\r\n\x1a\n")) or
-             (mime == "image/webp" and data.startswith(b"RIFF") and data[8:12] == b"WEBP"))
-    if not valid or len(data) > 10 * 1024 * 1024:
-        raise HTTPException(422, "Upload a JPEG, PNG, or WebP image under 10 MB.")
-    try:
-        with Image.open(BytesIO(data)) as image:
-            if image.format != {"image/jpeg": "JPEG", "image/png": "PNG", "image/webp": "WEBP"}[mime] or image.width * image.height > 40_000_000:
-                raise ValueError("Invalid image")
-            image.load()
-    except (UnidentifiedImageError, OSError, ValueError, Image.DecompressionBombError):
-        raise HTTPException(422, "Upload a valid JPEG, PNG, or WebP image.")
-    db.execute(update(Customer).where(Customer.id == c.id).values(id=Customer.id))
-    db.execute(update(Estimate).where(Estimate.id == estimate_id, Estimate.customer_id == c.id)
-               .values(updated_at=Estimate.updated_at).returning(Estimate.id))
-    db.expire_all()
-    e = owned(db, Estimate, estimate_id, c)
-    if e.status != "draft":
-        raise HTTPException(409, "Photos can only be added to drafts.")
-    path = Path(request.app.state.settings.photo_dir)
-    existing = db.scalars(select(Photo).where(Photo.estimate_id == e.id, Photo.label == label.strip())).all()
-    all_photos = db.scalars(select(Photo).join(Estimate, Photo.estimate_id == Estimate.id)
-                            .where(Estimate.customer_id == c.id)).all()
-    def stored_size(photo):
-        file = path / photo.storage_name
-        return photo.byte_size if photo.byte_size is not None else (file.stat().st_size if file.is_file() else 0)
-    total = sum(stored_size(photo) for photo in all_photos)
-    replacing = sum(stored_size(photo) for photo in existing)
-    if total - replacing + len(data) > MAX_CUSTOMER_PHOTO_BYTES:
-        raise HTTPException(413, "Photo storage limit reached. Contact support.")
-    estimate_count = sum(photo.estimate_id == e.id for photo in all_photos)
-    if estimate_count - len(existing) + 1 > MAX_PHOTOS_PER_ESTIMATE:
-        raise HTTPException(413, "Estimate photo limit reached.")
-    consume_rate(db, c.id, "photo_upload", MAX_PHOTO_UPLOADS_PER_HOUR)
-    path.mkdir(parents=True, exist_ok=True)
-    storage_name = uid()
-    (path / storage_name).write_bytes(data)
-    old_paths = [path / photo.storage_name for photo in existing]
-    if existing:
-        p = existing[0]
-        for duplicate in existing[1:]:
-            db.delete(duplicate)
-        p.storage_name = storage_name
-        p.mime_type = mime
-        p.sha256 = hashlib.sha256(data).hexdigest()
-        p.byte_size = len(data)
-    else:
-        p = Photo(estimate_id=e.id, label=label.strip(), mime_type=mime, storage_name=storage_name,
-                  sha256=hashlib.sha256(data).hexdigest(), byte_size=len(data))
-        db.add(p)
-    try:
-        db.commit()
-    except Exception:
-        (path / storage_name).unlink(missing_ok=True)
-        raise
-    for old_path in old_paths:
-        old_path.unlink(missing_ok=True)
-    return {"id": p.id, "label": p.label}
+    # Older app builds use the same private storage transaction, quotas and
+    # uncertainty recovery as the guided host. Preserve their 10 MB contract
+    # and do not make a new automated framing claim on this legacy route.
+    from .capture_routes import save_photo, validate_image
+    await run_in_threadpool(validate_image, data, mime, 10 * 1024 * 1024)
+    saved = await run_in_threadpool(save_photo, estimate_id, request, c, db, data, mime,
+        {'capture_key': label.strip(), 'body_style': 'sedan', 'operation_id': uid()},
+        verify_framing=False, validate_capture_key=False, max_bytes=MAX_CUSTOMER_PHOTO_BYTES, max_photos=MAX_PHOTOS_PER_ESTIMATE,
+        max_uploads=MAX_PHOTO_UPLOADS_PER_HOUR)
+    return {'id': saved['id'], 'label': saved['label']}
 
 
 @router.get("/estimates/{estimate_id}/photos/{photo_id}")
@@ -513,6 +513,21 @@ def assistant(body: AssistantInput, request: Request, c: Customer = Depends(curr
     mobile = body.mobile_only or bool(re.search(r"\bmobile\b|at (my )?(home|house|work)|driveway|come to", message))
     urgent = bool(re.search(r"brakes? (fail(ed|ure)?|not working)|smoke|overheat|fuel leak|burning smell|airbag|high voltage|unsafe|oil pressure", message))
     intent = "find_provider" if wants_provider and specialty and postal and car else ("clarify" if wants_provider else "advice")
+    directory_result = None
+    if intent == 'find_provider' and request.app.state.settings.discovery_enabled and not c.demo:
+        from .discovery import search
+        from .discovery_models import DedicatedShop
+        from .shop_models import MyShop
+        favorite = db.get(DedicatedShop, (c.id, car.id, specialty))
+        if favorite and favorite.source == 'my_shop' and not urgent:
+            saved = db.get(MyShop, favorite.source_id)
+            if saved and saved.customer_id == c.id and not saved.deleted:
+                return {'reply': f'Your dedicated shop for this work is {saved.name}. Open My shops to review a contact request and confirm services with them.',
+                        'intent': 'shop_outreach', 'specialty': specialty, 'providers': [], 'videos': [], 'dedicated_shop_id': saved.id}
+        lock_customer(db, c.id)
+        consume_rate(db, c.id, 'directory_search', 120)
+        db.commit()
+        directory_result = search(db, request, c, postal, car, specialty, mobile)
     matches = [p for p in matching_providers(db, specialty, postal, mobile, c.demo) if p.accepting_requests] if intent == "find_provider" else []
     if intent == "clarify":
         missing = [name for name, value in (("repair type", specialty), ("vehicle", car), ("postal code", postal)) if not value]
@@ -520,6 +535,12 @@ def assistant(body: AssistantInput, request: Request, c: Customer = Depends(curr
     elif intent == "find_provider":
         reply = (f"These {'mobile ' if mobile else ''}providers list your service area and specialty. Choose one to review your request; they will confirm availability and pricing."
                  if matches else "I couldn't find an opted-in provider matching those details. Try another service or a shop instead of mobile help.")
+        if directory_result:
+            reply = directory_result['message']
+            if mobile and not directory_result['providers']:
+                nearest = next((p for p in directory_result['shop_visit_alternatives'] if p['source'] == 'estimoto' and specialty in p['specialties']), None)
+                if nearest:
+                    reply = f"{nearest['name']} is a nearby participating shop for this work. It requires a shop visit; mobile coverage is not listed for your ZIP. Review the request with the shop to confirm availability and pricing."
     elif re.search(r"tire|tyre|pressure", message):
         reply = "Use the cold tire pressure on the driver-door placard or in your owner's manual. Check with a gauge when the tires are cold. If a tire keeps losing pressure or has visible damage, have a technician inspect it."
     elif "oil" in message:
@@ -541,6 +562,9 @@ def assistant(body: AssistantInput, request: Request, c: Customer = Depends(curr
         videos = [{"title": "Search YouTube for this maintenance topic", "url": f"https://www.youtube.com/results?search_query={search}", "source": "YouTube search · review vehicle compatibility"}]
     result = {"reply": reply, "intent": intent, "specialty": specialty,
               "providers": [provider(p) for p in matches], "videos": videos}
+    if directory_result:
+        result['providers'] = directory_result['providers'] + directory_result['shop_visit_alternatives']
+        result['discovery'] = {key: value for key, value in directory_result.items() if key not in ('providers', 'shop_visit_alternatives')}
     evidence = []
     if not urgent and re.search(r"\b(schedule|book|contact|reach out|appointment)\b", message) and re.search(r"\b(my|saved|usual|own|previous)\b.*\b(shop|mechanic|garage)\b", message):
         return {"reply": "Open My shops to choose your shop and preferred times. I'll prepare the request for you to review and authorize. Your shop confirms the appointment.",

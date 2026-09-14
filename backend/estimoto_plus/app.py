@@ -28,6 +28,8 @@ from .vehicle_images import router as vehicle_images_router
 from .android_download import router as android_download_router
 from .calendar_routes import router as calendar_router
 from .calendar_sync import sync_calendar_batch
+from .capture_routes import router as capture_router
+from .discovery import router as discovery_router
 
 
 def create_app(settings: Settings | None = None, *, auth_verifier=None, auth_client=None, bridge_transport=None):
@@ -95,6 +97,13 @@ def create_app(settings: Settings | None = None, *, auth_verifier=None, auth_cli
         response.headers["X-Content-Type-Options"] = "nosniff"
         if request.url.path.startswith("/v1/"):
             response.headers["Cache-Control"] = "private, no-store"
+        if request.url.path.startswith('/capture/'):
+            response.headers['Content-Security-Policy'] = (
+                "default-src 'none'; script-src 'self'; style-src 'self' 'unsafe-inline'; "
+                "img-src 'self' data: blob:; font-src 'self'; media-src 'self' blob:; "
+                "worker-src 'self' blob:; connect-src 'none'; frame-ancestors 'self'; "
+                "base-uri 'none'; form-action 'none'")
+            response.headers['Permissions-Policy'] = 'camera=(self), microphone=()'
         return response
 
     app.add_middleware(PhotoBodyLimit)
@@ -126,6 +135,8 @@ def create_app(settings: Settings | None = None, *, auth_verifier=None, auth_cli
     app.state.auth_client = auth_client
     app.state.bridge_transport = bridge_transport
     app.state.calendar_transport = None
+    app.state.capture_transport = None
+    app.state.discovery_transport = None
     app.include_router(customer_router)
     app.include_router(bridge_router)
     app.include_router(saved_shops_router)
@@ -133,6 +144,8 @@ def create_app(settings: Settings | None = None, *, auth_verifier=None, auth_cli
     app.include_router(vehicle_images_router)
     app.include_router(android_download_router)
     app.include_router(calendar_router)
+    app.include_router(capture_router)
+    app.include_router(discovery_router)
 
     @app.get("/health/live")
     def health_live():
@@ -149,7 +162,7 @@ def create_app(settings: Settings | None = None, *, auth_verifier=None, auth_cli
                 revision = connection.scalar(sql_text("SELECT version_num FROM alembic_version"))
                 connection.execute(sql_text("SELECT 1"))
             photo_path = Path(settings.photo_dir)
-            if revision != "6db7a239f1c8" or not photo_path.is_dir() or not os.access(photo_path, os.W_OK):
+            if revision != "32ac7f618b90" or not photo_path.is_dir() or not os.access(photo_path, os.W_OK):
                 raise RuntimeError("not ready")
             if settings.environment == "production" and not (os.path.ismount(photo_path) or os.path.ismount(photo_path.parent)):
                 raise RuntimeError("not ready")
