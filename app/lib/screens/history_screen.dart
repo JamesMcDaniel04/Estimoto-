@@ -92,6 +92,15 @@ class _HistoryScreenState extends WorkspaceState<HistoryScreen> {
     if (active) await load();
   }
 
+  Future<void> edit(Json record) async {
+    await Navigator.of(context).push<Json>(
+      MaterialPageRoute<Json>(
+        builder: (_) => HistoryEditor(controller: controller, record: record),
+      ),
+    );
+    if (active) await load();
+  }
+
   Future<void> openReceipts(String id) async {
     if (!active) return;
     await Navigator.of(context).push(
@@ -281,6 +290,11 @@ class _HistoryScreenState extends WorkspaceState<HistoryScreen> {
                             ),
                           ),
                           IconButton(
+                            tooltip: 'Edit history entry',
+                            onPressed: busy ? null : () => edit(record),
+                            icon: const Icon(Icons.edit_outlined),
+                          ),
+                          IconButton(
                             tooltip: 'Delete history entry',
                             onPressed: busy ? null : () => remove(record),
                             icon: const Icon(Icons.delete_outline),
@@ -376,11 +390,15 @@ class HistoryEditor extends StatefulWidget {
   const HistoryEditor({
     super.key,
     required this.controller,
+    this.record,
     this.receiptStore,
     this.captureService,
     this.pdfPicker,
   });
   final PlusController controller;
+
+  /// When set, the editor changes this saved entry instead of creating one.
+  final Json? record;
   final ReceiptPendingStore? receiptStore;
   final EstimateCaptureService? captureService;
   final Future<XFile?> Function()? pdfPicker;
@@ -414,8 +432,27 @@ class _HistoryEditorState extends WorkspaceState<HistoryEditor> {
       fields[key] = TextEditingController();
     }
     vehicleId = controller.selectedVehicle?.id;
+    final record = widget.record;
+    if (record != null) {
+      vehicleId = textOf(record, 'vehicle_id');
+      type = textOf(record, 'service_type', 'maintenance');
+      date =
+          DateTime.tryParse(textOf(record, 'service_date')) ?? DateTime.now();
+      for (final entry in fields.entries) {
+        final value = record[entry.key];
+        entry.value.text = entry.key == 'cost_cents' && value is int
+            ? receiptCost(value).substring(1)
+            : value?.toString() ?? '';
+      }
+      restoring = false;
+      return;
+    }
     restore();
   }
+
+  bool get editing => widget.record != null;
+  int get attachedReceipts =>
+      widget.record == null ? 0 : rowsOf(widget.record!, 'receipts').length;
 
   Future<void> restore() async {
     try {
@@ -486,6 +523,15 @@ class _HistoryEditorState extends WorkspaceState<HistoryEditor> {
                   ? parseReceiptCost(entry.value.text)
                   : entry.value.text.trim(),
           };
+      if (editing) {
+        final changes = Map<String, dynamic>.from(body)..remove('vehicle_id');
+        await workspace.updateHistory(textOf(widget.record!, 'id'), changes);
+        if (mounted && active) {
+          controller.historyChanged();
+          Navigator.pop(context, widget.record);
+        }
+        return;
+      }
       try {
         final result = await workspace.addHistory(body);
         if (mounted && active) {
@@ -526,17 +572,35 @@ class _HistoryEditorState extends WorkspaceState<HistoryEditor> {
     }
     final locked = busy || restoring || pending != null;
     return Scaffold(
-      appBar: AppBar(title: const Text('Add service history')),
+      appBar: AppBar(
+        title: Text(editing ? 'Edit service history' : 'Add service history'),
+      ),
       bottomNavigationBar: SafeArea(
         top: false,
         child: Padding(
           padding: const EdgeInsets.fromLTRB(20, 12, 20, 16),
-          child: BusyButton(
-            busy: busy,
-            label: pending != null
-                ? 'Recover saved entry'
-                : 'Save history entry',
-            onPressed: restoring ? null : () => save(),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              if (editing && attachedReceipts > 0)
+                Padding(
+                  padding: const EdgeInsets.only(bottom: 10),
+                  child: Text(
+                    '$attachedReceipts receipt${attachedReceipts == 1 ? '' : 's'} stays attached to this entry.',
+                    style: Theme.of(context).textTheme.bodySmall,
+                  ),
+                ),
+              BusyButton(
+                busy: busy,
+                label: editing
+                    ? 'Save changes'
+                    : pending != null
+                    ? 'Recover saved entry'
+                    : 'Save history entry',
+                onPressed: restoring ? null : () => save(),
+              ),
+            ],
           ),
         ),
       ),

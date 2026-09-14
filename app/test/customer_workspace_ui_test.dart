@@ -1,4 +1,6 @@
 import 'dart:async';
+import 'dart:typed_data';
+import 'package:estimoto_plus/services/receipt_pending_types.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_test/flutter_test.dart';
@@ -530,5 +532,44 @@ void main() {
     await _tap(tester, find.widgetWithText(TextButton, 'Discard'));
     expect(find.text('Recover scheduling draft'), findsNothing);
     expect(await workspace.pending('outreach-draft'), isNull);
+  });
+
+  testWidgets('a history record can be edited and keeps its receipts', (
+    tester,
+  ) async {
+    final controller = await _controller();
+    final record = await controller.repository.addKnowledgeRecord({
+      'vehicle_id': controller.snapshot!.vehicles.first.id,
+      'service_type': 'maintenance',
+      'service_date': '2026-09-01',
+      'shop_name': 'Old Shop',
+      'cost_cents': 1000,
+    }, 'h-edit');
+    await controller.repository
+        .openReceiptRecord(record['id'] as String, isCurrent: () => true)
+        .upload(
+          ReceiptPending(
+            ownerId: controller.snapshot!.profile.id,
+            recordId: record['id'] as String,
+            operationId: '11111111-1111-4111-8111-111111111111',
+            filename: 'work.pdf',
+            mimeType: 'application/pdf',
+            bytes: Uint8List.fromList('%PDF-1.4'.codeUnits),
+          ),
+        );
+    await _mount(tester, HistoryScreen(controller: controller));
+    await _tap(tester, find.byTooltip('Edit history entry').first);
+    expect(find.text('Edit service history'), findsOneWidget);
+    expect(find.textContaining('1 receipt stays attached'), findsOneWidget);
+    await tester.enterText(
+      find.widgetWithText(TextFormField, 'Shop or DIY (optional)'),
+      'New Shop',
+    );
+    await _tap(tester, find.text('Save changes'));
+    expect(find.text('New Shop'), findsOneWidget);
+    expect(find.text('Old Shop'), findsNothing);
+    final saved = (await controller.repository.getKnowledge())['records'].first;
+    expect(saved['shop_name'], 'New Shop');
+    expect(saved['cost_cents'], 1000);
   });
 }

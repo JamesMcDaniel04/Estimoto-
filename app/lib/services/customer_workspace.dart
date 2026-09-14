@@ -178,6 +178,14 @@ class CustomerWorkspace {
   );
   Future<Json> addHistory(Json body) =>
       write('history-record', body, controller.repository.addKnowledgeRecord);
+
+  /// Edits are naturally idempotent, so they bypass the pending-write store.
+  Future<Json> updateHistory(String id, Json body) async {
+    check();
+    final result = await controller.repository.updateKnowledgeRecord(id, body);
+    check();
+    return result;
+  }
 }
 
 Object? _ordered(Object? value) {
