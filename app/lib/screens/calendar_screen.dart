@@ -462,12 +462,11 @@ class _CalendarScreenState extends WorkspaceState<CalendarScreen>
               icon: Icons.check,
             ),
           ],
-          if (!controller.isDemo &&
-              (connected ||
-                  state == 'connecting' ||
-                  state == 'reconnect_required' ||
-                  state == 'disconnecting' ||
-                  state == 'disconnect_uncertain')) ...[
+          if ((connected ||
+              state == 'connecting' ||
+              state == 'reconnect_required' ||
+              state == 'disconnecting' ||
+              state == 'disconnect_uncertain')) ...[
             const SizedBox(height: 20),
             OutlinedButton.icon(
               key: const Key('calendar-disconnect'),

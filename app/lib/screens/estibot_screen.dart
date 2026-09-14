@@ -28,6 +28,29 @@ class _EstibotScreenState extends WorkspaceState<EstibotScreen> {
     super.dispose();
   }
 
+  Future<void> clearConversation() async {
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: const Text('Clear this conversation?'),
+        content: const Text(
+          'Messages are only kept on this screen. Your garage, estimates and requests are not affected.',
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context, false),
+            child: const Text('Keep'),
+          ),
+          TextButton(
+            onPressed: () => Navigator.pop(context, true),
+            child: const Text('Clear'),
+          ),
+        ],
+      ),
+    );
+    if (confirmed == true && active) widget.controller.clearConversation();
+  }
+
   Future<void> send([String? prompt]) async {
     if (!active) return;
     final value = prompt ?? message.text;
@@ -60,9 +83,21 @@ class _EstibotScreenState extends WorkspaceState<EstibotScreen> {
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    const PageHeading(
+                    PageHeading(
                       'A little clarity.\nThe right connection.',
                       'Understand estimates, plan routine care, find repair help, or schedule with your saved shop.',
+                      trailing: widget.controller.messages.isEmpty
+                          ? null
+                          : PopupMenuButton<String>(
+                              tooltip: 'Conversation options',
+                              itemBuilder: (_) => const [
+                                PopupMenuItem(
+                                  value: 'clear',
+                                  child: Text('Clear conversation'),
+                                ),
+                              ],
+                              onSelected: (_) => clearConversation(),
+                            ),
                     ),
                     VehiclePicker(controller: widget.controller),
                     const SizedBox(height: 12),
@@ -187,6 +222,21 @@ class _EstibotScreenState extends WorkspaceState<EstibotScreen> {
                               ),
                             ),
                             if (!entry.isUser) ...[
+                              if (entry.answer!.intent == 'unmatched')
+                                Padding(
+                                  padding: const EdgeInsets.only(top: 12),
+                                  child: ActionChip(
+                                    avatar: const Icon(
+                                      Icons.near_me_outlined,
+                                      size: 18,
+                                    ),
+                                    label: const Text(
+                                      'Find a technician for this',
+                                    ),
+                                    onPressed: () =>
+                                        widget.controller.selectTab(4),
+                                  ),
+                                ),
                               if (entry.answer!.intent == 'shop_outreach')
                                 Padding(
                                   padding: const EdgeInsets.only(top: 12),

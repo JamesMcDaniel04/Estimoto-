@@ -953,7 +953,7 @@ class DemoPlusRepository extends PlusRepository {
         ? 'Use the cold tire pressure on the driver-door placard or in your owner’s manual. Check with a gauge when the tires are cold. If a tire keeps losing pressure or has visible damage, have a technician inspect it.'
         : RegExp(r'estimate|cost|price').hasMatch(message)
         ? 'An estimate separates the work, parts and labor needed for your repair. Your Estimates tab holds the shop’s figures and review status. I can help you find a PDR technician or collision shop for a specific concern.'
-        : 'I can help you understand an estimate, plan routine maintenance, or find a technician. Try “Find mobile dent repair for my car” or “How do I check tire pressure?”';
+        : _unmatchedReply;
     final videos =
         RegExp(r'how|video|tutorial').hasMatch(message) &&
             RegExp(r'oil|tire|tyre|pressure|filter').hasMatch(message)
@@ -974,12 +974,20 @@ class DemoPlusRepository extends PlusRepository {
         : <Json>[];
     return AssistantAnswer.fromJson({
       'reply': reply,
-      'intent': 'advice',
+      'intent': reply == _unmatchedReply ? 'unmatched' : 'advice',
       'specialty': specialty,
       'videos': videos,
+      if (reply == _unmatchedReply)
+        'discovery': {
+          'postal_code': (_state['profile'] as Json)['postal_code'],
+          'specialty': specialty,
+        },
     });
   }
 }
+
+const _unmatchedReply =
+    "I can't answer that one yet. I can explain an estimate, plan routine maintenance, or find a technician near you.";
 
 class _DemoReceiptApi extends ReceiptApi {
   _DemoReceiptApi(this.repository, this.recordId, this.isCurrent);
