@@ -1,5 +1,8 @@
 import 'dart:convert';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:estimoto_plus/services/customer_workspace.dart';
+import 'package:estimoto_plus/domain/models.dart';
+import 'dart:typed_data';
 import 'package:http/http.dart' as http;
 import 'package:http/testing.dart';
 import 'package:estimoto_plus/data/api_repository.dart';
@@ -130,4 +133,200 @@ void main() {
       }
     },
   );
+
+  test('demo reminders can be edited, reopened and deleted', () async {
+    final repository = DemoPlusRepository();
+    final vehicle = (await repository.bootstrap()).vehicles.first;
+    final made = await repository.addReminder({
+      'vehicle_id': vehicle.id,
+      'title': 'Oil',
+      'due_mileage': 1000,
+    });
+    final id = made['id'] as String;
+    final edited = await repository.updateReminder(id, {
+      'title': 'Oil and filter',
+    });
+    expect(edited['title'], 'Oil and filter');
+    expect(edited['due_mileage'], 1000);
+    expect(
+      () => repository.updateReminder(id, {
+        'due_date': null,
+        'due_mileage': null,
+      }),
+      throwsA(isA<PlusApiException>()),
+    );
+    await repository.completeReminder(id);
+    expect((await repository.reopenReminder(id))['completed'], false);
+    await repository.deleteReminder(id);
+    expect(
+      (await repository.bootstrap()).reminders.any((r) => r.id == id),
+      isFalse,
+    );
+    expect(
+      () => repository.deleteReminder(id),
+      throwsA(isA<PlusApiException>()),
+    );
+  });
+
+  test(
+    'demo estimate drafts can be edited, photos removed and drafts deleted',
+    () async {
+      final repository = DemoPlusRepository();
+      final vehicle = (await repository.bootstrap()).vehicles.first;
+      final draft = await repository.createEstimate({
+        'vehicle_id': vehicle.id,
+        'discipline': 'pdr',
+        'description': 'Ding',
+      });
+      final id = draft['id'] as String;
+      final edited = await repository.updateEstimate(id, {
+        'description': 'Two dings',
+      });
+      expect(edited['description'], 'Two dings');
+      final photo = await repository.uploadPhoto(
+        id,
+        Uint8List.fromList([1, 2, 3]),
+        'a.jpg',
+        'front',
+      );
+      await repository.deletePhoto(id, photo['id'] as String);
+      final after = (await repository.bootstrap()).estimates.firstWhere(
+        (e) => e.id == id,
+      );
+      expect(after.photos, isEmpty);
+      expect(
+        () => repository.getPhoto(id, photo['id'] as String),
+        throwsA(isA<PlusApiException>()),
+      );
+      await repository.deleteEstimate(id);
+      expect(
+        (await repository.bootstrap()).estimates.any((e) => e.id == id),
+        isFalse,
+      );
+      expect(
+        () => repository.deleteEstimate(id),
+        throwsA(isA<PlusApiException>()),
+      );
+    },
+  );
+
+  test('demo shared estimates are locked with a code', () async {
+    final repository = DemoPlusRepository();
+    final shared = (await repository.bootstrap()).estimates.firstWhere(
+      (e) => e.status != 'draft',
+    );
+    expect(
+      () => repository.deleteEstimate(shared.id),
+      throwsA(
+        isA<PlusApiException>().having(
+          (e) => e.code,
+          'code',
+          'estimate_locked',
+        ),
+      ),
+    );
+  });
+
+  test(
+    'demo scheduling drafts can be discarded and sent requests withdrawn',
+    () async {
+      final repository = DemoPlusRepository();
+      final vehicle = (await repository.bootstrap()).vehicles.first;
+      final shop = await repository.saveMyShop({
+        'name': 'Shop',
+        'email': 'shop@example.test',
+        'phone': '',
+      });
+      Json body() => {
+        'shop_id': shop['id'],
+        'vehicle_id': vehicle.id,
+        'service_summary': 'Brakes',
+        'proposed_slots': [
+          offsetTimestamp(DateTime.now().add(const Duration(days: 2))),
+        ],
+      };
+      final draft = await repository.createShopOutreach(body(), 'k1');
+      await repository.deleteShopOutreach(draft['id'] as String);
+      expect(await repository.listShopOutreach(), isEmpty);
+      final second = await repository.createShopOutreach(body(), 'k2');
+      await repository.authorizeShopOutreach(second['id'] as String, {
+        'share_contact': true,
+        'review_hash': second['review_hash'],
+      }, 'a2');
+      expect(
+        () => repository.deleteShopOutreach(second['id'] as String),
+        throwsA(isA<PlusApiException>()),
+      );
+      final withdrawn = await repository.withdrawShopOutreach(
+        second['id'] as String,
+      );
+      expect(withdrawn['status'], 'withdrawn');
+      expect(
+        () => repository.withdrawShopOutreach(second['id'] as String),
+        throwsA(isA<PlusApiException>()),
+      );
+    },
+  );
+
+  test('demo history records can be edited in place', () async {
+    final repository = DemoPlusRepository();
+    final vehicle = (await repository.bootstrap()).vehicles.first;
+    final record = await repository.addKnowledgeRecord({
+      'vehicle_id': vehicle.id,
+      'service_type': 'maintenance',
+      'service_date': '2026-09-01',
+      'shop_name': 'Old',
+    }, 'h1');
+    final edited = await repository.updateKnowledgeRecord(
+      record['id'] as String,
+      {'shop_name': 'New', 'cost_cents': 500},
+    );
+    expect(edited['shop_name'], 'New');
+    expect(edited['cost_cents'], 500);
+    expect(edited['service_date'], '2026-09-01');
+    expect(
+      (await repository.getKnowledge())['records'].first['shop_name'],
+      'New',
+    );
+  });
+
+  test('demo valuation history is listed newest first and deletable', () async {
+    final repository = DemoPlusRepository();
+    final vehicle = (await repository.bootstrap()).vehicles.first;
+    final before =
+        (await repository.listVehicleValuations(vehicle.id))['valuations']
+            as List;
+    expect(before, isNotEmpty);
+    final first = before.first as Json;
+    expect(
+      DateTime.parse(
+        first['created_at'] as String,
+      ).isAfter(DateTime.parse((before.last as Json)['created_at'] as String)),
+      isTrue,
+    );
+    await repository.deleteVehicleValuation(vehicle.id, first['id'] as String);
+    final after =
+        (await repository.listVehicleValuations(vehicle.id))['valuations']
+            as List;
+    expect(after.length, before.length - 1);
+    expect(
+      () =>
+          repository.deleteVehicleValuation(vehicle.id, first['id'] as String),
+      throwsA(isA<PlusApiException>()),
+    );
+  });
+
+  test('demo guided capture reports a typed unavailable code', () {
+    final repository = DemoPlusRepository();
+    expect(
+      () => repository.openGuidedCapture('e1', isCurrent: () => true),
+      throwsA(
+        isA<PlusApiException>().having(
+          (e) => e.code,
+          'code',
+          'guided_capture_unavailable',
+        ),
+      ),
+    );
+  });
 }

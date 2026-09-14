@@ -5,6 +5,7 @@ import '../domain/models.dart';
 import 'demo_seed.dart';
 import 'repository.dart';
 import '../services/calendar_time.dart';
+import '../services/guided_capture_api.dart';
 import '../services/receipt_api.dart';
 import '../services/receipt_pending.dart';
 import 'package:timezone/timezone.dart' as tz;
@@ -23,6 +24,66 @@ class DemoPlusRepository extends PlusRepository {
     required bool Function() isCurrent,
   }) => _DemoReceiptApi(this, recordId, isCurrent);
   final _vehicleImages = <String, VehiclePhoto>{};
+
+  late final Map<String, List<Json>> _valuations = _seedValuations();
+
+  Map<String, List<Json>> _seedValuations() {
+    final vehicle = _rows('vehicles').first;
+    Json sample(int daysAgo, int retail, int wholesale, int mileage) => {
+      'id': _id(),
+      'state': 'CO',
+      'condition': 'average',
+      'mileage': mileage,
+      'created_at': DateTime.now()
+          .subtract(Duration(days: daysAgo))
+          .toIso8601String(),
+      'payload': {
+        'buckets': [
+          {'kind': 'retail', 'amount_cents': retail},
+          {'kind': 'wholesale', 'amount_cents': wholesale},
+        ],
+      },
+    };
+    return {
+      vehicle['id'] as String: [
+        sample(30, 2400000, 2050000, 28100),
+        sample(90, 2480000, 2110000, 26900),
+      ],
+    };
+  }
+
+  @override
+  Future<Json> listVehicleValuations(String vehicleId) async {
+    _find('vehicles', vehicleId);
+    return {
+      'vehicle_id': vehicleId,
+      'valuations': (_valuations[vehicleId] ?? const <Json>[])
+          .map(_copy)
+          .toList(),
+    };
+  }
+
+  @override
+  Future<void> deleteVehicleValuation(
+    String vehicleId,
+    String valuationId,
+  ) async {
+    final rows = _valuations[vehicleId] ?? <Json>[];
+    if (!rows.any((r) => r['id'] == valuationId)) {
+      throw const PlusApiException('Not found.', 404);
+    }
+    rows.removeWhere((r) => r['id'] == valuationId);
+  }
+
+  @override
+  GuidedCaptureApi openGuidedCapture(
+    String estimateId, {
+    required bool Function() isCurrent,
+  }) => throw const PlusApiException(
+    'The guided camera is unavailable in this preview.',
+    503,
+    'guided_capture_unavailable',
+  );
 
   final _dedicated = <String, Json>{};
   @override
@@ -366,6 +427,36 @@ class DemoPlusRepository extends PlusRepository {
     _outreach.add(record);
     return record;
   });
+  bool _demoSent(Json row) =>
+      row['delivery_status'] == 'local_preview' && row['status'] == 'draft';
+
+  @override
+  Future<void> deleteShopOutreach(String id) async {
+    final row = _workspaceFind(_outreach, id);
+    const discardable = {'draft', 'call_required', 'delivery_failed'};
+    if (_demoSent(row) || !discardable.contains(row['status'])) {
+      throw const PlusApiException(
+        'This request was already sent and can only be withdrawn.',
+        409,
+      );
+    }
+    _outreach.removeWhere((r) => r['id'] == id);
+  }
+
+  @override
+  Future<Json> withdrawShopOutreach(String id) async {
+    final row = _workspaceFind(_outreach, id);
+    const withdrawable = {'queued', 'delivery_unknown', 'waiting_for_reply'};
+    if (!_demoSent(row) && !withdrawable.contains(row['status'])) {
+      throw const PlusApiException(
+        'This request can no longer be withdrawn.',
+        409,
+      );
+    }
+    row['status'] = 'withdrawn';
+    return _copy(row);
+  }
+
   @override
   Future<Json> authorizeShopOutreach(
     String id,
@@ -401,8 +492,8 @@ class DemoPlusRepository extends PlusRepository {
     if (!isCurrent()) {
       throw const PlusApiException('Your account changed.', 401);
     }
-    _find('vehicles', vehicleId);
-    return {
+    final vehicle = _find('vehicles', vehicleId);
+    final result = <String, dynamic>{
       'vehicle_id': vehicleId,
       'status': 'available',
       'sample': true,
@@ -434,6 +525,15 @@ class DemoPlusRepository extends PlusRepository {
       'message':
           'Fixed fictional amounts show how a valuation appears. No valuation provider was contacted. These amounts do not value this vehicle or change with your selections.',
     };
+    (_valuations[vehicleId] ??= <Json>[]).insert(0, {
+      'id': _id(),
+      'state': body['state'],
+      'condition': body['condition'],
+      'mileage': vehicle['mileage'] ?? 0,
+      'created_at': DateTime.now().toIso8601String(),
+      'payload': {'buckets': _copy(result)['buckets']},
+    });
+    return result;
   }
 
   @override
@@ -456,6 +556,13 @@ class DemoPlusRepository extends PlusRepository {
         _history.add(record);
         return record;
       });
+  @override
+  Future<Json> updateKnowledgeRecord(String id, Json body) async {
+    final row = _workspaceFind(_history, id);
+    row.addAll(_copy(body));
+    return _copy(row);
+  }
+
   @override
   Future<void> deleteKnowledgeRecord(String id) async {
     _workspaceFind(_history, id);
@@ -670,6 +777,72 @@ class DemoPlusRepository extends PlusRepository {
     final row = _find('reminders', id);
     row['completed'] = true;
     return row;
+  }
+
+  @override
+  Future<Json> updateReminder(String id, Json body) async {
+    final row = _find('reminders', id);
+    final merged = {...row, ...body};
+    if (merged['due_date'] == null && merged['due_mileage'] == null) {
+      throw const PlusApiException('Add a date or mileage for this reminder.');
+    }
+    if (body['vehicle_id'] != null) {
+      _find('vehicles', body['vehicle_id'] as String);
+    }
+    row.addAll(body);
+    return row;
+  }
+
+  @override
+  Future<void> deleteReminder(String id) async {
+    _find('reminders', id);
+    _rows('reminders').removeWhere((r) => r['id'] == id);
+  }
+
+  @override
+  Future<Json> reopenReminder(String id) async {
+    final row = _find('reminders', id);
+    row['completed'] = false;
+    return row;
+  }
+
+  Json _editableEstimate(String id) {
+    final row = _find('estimates', id);
+    if (row['status'] != 'draft' ||
+        (row['delivery_status'] ?? 'draft') != 'draft') {
+      throw const PlusApiException(
+        'This estimate has been shared and can no longer be changed.',
+        409,
+        'estimate_locked',
+      );
+    }
+    return row;
+  }
+
+  @override
+  Future<Json> updateEstimate(String id, Json body) async {
+    final row = _editableEstimate(id);
+    row.addAll(body);
+    row['updated_at'] = DateTime.now().toIso8601String();
+    return row;
+  }
+
+  @override
+  Future<void> deleteEstimate(String id) async {
+    _editableEstimate(id);
+    _rows('estimates').removeWhere((e) => e['id'] == id);
+    _photoBytes.removeWhere((key, _) => key.startsWith('$id/'));
+  }
+
+  @override
+  Future<void> deletePhoto(String estimateId, String photoId) async {
+    final row = _editableEstimate(estimateId);
+    final photos = row['photos'] as List;
+    if (!photos.any((p) => p['id'] == photoId)) {
+      throw const PlusApiException('Not found.', 404);
+    }
+    photos.removeWhere((p) => p['id'] == photoId);
+    _photoBytes.remove('$estimateId/$photoId');
   }
 
   @override

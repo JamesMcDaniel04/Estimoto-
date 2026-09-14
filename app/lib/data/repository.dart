@@ -34,6 +34,12 @@ abstract class PlusRepository {
     'Vehicle value estimates are currently unavailable.',
     503,
   );
+  Future<Json> listVehicleValuations(String vehicleId) async => {
+    'vehicle_id': vehicleId,
+    'valuations': <Json>[],
+  };
+  Future<void> deleteVehicleValuation(String vehicleId, String valuationId) =>
+      throw const PlusApiException('Past lookups cannot be removed right now.');
   Future<PlusSnapshot> bootstrap();
   Future<Json> saveProfile(Json body);
   Future<Json> saveVehicle(Json body, {String? id});
@@ -55,10 +61,25 @@ abstract class PlusRepository {
   );
   Future<Uint8List> getPhoto(String estimateId, String photoId);
   Future<Json> submitEstimate(String id, Json body, String idempotencyKey);
+  Future<Json> updateEstimate(String id, Json body) =>
+      throw const PlusApiException(
+        'This estimate cannot be changed right now.',
+      );
+  Future<void> deleteEstimate(String id) => throw const PlusApiException(
+    'This estimate cannot be changed right now.',
+  );
+  Future<void> deletePhoto(String estimateId, String photoId) =>
+      throw const PlusApiException('This photo cannot be removed right now.');
   Future<Json> createRequest(Json body, String idempotencyKey);
   Future<Json> cancelRequest(String id);
   Future<Json> addReminder(Json body);
   Future<Json> completeReminder(String id);
+  Future<Json> updateReminder(String id, Json body) =>
+      throw const PlusApiException('Reminders cannot be changed right now.');
+  Future<void> deleteReminder(String id) =>
+      throw const PlusApiException('Reminders cannot be changed right now.');
+  Future<Json> reopenReminder(String id) =>
+      throw const PlusApiException('Reminders cannot be changed right now.');
   Future<AssistantAnswer> askAssistant(Json body);
   Future<List<Json>> listMyShops();
   Future<Json> saveMyShop(Json body, {String? id});
@@ -71,9 +92,17 @@ abstract class PlusRepository {
     Json body,
     String idempotencyKey,
   );
+  Future<void> deleteShopOutreach(String id) => throw const PlusApiException(
+    'This request cannot be discarded right now.',
+  );
+  Future<Json> withdrawShopOutreach(String id) => throw const PlusApiException(
+    'This request cannot be withdrawn right now.',
+  );
   Future<Json> getKnowledge();
   Future<Json> addKnowledgeRecord(Json body, String idempotencyKey);
   Future<void> deleteKnowledgeRecord(String id);
+  Future<Json> updateKnowledgeRecord(String id, Json body) =>
+      throw const PlusApiException('History cannot be changed right now.');
   Future<Json> saveKnowledgePreferences(Json body);
   Future<Json> discoverProviders(Json query) async => {
     'providers': <Json>[],

@@ -66,6 +66,11 @@ class PlusController extends ChangeNotifier {
     if (!_disposed) notifyListeners();
   }
 
+  void clearConversation() {
+    messages.clear();
+    _notify();
+  }
+
   void selectTab(int value) {
     tab = value;
     _notify();

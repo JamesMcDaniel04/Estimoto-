@@ -454,6 +454,61 @@ class ApiPlusRepository extends PlusRepository {
   Future<Json> completeReminder(String id) =>
       _send('POST', '/v1/reminders/${Uri.encodeComponent(id)}/complete');
   @override
+  Future<Json> updateReminder(String id, Json body) =>
+      _send('PUT', '/v1/reminders/${Uri.encodeComponent(id)}', body: body);
+  @override
+  Future<void> deleteReminder(String id) async {
+    await _send('DELETE', '/v1/reminders/${Uri.encodeComponent(id)}');
+  }
+
+  @override
+  Future<Json> reopenReminder(String id) =>
+      _send('POST', '/v1/reminders/${Uri.encodeComponent(id)}/reopen');
+  @override
+  Future<Json> updateEstimate(String id, Json body) =>
+      _send('PUT', '/v1/estimates/${Uri.encodeComponent(id)}', body: body);
+  @override
+  Future<void> deleteEstimate(String id) async {
+    await _send('DELETE', '/v1/estimates/${Uri.encodeComponent(id)}');
+  }
+
+  @override
+  Future<void> deletePhoto(String estimateId, String photoId) async {
+    await _send(
+      'DELETE',
+      '/v1/estimates/${Uri.encodeComponent(estimateId)}/photos/${Uri.encodeComponent(photoId)}',
+    );
+  }
+
+  @override
+  Future<void> deleteShopOutreach(String id) async {
+    await _send('DELETE', '/v1/shop-outreach/${Uri.encodeComponent(id)}');
+  }
+
+  @override
+  Future<Json> withdrawShopOutreach(String id) =>
+      _send('POST', '/v1/shop-outreach/${Uri.encodeComponent(id)}/withdraw');
+  @override
+  Future<Json> updateKnowledgeRecord(String id, Json body) => _send(
+    'PUT',
+    '/v1/knowledge/records/${Uri.encodeComponent(id)}',
+    body: body,
+  );
+  @override
+  Future<Json> listVehicleValuations(String vehicleId) =>
+      _send('GET', '/v1/vehicles/${Uri.encodeComponent(vehicleId)}/valuations');
+  @override
+  Future<void> deleteVehicleValuation(
+    String vehicleId,
+    String valuationId,
+  ) async {
+    await _send(
+      'DELETE',
+      '/v1/vehicles/${Uri.encodeComponent(vehicleId)}/valuations/${Uri.encodeComponent(valuationId)}',
+    );
+  }
+
+  @override
   Future<AssistantAnswer> askAssistant(Json body) async =>
       AssistantAnswer.fromJson(
         await _send(
