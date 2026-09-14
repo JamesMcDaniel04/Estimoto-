@@ -69,7 +69,7 @@
 		<string>UIInterfaceOrientationLandscapeRight</string>
 	</array>
 	<key>NSCameraUsageDescription</key>
-	<string>Take photos of vehicle damage for your estimate.</string>
+	<string>Photograph your vehicle, damage and driver-door VIN label with the guided estimate camera.</string>
 	<key>NSPhotoLibraryUsageDescription</key>
 	<string>Choose vehicle photos to attach to your estimate.</string>
 	<key>FlutterDeepLinkingEnabled</key>

@@ -7,6 +7,13 @@ environment:
   sdk: ^3.12.1
 
 dependencies:
+  crypto: 3.0.7
+  path_provider: 2.1.6
+  web: 1.1.1
+  webview_flutter: 4.14.1
+  webview_flutter_android: 4.14.1
+  webview_flutter_wkwebview: 3.26.1
+  permission_handler: 13.0.2
   cupertino_icons: 1.0.8
   flutter:
     sdk: flutter

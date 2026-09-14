@@ -178,7 +178,8 @@ void main() {
     expect(draft.status, 'draft');
     expect(draft.amountCents, isNull);
     expect(draft.json['date_of_loss'], isNull);
-    expect(find.text('Add clear photos'), findsWidgets);
+    expect(find.byKey(const Key('open-guided-capture')), findsOneWidget);
+    expect(find.byKey(const Key('capture-camera')), findsNothing);
     expect(tester.takeException(), isNull);
   });
 

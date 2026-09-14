@@ -13,11 +13,13 @@ class EstimateCaptureGuide extends StatefulWidget {
     required this.controller,
     required this.estimate,
     this.captureService,
+    this.recoveryOnly = false,
     this.onBusyChanged,
   });
   final PlusController controller;
   final CustomerEstimate estimate;
   final EstimateCaptureService? captureService;
+  final bool recoveryOnly;
   final ValueChanged<bool>? onBusyChanged;
   @override
   State<EstimateCaptureGuide> createState() => _EstimateCaptureGuideState();
@@ -217,6 +219,13 @@ class _EstimateCaptureGuideState extends State<EstimateCaptureGuide> {
 
   @override
   Widget build(BuildContext context) {
+    if (!current) return const SizedBox.shrink();
+    if (widget.recoveryOnly &&
+        pending == null &&
+        !otherPending &&
+        error == null) {
+      return const SizedBox.shrink();
+    }
     final snapshot = widget.controller.snapshot!;
     final keys = estimateRequiredKeys(snapshot);
     final saved = savedCaptureKeys(widget.estimate);
@@ -233,23 +242,25 @@ class _EstimateCaptureGuideState extends State<EstimateCaptureGuide> {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        const SectionHeading('Add clear photos'),
-        Text(
-          '${keys.length - missing.length} of ${keys.length} required vehicle views saved',
-          style: Theme.of(context).textTheme.titleMedium,
-        ),
-        const SizedBox(height: 10),
-        LinearProgressIndicator(
-          value: keys.isEmpty
-              ? 0
-              : (keys.length - missing.length) / keys.length,
-        ),
-        const SizedBox(height: 12),
-        Text(
-          widget.estimate.discipline == 'pdr'
-              ? 'Add all eight vehicle views, then photograph the damaged panel. These photos help the shop review your estimate.'
-              : 'Add all eight vehicle views. Photos of the damaged panels can help the shop understand the repair.',
-        ),
+        if (!widget.recoveryOnly) ...[
+          const SectionHeading('Add clear photos'),
+          Text(
+            '${keys.length - missing.length} of ${keys.length} required vehicle views saved',
+            style: Theme.of(context).textTheme.titleMedium,
+          ),
+          const SizedBox(height: 10),
+          LinearProgressIndicator(
+            value: keys.isEmpty
+                ? 0
+                : (keys.length - missing.length) / keys.length,
+          ),
+          const SizedBox(height: 12),
+          Text(
+            widget.estimate.discipline == 'pdr'
+                ? 'Add all required vehicle views, then photograph the damaged panel. These photos help the shop review your estimate.'
+                : 'Add all required vehicle views. Photos of the damaged panels can help the shop understand the repair.',
+          ),
+        ],
         if (error != null)
           Padding(
             padding: const EdgeInsets.only(top: 12),
@@ -330,7 +341,7 @@ class _EstimateCaptureGuideState extends State<EstimateCaptureGuide> {
               ),
             ),
           ),
-        if (pending == null && !otherPending)
+        if (!widget.recoveryOnly && pending == null && !otherPending)
           Card(
             key: guideKey,
             child: Padding(
@@ -434,44 +445,48 @@ class _EstimateCaptureGuideState extends State<EstimateCaptureGuide> {
             ),
           ),
         const SizedBox(height: 16),
-        for (final key in keys)
-          ListTile(
-            key: Key('capture-check-$key'),
-            contentPadding: EdgeInsets.zero,
-            leading: Icon(
-              saved.contains(key)
-                  ? Icons.check_circle
-                  : Icons.radio_button_unchecked,
-              color: saved.contains(key) ? const Color(0xFF08796D) : null,
+        if (!widget.recoveryOnly) ...[
+          for (final key in keys)
+            ListTile(
+              key: Key('capture-check-$key'),
+              contentPadding: EdgeInsets.zero,
+              leading: Icon(
+                saved.contains(key)
+                    ? Icons.check_circle
+                    : Icons.radio_button_unchecked,
+                color: saved.contains(key) ? const Color(0xFF08796D) : null,
+              ),
+              title: Text(captureLabel(key)),
+              subtitle: Text(
+                saved.contains(key)
+                    ? 'Saved · tap to add another view'
+                    : 'Still needed',
+              ),
+              onTap: busy || pending != null || otherPending
+                  ? null
+                  : () {
+                      setState(() => selectedKey = key);
+                      _showGuide();
+                    },
             ),
-            title: Text(captureLabel(key)),
-            subtitle: Text(
-              saved.contains(key)
-                  ? 'Saved · tap to add another view'
-                  : 'Still needed',
+          if (widget.estimate.discipline == 'pdr')
+            ListTile(
+              key: const Key('capture-check-damage'),
+              contentPadding: EdgeInsets.zero,
+              leading: Icon(
+                damageNeeded
+                    ? Icons.radio_button_unchecked
+                    : Icons.check_circle,
+                color: damageNeeded ? null : const Color(0xFF08796D),
+              ),
+              title: const Text('Damaged panel'),
+              subtitle: Text(damageNeeded ? 'Still needed for PDR' : 'Saved'),
             ),
-            onTap: busy || pending != null || otherPending
-                ? null
-                : () {
-                    setState(() => selectedKey = key);
-                    _showGuide();
-                  },
+          EstimatePhotoGallery(
+            controller: widget.controller,
+            estimate: widget.estimate,
           ),
-        if (widget.estimate.discipline == 'pdr')
-          ListTile(
-            key: const Key('capture-check-damage'),
-            contentPadding: EdgeInsets.zero,
-            leading: Icon(
-              damageNeeded ? Icons.radio_button_unchecked : Icons.check_circle,
-              color: damageNeeded ? null : const Color(0xFF08796D),
-            ),
-            title: const Text('Damaged panel'),
-            subtitle: Text(damageNeeded ? 'Still needed for PDR' : 'Saved'),
-          ),
-        EstimatePhotoGallery(
-          controller: widget.controller,
-          estimate: widget.estimate,
-        ),
+        ],
       ],
     );
   }

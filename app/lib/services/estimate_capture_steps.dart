@@ -2,6 +2,7 @@ import '../domain/models.dart';
 
 const requiredEstimateViews = [
   'odometer',
+  'vin',
   'engine_bay',
   'interior',
   'tire_tread',
@@ -45,6 +46,7 @@ const collisionDamagePanels = [
 ];
 const _labels = {
   'odometer': 'Odometer',
+  'vin': 'Driver-door VIN label',
   'engine_bay': 'Engine bay',
   'interior': 'Interior',
   'tire_tread': 'Tire tread',
@@ -71,10 +73,23 @@ const _labels = {
   'tail_lamps': 'Tail lamps',
   'windshield': 'Windshield',
 };
-String captureLabel(String key) =>
-    _labels[key.startsWith('panel_') ? key.substring(6) : key] ??
-    'Additional photo';
+String captureLabel(String key) {
+  for (final prefix in ['hail_close_', 'hail_raking_', 'panel_']) {
+    if (key.startsWith(prefix)) {
+      final panel = _labels[key.substring(prefix.length)] ?? 'Damage';
+      return prefix == 'hail_raking_'
+          ? '$panel · angled view'
+          : prefix == 'hail_close_'
+          ? '$panel · close view'
+          : panel;
+    }
+  }
+  return _labels[key] ?? 'Additional photo';
+}
+
 String captureGuidance(String key) => switch (key) {
+  'vin' =>
+    'Photograph the VIN label inside the driver door jamb. Confirm the characters yourself before updating your saved VIN.',
   'odometer' =>
     'Park safely and photograph the dashboard with the mileage clearly visible.',
   'engine_bay' =>
@@ -122,10 +137,12 @@ List<String> missingEstimateViews(
   snapshot,
 ).where((key) => !savedCaptureKeys(estimate).contains(key)).toList();
 bool hasDamagePhoto(PlusSnapshot snapshot, CustomerEstimate estimate) =>
-    estimatePanelTypes(
-      snapshot,
-      estimate.discipline,
-    ).any((panel) => savedCaptureKeys(estimate).contains('panel_$panel'));
+    estimatePanelTypes(snapshot, estimate.discipline).any((panel) {
+      final saved = savedCaptureKeys(estimate);
+      return saved.contains('panel_$panel') ||
+          (saved.contains('hail_close_$panel') &&
+              saved.contains('hail_raking_$panel'));
+    });
 bool estimatePhotosReady(PlusSnapshot snapshot, CustomerEstimate estimate) =>
     missingEstimateViews(snapshot, estimate).isEmpty &&
     (estimate.discipline != 'pdr' || hasDamagePhoto(snapshot, estimate));

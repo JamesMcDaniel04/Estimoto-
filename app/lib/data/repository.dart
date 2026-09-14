@@ -1,5 +1,6 @@
 import 'dart:typed_data';
 import '../domain/models.dart';
+import '../services/guided_capture_api.dart';
 
 class PlusApiException implements Exception {
   const PlusApiException(this.message, [this.statusCode, this.code]);
@@ -12,6 +13,12 @@ class PlusApiException implements Exception {
 
 abstract class PlusRepository {
   bool get isDemo;
+  GuidedCaptureApi openGuidedCapture(
+    String estimateId, {
+    required bool Function() isCurrent,
+  }) => throw const PlusApiException(
+    'The guided camera is unavailable in this preview.',
+  );
   Future<PlusSnapshot> bootstrap();
   Future<Json> saveProfile(Json body);
   Future<Json> saveVehicle(Json body, {String? id});

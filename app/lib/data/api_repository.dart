@@ -6,6 +6,8 @@ import 'package:http_parser/http_parser.dart';
 import '../domain/models.dart';
 import 'repository.dart';
 import '../services/calendar_errors.dart';
+import '../services/guided_capture_api.dart';
+import '../services/guided_capture_pending.dart';
 
 class ApiPlusRepository extends PlusRepository {
   ApiPlusRepository({
@@ -45,6 +47,16 @@ class ApiPlusRepository extends PlusRepository {
   final http.Client _client;
   @override
   bool get isDemo => false;
+  @override
+  GuidedCaptureApi openGuidedCapture(
+    String estimateId, {
+    required bool Function() isCurrent,
+  }) {
+    if (!RegExp(r'^[A-Za-z0-9][A-Za-z0-9_-]{0,35}$').hasMatch(estimateId)) {
+      throw const PlusApiException('This estimate is unavailable.', 404);
+    }
+    return _ApiGuidedCapture(this, estimateId, isCurrent);
+  }
 
   Future<Map<String, String>> _headers() async {
     final accessToken = await token();
@@ -545,4 +557,202 @@ class ApiPlusRepository extends PlusRepository {
 
   @override
   void close() => _client.close();
+}
+
+class _ApiGuidedCapture extends GuidedCaptureApi {
+  _ApiGuidedCapture(this.repository, this.estimateId, this.isCurrent);
+  final ApiPlusRepository repository;
+  final String estimateId;
+  final bool Function() isCurrent;
+  @override
+  Uri get pageUri => repository.baseUri.resolve('/capture/');
+  void check() {
+    if (!isCurrent()) {
+      throw const PlusApiException(
+        'Capture is paused or your account changed. Reopen the guide to continue.',
+        401,
+      );
+    }
+  }
+
+  Future<Json> request(
+    String method,
+    String suffix, {
+    Json? body,
+    Uint8List? bytes,
+    String? mimeType,
+    Map<String, String>? fields,
+  }) async {
+    check();
+    final headers = await repository._headers();
+    check();
+    final uri = repository.baseUri.resolve(
+      '/v1/estimates/${Uri.encodeComponent(estimateId)}/capture$suffix',
+    );
+    final http.BaseRequest outgoing;
+    if (bytes != null) {
+      if (bytes.isEmpty ||
+          bytes.length > maxGuidedCaptureBytes ||
+          !const ['image/jpeg', 'image/png', 'image/webp'].contains(mimeType)) {
+        throw const PlusApiException(
+          'Choose a JPEG, PNG or WebP photo under 8 MB.',
+          422,
+        );
+      }
+      outgoing = http.MultipartRequest(method, uri)
+        ..fields.addAll(fields!)
+        ..files.add(
+          http.MultipartFile.fromBytes(
+            'photo',
+            bytes,
+            filename: 'capture',
+            contentType: MediaType.parse(mimeType!),
+          ),
+        );
+    } else {
+      final value = http.Request(method, uri);
+      if (body != null) {
+        value.headers['Content-Type'] = 'application/json';
+        value.body = jsonEncode(body);
+      }
+      outgoing = value;
+    }
+    outgoing.headers.addAll(headers);
+    outgoing.followRedirects = false;
+    check();
+    try {
+      final response = await repository._client
+          .send(outgoing)
+          .timeout(const Duration(seconds: 45));
+      check();
+      final buffer = BytesBuilder(copy: false);
+      await for (final chunk in response.stream.timeout(
+        const Duration(seconds: 8),
+      )) {
+        check();
+        if (buffer.length + chunk.length > 128 * 1024) {
+          throw const PlusApiException(
+            'Capture received an unreadable response. Keep this photo and retry.',
+            502,
+          );
+        }
+        buffer.add(chunk);
+      }
+      check();
+      final raw = utf8.decode(buffer.takeBytes());
+      Json? decoded;
+      try {
+        final value = jsonDecode(raw);
+        if (value is Map) decoded = Map<String, dynamic>.from(value);
+      } catch (_) {}
+      if (response.statusCode >= 300) {
+        final detail = decoded?['detail'];
+        const safeDetails = {
+          'This capture expired. Take the photo again.',
+          'This photo is still saving. Retry the same photo shortly.',
+          'This photo is being recovered. Retry the same photo shortly.',
+          'The staged photo needs recovery. Keep the same capture and contact support.',
+          'Photography is closed for this estimate.',
+          'Photo storage limit reached. Contact support.',
+          'Estimate photo limit reached.',
+          'The VIN photo changed. Take another photo.',
+          'The VIN photo changed. Try the new photo.',
+          'The VIN photo changed. Review the new photo before confirming.',
+          'Your saved VIN changed. Review it before confirming.',
+          'Enter the 17 VIN characters shown on the label.',
+          'VIN recognition is temporarily unavailable.',
+          'Capture assistance is temporarily unavailable.',
+          'Photo validation is busy. Keep this photo and retry shortly.',
+        };
+        final message = safeDetails.contains(detail)
+            ? detail as String
+            : switch (response.statusCode) {
+                401 => 'Your session ended. Sign in again before continuing.',
+                403 ||
+                404 => 'This capture is unavailable for the current account.',
+                409 =>
+                  'This capture needs recovery. Keep the same photo and retry.',
+                413 =>
+                  'Photo storage is full or this photo is too large. Keep it and review recovery options.',
+                422 =>
+                  'Check this photo and capture step, then take the photo again.',
+                429 => 'Please wait a moment, then retry the same photo.',
+                _ =>
+                  'Capture assistance is temporarily unavailable. Keep this photo and retry.',
+              };
+        throw PlusApiException(message, response.statusCode);
+      }
+      if (decoded == null) {
+        throw const PlusApiException(
+          'Capture received an unreadable response. Keep this photo and retry.',
+          502,
+        );
+      }
+      return decoded;
+    } on TimeoutException {
+      throw const PlusApiException(
+        'Capture timed out. Keep the same photo and retry.',
+        408,
+      );
+    } on http.ClientException {
+      throw const PlusApiException(
+        'The connection was interrupted. Keep the same photo and retry.',
+        503,
+      );
+    } on FormatException {
+      throw const PlusApiException(
+        'Capture received an unreadable response. Keep this photo and retry.',
+        502,
+      );
+    }
+  }
+
+  @override
+  Future<Json> state() => request('GET', '');
+  @override
+  Future<Json> checkFrame({
+    required Uint8List bytes,
+    required String mimeType,
+    required String captureKey,
+    required String bodyStyle,
+  }) => request(
+    'POST',
+    '/guidance',
+    bytes: bytes,
+    mimeType: mimeType,
+    fields: {'capture_key': captureKey, 'body_style': bodyStyle},
+  );
+  @override
+  Future<Json> save(GuidedCapturePending photo) {
+    if (photo.estimateId != estimateId) {
+      throw const PlusApiException(
+        'This capture belongs to another estimate.',
+        409,
+      );
+    }
+    return request(
+      'POST',
+      '/photos',
+      bytes: photo.bytes,
+      mimeType: photo.mimeType,
+      fields: {
+        'capture_key': photo.captureKey,
+        'body_style': photo.bodyStyle,
+        'operation_id': photo.operationId,
+      },
+    );
+  }
+
+  @override
+  Future<Json> recognize(String photoId) =>
+      request('POST', '/vin/recognize', body: {'photo_id': photoId});
+  @override
+  Future<Json> confirm(Json body) =>
+      request('POST', '/vin/confirm', body: body);
+  @override
+  Future<Json> help(String captureKey, String question) => request(
+    'POST',
+    '/help',
+    body: {'capture_key': captureKey, 'question': question},
+  );
 }

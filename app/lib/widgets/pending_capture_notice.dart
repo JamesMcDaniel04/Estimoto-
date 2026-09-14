@@ -3,6 +3,9 @@ import '../screens/estimate_forms.dart';
 import '../screens/vehicle_photo_screen.dart';
 import '../services/estimate_capture.dart';
 import '../state/plus_controller.dart';
+import '../services/guided_capture_pending.dart';
+import '../screens/guided_capture_screen.dart';
+import 'workspace_widgets.dart';
 
 class PendingCaptureNotice extends StatefulWidget {
   const PendingCaptureNotice({super.key, required this.controller});
@@ -11,8 +14,11 @@ class PendingCaptureNotice extends StatefulWidget {
   State<PendingCaptureNotice> createState() => _PendingCaptureNoticeState();
 }
 
-class _PendingCaptureNoticeState extends State<PendingCaptureNotice> {
+class _PendingCaptureNoticeState extends WorkspaceState<PendingCaptureNotice> {
+  @override
+  PlusController get controller => widget.controller;
   PendingEstimateCapture? pending;
+  GuidedCapturePending? guided;
   @override
   void initState() {
     super.initState();
@@ -30,10 +36,46 @@ class _PendingCaptureNoticeState extends State<PendingCaptureNotice> {
     } catch (_) {
       // Capture itself fails closed if encrypted storage is unavailable.
     }
+    if (!active) return;
+    try {
+      final value = await createGuidedCapturePendingStore().read(id);
+      if (active) setState(() => guided = value);
+    } catch (_) {
+      // The camera entry provides explicit unreadable-storage recovery.
+    }
   }
 
   @override
   Widget build(BuildContext context) {
+    if (!current) return const SizedBox.shrink();
+    final capture = guided;
+    if (capture != null) {
+      return MaterialBanner(
+        content: const Text('A guided photo is waiting to finish.'),
+        actions: [
+          TextButton(
+            onPressed: () async {
+              if (!active ||
+                  !controller.snapshot!.estimates.any(
+                    (e) => e.id == capture.estimateId,
+                  )) {
+                return;
+              }
+              await Navigator.of(context).push(
+                MaterialPageRoute<void>(
+                  builder: (_) => GuidedCaptureScreen(
+                    controller: controller,
+                    estimateId: capture.estimateId,
+                  ),
+                ),
+              );
+              if (active) await _load();
+            },
+            child: const Text('Review saved photo'),
+          ),
+        ],
+      );
+    }
     final saved = pending;
     if (saved == null) return const SizedBox.shrink();
     return MaterialBanner(

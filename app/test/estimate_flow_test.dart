@@ -273,23 +273,12 @@ void main() {
   );
 
   testWidgets(
-    'guided PDR capture saves all required views and a real panel before explicit shop consent',
+    'completed guided PDR photos still require a shop choice and explicit contact consent',
     (tester) async {
-      final repository = _Repository();
+      final repository = _Repository(complete: true);
       final controller = await _mount(tester, repository);
-      expect(find.text('0 of 8 required vehicle views saved'), findsOneWidget);
-      for (final key in requiredEstimateViews) {
-        await _tap(tester, find.byKey(const Key('capture-camera')));
-        expect(repository.uploads.last, key);
-        expect(tester.takeException(), isNull, reason: key);
-      }
-      expect(find.text('Next: the damaged panel'), findsOneWidget);
-      await _tap(tester, find.byKey(const Key('damage-panel')));
-      await tester.tap(find.text('Left front door').last);
-      await tester.pumpAndSettle();
-      await _tap(tester, find.byKey(const Key('capture-camera')));
-      expect(repository.uploads.last, 'panel_front_door_left');
-      expect(find.text('Photos ready for your review'), findsOneWidget);
+      expect(find.byKey(const Key('open-guided-capture')), findsOneWidget);
+      expect(find.byKey(const Key('capture-camera')), findsNothing);
       expect(repository.sends, isEmpty);
       await _tap(tester, find.byKey(const Key('estimate-review')));
       expect(repository.discoveryQueries.single['vehicle_id'], 'vehicle-1');
@@ -346,9 +335,7 @@ void main() {
       expect(tester.takeException(), isNull);
     },
   );
-  testWidgets('eight documentary views alone cannot submit PDR', (
-    tester,
-  ) async {
+  testWidgets('documentary views alone cannot submit PDR', (tester) async {
     final repository = _Repository(complete: true);
     (repository.estimate['photos'] as List).removeLast();
     await _mount(tester, repository, reviewOnly: true);
@@ -410,7 +397,8 @@ void main() {
       );
       await _tap(tester, find.text('Retake this view'));
       expect(store.value, isNull);
-      expect(find.text('Next: Engine bay'), findsOneWidget);
+      expect(find.byKey(const Key('open-guided-capture')), findsOneWidget);
+      expect(find.byKey(const Key('capture-camera')), findsNothing);
       expect(tester.takeException(), isNull);
     },
   );
@@ -438,7 +426,7 @@ void main() {
       expect(find.textContaining('secret'), findsNothing);
       await _tap(tester, find.byKey(const Key('discard-other-capture')));
       expect(store.value, isNull);
-      expect(find.byKey(const Key('capture-camera')), findsOneWidget);
+      expect(find.byKey(const Key('open-guided-capture')), findsOneWidget);
       expect(tester.takeException(), isNull);
     },
   );
