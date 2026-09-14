@@ -23,7 +23,10 @@ distance or a claim that mobile service reaches the ZIP.
 Each listing preserves provider display fields and adds `source`, `source_id`,
 `source_url`, `distance_miles`, `mobile_status`, `specialty_evidence`,
 `vehicle_match`, `request_modes`, `favorite`, and optional public `website` and
-`email`. Source identities are intentionally distinct:
+`email`. Every listing also has `media:null` or
+`{url,kind:"logo"|"photo",attribution,source_url}`. The same nullable media and
+`source_id` appear on bootstrap and `/v1/providers` participant rows. Source
+identities are intentionally distinct:
 
 | Source | Listing `id` | Favorite `source_id` | Booking |
 | --- | --- | --- | --- |
@@ -32,6 +35,24 @@ Each listing preserves provider display fields and adds `source`, `source_id`,
 | `my_shop` | Existing private MyShop ID | Existing private MyShop ID | Existing reviewed outreach flow |
 
 External listings have `accepting_requests:false` and empty `request_modes`.
+Participating shop logos come only from the original owner's authenticated
+catalog, and the image URL must be the configured bridge origin's exact
+`/public/plus/providers/{source_id}/logo` route. The original route checks
+current public opt-in and current logo before returning bounded raster bytes;
+Plus never republishes a private stored-object URL or signed media reference.
+Removed logos clear on the next catalog pull. Public OSM photos require a
+source-declared Commons `File:` tag and a successful fixed-origin Commons
+imageinfo check with a raster MIME, creator and license. Plus constructs the
+320-pixel Commons image URL and linked file page, never follows a mapper's
+arbitrary `image` or website URL. At most 20 distinct files are checked in one
+bounded Commons request per daily OSM refresh; metadata failure leaves media
+null without dropping the listing. The existing 24-hour/7-day public cache
+also applies to photo metadata. Clients display image credit and its source
+link, suppress referrers, and fall back to a neutral placeholder on image load
+failure. An OSM photo on an exact-location duplicate may accompany a
+participating card if that card has no published logo; its Commons credit stays
+attached. Media never changes source identity, ranking, the 100-result cap or
+request admission.
 Mobile results require an explicitly mobile participating provider that covers
 the exact service ZIP. Nearby fixed shops appear separately as shop visits.
 Estibot calls the same search: its `providers` field flattens the two listing

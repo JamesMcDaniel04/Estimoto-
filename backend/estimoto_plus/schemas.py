@@ -133,6 +133,13 @@ class AssistantInput(Strict):
         return result
 
 
+class PublishedMedia(Strict):
+    url: str = Field(min_length=1, max_length=500)
+    kind: Literal['logo', 'photo']
+    attribution: str = Field(min_length=1, max_length=250)
+    source_url: str = Field(min_length=1, max_length=500)
+
+
 class ProviderPublish(Strict):
     source_id: str = Field(min_length=1, max_length=100)
     name: str = Field(min_length=1, max_length=200)
@@ -146,6 +153,7 @@ class ProviderPublish(Strict):
     accepting_requests: bool = False
     public_visible: bool = False
     description: str = Field(default="", max_length=5000)
+    media: PublishedMedia | None = None
 
     @field_validator("postal_codes")
     @classmethod

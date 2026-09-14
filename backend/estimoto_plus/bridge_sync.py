@@ -10,6 +10,7 @@ from sqlalchemy import select, update
 
 from .models import Outbox, Provider, ServiceRequest, now
 from .schemas import ProviderPublish, RequestInboundEvent
+from .partner_media import valid_partner_media
 
 LOG = logging.getLogger(__name__)
 MAX_CATALOG_BYTES = 1024 * 1024
@@ -47,6 +48,9 @@ def sync_providers(settings, transport, session_factory):
     except ValidationError:
         return False
     if len({item.source_id for item in published}) != len(published):
+        return False
+    if any(not valid_partner_media(item.media, source_id=item.source_id, name=item.name,
+                                   bridge_url=settings.bridge_url) for item in published):
         return False
     with session_factory() as db:
         source_ids = [item.source_id for item in published]

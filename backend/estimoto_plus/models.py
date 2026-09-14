@@ -87,6 +87,7 @@ class Provider(Base):
     public_visible: Mapped[bool] = mapped_column(Boolean, default=False)
     demo_only: Mapped[bool] = mapped_column(Boolean, default=False)
     description: Mapped[str] = mapped_column(Text, default="")
+    media: Mapped[dict | None] = mapped_column(JSON, nullable=True)
 
 
 class CalendarSourceMixin:

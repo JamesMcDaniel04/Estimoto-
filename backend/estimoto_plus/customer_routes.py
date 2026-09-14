@@ -63,7 +63,7 @@ def vehicle(v):
 
 
 def provider(p):
-    return {k: getattr(p, k) for k in ("id", "name", "kind", "specialties", "postal_codes", "city", "address", "phone", "mobile_service", "accepting_requests", "description")}
+    return {k: getattr(p, k) for k in ("id", "source_id", "name", "kind", "specialties", "postal_codes", "city", "address", "phone", "mobile_service", "accepting_requests", "description", "media")}
 
 
 def request_view(db, r):

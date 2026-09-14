@@ -16,12 +16,16 @@ from .estimate_delivery import deliver_estimate_batch
 from .estimate_workflow import apply_submitted_snapshot
 from .models import Customer, Estimate, EstimateOutbox, Outbox, Photo, Provider, Repair, RequestEvent, ServiceRequest, Vehicle, now
 from .schemas import EstimateSnapshot, ProviderPublish, RepairSnapshot, RequestInboundEvent
+from .partner_media import valid_partner_media
 
 router = APIRouter(prefix="/v1/bridge", dependencies=[Depends(bridge_authorized)])
 
 
 @router.post("/providers")
-def upsert_provider(body: ProviderPublish, db: Session = Depends(db_session)):
+def upsert_provider(body: ProviderPublish, request: Request, db: Session = Depends(db_session)):
+    if not valid_partner_media(body.media, source_id=body.source_id, name=body.name,
+                               bridge_url=request.app.state.settings.bridge_url):
+        raise HTTPException(422, "Invalid provider media.")
     p = db.scalar(select(Provider).where(Provider.source_id == body.source_id))
     if p is None:
         p = Provider(source_id=body.source_id)

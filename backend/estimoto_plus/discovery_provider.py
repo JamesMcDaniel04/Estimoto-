@@ -6,6 +6,7 @@ import re
 import time
 from urllib.parse import urlsplit
 import httpx
+from .directory_media import MAX_FILES, commons_file, verified_commons_media
 
 RADIUS_MILES = 30
 RADIUS_METERS = 48280.32
@@ -62,7 +63,7 @@ def coordinates(data):
 def read_public(method, url, transport, *, form=None, limit=3 * 1024 * 1024, meter=None):
     try:
         started = time.monotonic()
-        read_timeout = 5 if url.startswith('https://api.zippopotam.us/') else 20
+        read_timeout = 5 if url.startswith(('https://api.zippopotam.us/', 'https://commons.wikimedia.org/')) else 20
         with httpx.Client(transport=transport, timeout=httpx.Timeout(read_timeout, connect=5), follow_redirects=False, trust_env=False,
                           headers={'Accept-Encoding': 'identity', 'User-Agent': 'EstimotoPlus/1.0 (https://estimoto.io; support@estimoto.io)'}) as client:
             with client.stream(method, url, data=form) as response:
@@ -148,19 +149,33 @@ def normalize_listing(element):
             'website': public_url(tags.get('contact:website') or tags.get('website')), 'description': 'Public repair-shop listing. Confirm services directly.',
             'mobile_service': False, 'mobile_status': 'unknown', 'accepting_requests': False, 'request_modes': [],
             'point': point, 'listed_makes': makes, 'vehicle_match': {'status': 'not_verified', 'make': None, 'basis': None},
-            'favorite': False}
+            'favorite': False, 'media': None}
 
 
 def fetch_listings(point, transport, *, limit=3 * 1024 * 1024, meter=None):
     lat, lon = coordinates({'lat': point[0], 'lon': point[1]})
     query = f'[out:json][timeout:20];nwr(around:{RADIUS_METERS},{lat:.6f},{lon:.6f})["shop"~"^(car_repair|tyres)$"];out center tags;'
+    meter = meter if meter is not None else {'body_bytes': 0}
     data = read_public('POST', 'https://overpass-api.de/api/interpreter', transport, form={'data': query}, limit=limit, meter=meter)
     elements = data.get('elements')
     if data.get('remark') or not isinstance(elements, list) or len(elements) > 10000:
         raise DirectoryUnavailable()
     result = {}
+    declared = {}
     for element in elements:
         row = normalize_listing(element)
         if row and distance_miles(point, row['point']) <= RADIUS_MILES:
             result[row['source_id']] = row
+            title = commons_file(element['tags'])
+            if title and len(declared) < MAX_FILES:
+                declared.setdefault(title, []).append(row['source_id'])
+    remaining = limit - meter['body_bytes']
+    if declared and remaining >= 4096:
+        try:
+            media = verified_commons_media(declared, transport, read_public, limit=remaining, meter=meter)
+        except DirectoryUnavailable:
+            media = {}
+        for title, ids in declared.items():
+            for identifier in ids:
+                result[identifier]['media'] = media.get(title)
     return {'listings': list(result.values())}

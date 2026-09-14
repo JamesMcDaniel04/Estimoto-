@@ -81,7 +81,7 @@ def _public_provider(p):
             'mobile_status': 'listed' if p.mobile_service else 'not_listed',
             'specialty_evidence': [{'specialty': s, 'basis': 'owner_declared', 'source_url': ''} for s in p.specialties],
             'vehicle_match': {'status': 'not_verified', 'make': None, 'basis': None}, 'favorite': False,
-            'request_modes': [], 'listed_makes': []}
+            'request_modes': [], 'listed_makes': [], 'media': p.media}
 
 
 def search(db, request, customer, postal, vehicle=None, specialty=None, mobile_only=False):
@@ -133,6 +133,7 @@ def search(db, request, customer, postal, vehicle=None, specialty=None, mobile_o
         candidates.append(row)
     for public_row in (public or {}).get('listings', []):
         row = dict(public_row)
+        row.setdefault('media', None)  # Pre-upgrade cache rows remain readable.
         row['distance_miles'] = round(distance_miles(center['point'], row['point']), 1)
         candidates.append(row)
     for row in candidates:
@@ -171,6 +172,9 @@ def search(db, request, customer, postal, vehicle=None, specialty=None, mobile_o
                 unique[position] = row
             unique[position]['favorite'] = favorite
             unique[position]['favorite_references'] = [references[key] for key in sorted(references)]
+            # A matching physical business may have an OSM photo but no
+            # published partner logo. Keep the source credit with that photo.
+            unique[position]['media'] = unique[position]['media'] or previous['media'] or row['media']
             continue
         seen[key] = len(unique)
         unique.append(row)
