@@ -19,7 +19,8 @@ class PhotoBodyLimit:
                            (parts[2] == "vehicles" and parts[4] == "image")))
         capture_upload = (len(parts) == 6 and parts[1:3] == ['v1', 'estimates']
                           and parts[4] == 'capture' and parts[5] in {'photos', 'guidance'})
-        bounded_upload = bounded_upload or capture_upload
+        receipt_upload = (len(parts) == 6 and parts[1:4] == ['v1', 'knowledge', 'records'] and parts[5] == 'receipts')
+        bounded_upload = bounded_upload or capture_upload or receipt_upload
         body_limit = 8 * 1024 * 1024 + 4096 if capture_upload else MAX_PHOTO_BODY
         if scope["type"] != "http" or scope["method"] != "POST" or not bounded_upload:
             await self.app(scope, receive, send)

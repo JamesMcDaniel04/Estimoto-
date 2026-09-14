@@ -23,6 +23,7 @@ class KnowledgeRecord(Base):
     service_type: Mapped[str] = mapped_column(String(30))
     service_date: Mapped[str] = mapped_column(String(10))
     mileage: Mapped[int | None] = mapped_column(Integer, nullable=True)
+    cost_cents: Mapped[int | None] = mapped_column(Integer, nullable=True)
     shop_name: Mapped[str] = mapped_column(String(200), default="")
     parts_source: Mapped[str] = mapped_column(String(200), default="")
     parts_description: Mapped[str] = mapped_column(String(200), default="")
@@ -30,6 +31,24 @@ class KnowledgeRecord(Base):
     source: Mapped[str] = mapped_column(String(30), default="customer_reported")
     idempotency_key: Mapped[str] = mapped_column(String(200))
     payload_hash: Mapped[str] = mapped_column(String(64))
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=now)
+
+
+class KnowledgeReceipt(Base):
+    __tablename__ = "knowledge_receipts"
+    __table_args__ = (UniqueConstraint("customer_id", "idempotency_key"),)
+    id: Mapped[str] = mapped_column(String(36), primary_key=True, default=uid)
+    customer_id: Mapped[str] = mapped_column(ForeignKey("customers.id"), index=True)
+    record_id: Mapped[str | None] = mapped_column(ForeignKey("knowledge_records.id"), nullable=True, index=True)
+    idempotency_key: Mapped[str] = mapped_column(String(36))
+    payload_hash: Mapped[str] = mapped_column(String(64))
+    sha256: Mapped[str] = mapped_column(String(64))
+    filename: Mapped[str] = mapped_column(String(180))
+    content_type: Mapped[str] = mapped_column(String(40))
+    byte_size: Mapped[int] = mapped_column(Integer)
+    storage_name: Mapped[str | None] = mapped_column(String(36), nullable=True)
+    status: Mapped[str] = mapped_column(String(20), default="staging")
+    cleanup_retry_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=now)
 
 

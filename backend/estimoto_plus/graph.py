@@ -11,19 +11,19 @@ from collections import defaultdict
 from datetime import date, datetime, timedelta, timezone
 from typing import Literal
 
-from fastapi import APIRouter, Depends, Header, HTTPException
+from fastapi import APIRouter, Depends, Header, HTTPException, Request
 from pydantic import BaseModel, ConfigDict, Field, field_validator
 from sqlalchemy import case, delete, func, or_, select, update
-from sqlalchemy.orm import Session
+from sqlalchemy.orm import Session, object_session
 
 from .auth import bridge_authorized, current_customer, db_session
 from .models import Customer, ServiceRequest, Vehicle, now, uid
-from .graph_models import GraphEdge, GraphEntity, KnowledgePreference, KnowledgeRecord, KnowledgeDeletion, KnowledgeConsentEvent
+from .graph_models import GraphEdge, GraphEntity, KnowledgePreference, KnowledgeRecord, KnowledgeDeletion, KnowledgeConsentEvent, KnowledgeReceipt
 
 router = APIRouter()
 POLICY_VERSION = "2026-09-13"
 MIN_CONTRIBUTORS = 10
-ServiceType = Literal["oil_change", "tires", "brakes", "battery", "maintenance", "diagnostics", "collision", "pdr", "other"]
+ServiceType = Literal["oil_change", "tires", "brakes", "battery", "maintenance", "diagnostics", "collision", "pdr", "other", "repair", "modification"]
 
 
 class RecordInput(BaseModel):
@@ -32,6 +32,7 @@ class RecordInput(BaseModel):
     service_type: ServiceType
     service_date: str
     mileage: int | None = Field(default=None, ge=0, le=9999999, strict=True)
+    cost_cents: int | None = Field(default=None, ge=0, le=100_000_000, strict=True)
     shop_name: str = Field(default="", max_length=200)
     parts_source: str = Field(default="", max_length=200)
     parts_description: str = Field(default="", max_length=200)
@@ -54,11 +55,19 @@ class PreferenceInput(BaseModel):
     share_aggregate_insights: bool = Field(strict=True)
 
 
-def record_view(record):
+def record_view(record, receipts=None):
     result = {k: getattr(record, k) for k in (
         "id", "vehicle_id", "service_type", "service_date", "mileage", "shop_name",
-        "parts_source", "parts_description", "notes", "source")}
+        "parts_source", "parts_description", "notes", "source", "cost_cents")}
     result["created_at"] = record.created_at.isoformat()
+    result["currency"] = "USD"
+    from .receipts import receipt_view
+    db = object_session(record)
+    if receipts is None:
+        receipts = db.scalars(select(KnowledgeReceipt).where(
+            KnowledgeReceipt.customer_id == record.customer_id, KnowledgeReceipt.record_id == record.id,
+            KnowledgeReceipt.status == "saved").order_by(KnowledgeReceipt.created_at)) if db else []
+    result["receipts"] = [receipt_view(r) for r in receipts]
     return result
 
 
@@ -73,7 +82,11 @@ def knowledge(c: Customer = Depends(current_customer), db: Session = Depends(db_
     records = db.scalars(select(KnowledgeRecord).where(KnowledgeRecord.customer_id == c.id)
                          .order_by(KnowledgeRecord.service_date.desc(), KnowledgeRecord.created_at.desc()).limit(1000)).all()
     preference = db.get(KnowledgePreference, c.id)
-    return {"records": [record_view(r) for r in records],
+    receipts = defaultdict(list)
+    for receipt in db.scalars(select(KnowledgeReceipt).where(KnowledgeReceipt.customer_id == c.id,
+            KnowledgeReceipt.status == "saved").order_by(KnowledgeReceipt.created_at)):
+        receipts[receipt.record_id].append(receipt)
+    return {"records": [record_view(r, receipts[r.id]) for r in records],
             "preferences": {"share_aggregate_insights": bool(preference and preference.share_aggregate_insights)},
             "policy_version": POLICY_VERSION}
 
@@ -136,7 +149,11 @@ def create_record(body: RecordInput, idempotency_key: str | None = Header(defaul
                   c: Customer = Depends(current_customer), db: Session = Depends(db_session)):
     if not idempotency_key or len(idempotency_key) > 200:
         raise HTTPException(422, "Idempotency-Key is required.")
-    digest = hashlib.sha256(json.dumps(body.model_dump(), sort_keys=True).encode()).hexdigest()
+    payload = body.model_dump()
+    # Keep replay compatibility with history saved by app versions before costs.
+    if payload["cost_cents"] is None:
+        payload.pop("cost_cents")
+    digest = hashlib.sha256(json.dumps(payload, sort_keys=True).encode()).hexdigest()
     lock_customer(db, c.id)
     if db.get(KnowledgeDeletion, (c.id, idempotency_key)):
         raise HTTPException(410, "This history entry was deleted. Start a new entry to save it again.")
@@ -163,13 +180,18 @@ def create_record(body: RecordInput, idempotency_key: str | None = Header(defaul
 
 
 @router.delete("/v1/knowledge/records/{record_id}", status_code=204)
-def delete_record(record_id: str, c: Customer = Depends(current_customer), db: Session = Depends(db_session)):
+def delete_record(record_id: str, request: Request, c: Customer = Depends(current_customer), db: Session = Depends(db_session)):
     lock_customer(db, c.id)
     record = db.get(KnowledgeRecord, record_id)
     if record is None or record.customer_id != c.id:
         raise HTTPException(404, "History not found.")
     from .customer_routes import consume_rate
     consume_rate(db, c.id, "knowledge_delete", 60)
+    from .receipts import erase_receipt, recover_deletions
+    for receipt in db.scalars(select(KnowledgeReceipt).where(KnowledgeReceipt.customer_id == c.id,
+                                                            KnowledgeReceipt.record_id == record.id)):
+        erase_receipt(receipt)
+    db.flush()
     db.execute(delete(GraphEdge).where(GraphEdge.customer_id == c.id, GraphEdge.record_id == record.id))
     db.add(KnowledgeDeletion(customer_id=c.id, idempotency_key=record.idempotency_key))
     db.delete(record)
@@ -180,6 +202,7 @@ def delete_record(record_id: str, c: Customer = Depends(current_customer), db: S
                                       or_(GraphEdge.from_id == GraphEntity.id, GraphEdge.to_id == GraphEntity.id)).exists()
     db.execute(delete(GraphEntity).where(GraphEntity.customer_id == c.id, ~linked))
     db.commit()
+    recover_deletions(db, c.id, request.app.state.settings)
 
 
 @router.get("/v1/knowledge/graph")
@@ -276,7 +299,8 @@ def aggregate_insights(db):
         # Database-side distinct aggregation keeps memory bounded by the fixed
         # category vocabulary, even as the underlying source corpus grows.
         return [{"category": row.category, "contributors_rounded": row.count // 5 * 5} for row in db.execute(statement)]
-    return {"service_types": counts(KnowledgeRecord, KnowledgeRecord.service_type, KnowledgeRecord.service_type.in_(ServiceType.__args__)),
+    # Preserve the existing bridge vocabulary until staff supports new categories.
+    return {"service_types": counts(KnowledgeRecord, KnowledgeRecord.service_type, KnowledgeRecord.service_type.in_([v for v in ServiceType.__args__ if v not in {"repair", "modification"}])),
             "parts_sources": counts(KnowledgeRecord, supplier_category, KnowledgeRecord.parts_source != ""),
             "request_types": counts(ServiceRequest, ServiceRequest.specialty, ServiceRequest.specialty.in_(["pdr", "collision", "maintenance", "mechanical"])),
             "minimum_contributors": MIN_CONTRIBUTORS, "source": "opted_in_customer_reports",

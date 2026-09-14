@@ -8,6 +8,7 @@ from estimoto_plus import graph_models  # noqa: F401 - include graph metadata
 from estimoto_plus import calendar_models  # noqa: F401 - include calendar metadata
 from estimoto_plus import capture_models  # noqa: F401 - include private capture metadata
 from estimoto_plus import discovery_models  # noqa: F401 - public directory and private preferences
+from estimoto_plus import valuation_models  # noqa: F401 - private valuation cache
 
 config = context.config
 if config.config_file_name:
