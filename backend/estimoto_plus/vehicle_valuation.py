@@ -17,7 +17,7 @@ from urllib.parse import urlencode
 
 from fastapi import APIRouter, Depends, HTTPException, Request
 from pydantic import BaseModel, ConfigDict, field_validator
-from sqlalchemy import func, select, update
+from sqlalchemy import delete, func, select, update
 from sqlalchemy.orm import Session
 
 from .auth import current_customer, db_session
@@ -25,7 +25,7 @@ from .calendar_scheduling import lock_customer, utc
 from .customer_routes import consume_rate, owned
 from .graph_models import KnowledgeReceipt, KnowledgeRecord
 from .models import Customer, Vehicle, now, uid
-from .valuation_models import VehicleValuationCache, ValuationProviderState
+from .valuation_models import VehicleValuationCache, VehicleValuationHistory, ValuationProviderState
 from .vehicle_images import _fetch_https
 
 router = APIRouter(prefix='/v1/vehicles')
@@ -196,6 +196,29 @@ def response(snapshot, history, *, status='unavailable', cached=False, payload=N
                         if status == 'pending' else UNAVAILABLE), 'retry_after_seconds': retry}
 
 
+HISTORY_ROWS_PER_VEHICLE = 50
+
+
+def record_history(db, customer_id, vehicle_id, snapshot, digest, payload):
+    # Prune before adding and without flushing, so the caller's commit still
+    # carries the cache row that lost-acknowledgment recovery keys on.
+    with db.no_autoflush:
+        stale = db.scalars(select(VehicleValuationHistory.id)
+                           .where(VehicleValuationHistory.vehicle_id == vehicle_id)
+                           .order_by(VehicleValuationHistory.created_at.desc(), VehicleValuationHistory.id.desc())
+                           .offset(HISTORY_ROWS_PER_VEHICLE - 1)).all()
+    if stale:
+        db.execute(delete(VehicleValuationHistory).where(VehicleValuationHistory.id.in_(stale)))
+    db.add(VehicleValuationHistory(customer_id=customer_id, vehicle_id=vehicle_id, state=snapshot['state'],
+                                   condition=snapshot['condition'], mileage=snapshot['mileage'],
+                                   input_hash=digest, payload=payload))
+
+
+def history_view(row):
+    return {'id': row.id, 'state': row.state, 'condition': row.condition, 'mileage': row.mileage,
+            'created_at': utc(row.created_at).isoformat(), 'payload': row.payload}
+
+
 def provider_lock(db):
     if db.get_bind().dialect.name == 'postgresql':
         from sqlalchemy.dialects.postgresql import insert
@@ -228,6 +251,9 @@ def valuation(vehicle_id: str, body: ValuationInput, request: Request,
     if entry and entry.lease_until and utc(entry.lease_until) > stamp:
         return response(snapshot, history, status='pending', retry=60)
     if entry and entry.input_hash == digest and utc(entry.retry_at) > stamp:
+        if entry.payload:
+            record_history(db, customer_id, vehicle_id, snapshot, digest, entry.payload)
+            db.commit()
         return response(snapshot, history, status='available' if entry.payload else 'unavailable',
                         cached=True, payload=entry.payload, fetched_at=entry.fetched_at,
                         expires_at=entry.retry_at, retry=None if entry.payload else max(1, int((utc(entry.retry_at)-stamp).total_seconds())))
@@ -268,6 +294,8 @@ def valuation(vehicle_id: str, body: ValuationInput, request: Request,
     if result.global_backoff:
         state = provider_lock(db)
         state.blocked_until = stamp + timedelta(seconds=result.global_backoff)
+    if result.payload:
+        record_history(db, customer_id, vehicle_id, snapshot, digest, result.payload)
     db.commit()
     # The lookup is tied to the exact saved vehicle version at click time.
     if any(getattr(current, k) != snapshot[k] for k in ('vin', 'mileage', 'year', 'make', 'model')):
@@ -275,3 +303,22 @@ def valuation(vehicle_id: str, body: ValuationInput, request: Request,
     return response(snapshot, history_summary(db, customer_id, vehicle_id),
                     status='available' if result.payload else 'unavailable', payload=result.payload,
                     fetched_at=stamp, expires_at=entry.retry_at, retry=None if result.payload else result.retry_seconds)
+
+
+@router.get('/{vehicle_id}/valuations')
+def list_valuations(vehicle_id: str, c: Customer = Depends(current_customer), db: Session = Depends(db_session)):
+    owned(db, Vehicle, vehicle_id, c)
+    rows = db.scalars(select(VehicleValuationHistory)
+                      .where(VehicleValuationHistory.customer_id == c.id, VehicleValuationHistory.vehicle_id == vehicle_id)
+                      .order_by(VehicleValuationHistory.created_at.desc(), VehicleValuationHistory.id.desc())).all()
+    return {'vehicle_id': vehicle_id, 'valuations': [history_view(r) for r in rows]}
+
+
+@router.delete('/{vehicle_id}/valuations/{valuation_id}', status_code=204)
+def delete_valuation(vehicle_id: str, valuation_id: str, c: Customer = Depends(current_customer), db: Session = Depends(db_session)):
+    owned(db, Vehicle, vehicle_id, c)
+    row = db.get(VehicleValuationHistory, valuation_id)
+    if row is None or row.customer_id != c.id or row.vehicle_id != vehicle_id:
+        raise HTTPException(404, 'Not found.')
+    db.delete(row)
+    db.commit()
