@@ -7,6 +7,7 @@ import 'package:flutter/rendering.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_secure_storage/flutter_secure_storage.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:estimoto_plus/widgets/shop_profile.dart';
 import 'package:http/http.dart' as http;
 import 'package:http/testing.dart';
 import 'package:estimoto_plus/data/api_repository.dart';
@@ -306,8 +307,10 @@ void main() {
       final c = await discoveryController(repo);
       await mountDiscovery(tester, c);
       await tester.pumpAndSettle();
-      await openDiscoveryProfile(tester);
-      await tapDiscovery(tester, find.text('Request help'));
+      await tapDiscovery(
+        tester,
+        find.byKey(const ValueKey('shop-request-partner-plus-id')),
+      );
       c.selectVehicle(c.snapshot!.vehicles.last.id);
       await tester.pumpAndSettle();
       expect(find.text('Your search changed'), findsOneWidget);
@@ -340,7 +343,13 @@ void main() {
       await tester.pumpAndSettle();
       expect(find.text('Your dedicated shop: PDR'), findsOneWidget);
       await openDiscoveryProfile(tester);
-      expect(find.text('Request help'), findsOneWidget);
+      expect(
+        find.descendant(
+          of: find.byType(ShopProfile),
+          matching: find.text('Request help'),
+        ),
+        findsOneWidget,
+      );
       await tapDiscovery(tester, find.text('Change or remove saved choice'));
       await tapDiscovery(tester, find.text('Remove: PDR'));
       expect(repo.favorites, isEmpty);
@@ -359,7 +368,13 @@ void main() {
       await mountDiscovery(tester, c);
       await tester.pumpAndSettle();
       await openDiscoveryProfile(tester, id: 'osm:node:123');
-      expect(find.text('Request help'), findsNothing);
+      expect(
+        find.descendant(
+          of: find.byType(ShopProfile),
+          matching: find.text('Request help'),
+        ),
+        findsNothing,
+      );
       await tapDiscovery(tester, find.text('Save as my dedicated shop'));
       await tapDiscovery(tester, find.text('Save for: PDR'));
       expect(repo.savedFavorite, {
@@ -416,7 +431,13 @@ void main() {
       await tester.pumpAndSettle();
       await discoveryProof(tester, 'directory-card-320-large');
       await openDiscoveryProfile(tester);
-      await tapDiscovery(tester, find.text('Request help'));
+      await tapDiscovery(
+        tester,
+        find.descendant(
+          of: find.byType(ShopProfile),
+          matching: find.text('Request help'),
+        ),
+      );
       expect(find.text(serviceModeLabel('shop_visit')), findsOneWidget);
       await tester.enterText(
         find.byKey(const Key('request-description')),
@@ -455,7 +476,13 @@ void main() {
     await mountDiscovery(tester, c);
     await tester.pumpAndSettle();
     await openDiscoveryProfile(tester);
-    await tapDiscovery(tester, find.text('Request help'));
+    await tapDiscovery(
+      tester,
+      find.descendant(
+        of: find.byType(ShopProfile),
+        matching: find.text('Request help'),
+      ),
+    );
     expect(find.text('As previously submitted'), findsOneWidget);
     await tapDiscovery(tester, find.byKey(const Key('share-contact')));
     await tapDiscovery(tester, find.byKey(const Key('send-request')));
@@ -662,7 +689,13 @@ void main() {
       await tester.pumpAndSettle();
       await discoveryProof(tester, 'directory-card-390');
       await openDiscoveryProfile(tester);
-      expect(find.text('Request help'), findsOneWidget);
+      expect(
+        find.descendant(
+          of: find.byType(ShopProfile),
+          matching: find.text('Request help'),
+        ),
+        findsOneWidget,
+      );
       await tapDiscovery(tester, find.byTooltip('Close shop profile'));
       expect(tester.takeException(), isNull);
     },
