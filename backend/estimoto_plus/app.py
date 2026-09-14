@@ -4,6 +4,7 @@ import os
 from contextlib import asynccontextmanager, suppress
 from pathlib import Path
 from fastapi import FastAPI, HTTPException
+from fastapi.exception_handlers import http_exception_handler
 from fastapi.exceptions import RequestValidationError
 from fastapi.responses import JSONResponse
 from fastapi.middleware.cors import CORSMiddleware
@@ -132,6 +133,13 @@ def create_app(settings: Settings | None = None, *, auth_verifier=None, auth_cli
                            allow_methods=["GET", "POST", "PUT", "DELETE"],
                            allow_headers=["Authorization", "Content-Type", "Idempotency-Key"],
                            expose_headers=["X-Vehicle-Image-Source", "ETag", "Retry-After"])
+
+    @app.exception_handler(HTTPException)
+    async def coded_http_exception(request, exc):
+        # Routes may raise a dict detail with a stable "code" for the app.
+        if isinstance(exc.detail, dict) and "detail" in exc.detail:
+            return JSONResponse(status_code=exc.status_code, content=exc.detail, headers=exc.headers)
+        return await http_exception_handler(request, exc)
 
     @app.exception_handler(RequestValidationError)
     def validation_error(_request, _exc):

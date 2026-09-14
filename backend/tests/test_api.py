@@ -452,3 +452,46 @@ def test_reminder_update_delete_and_reopen(clients):
     assert client.delete(f"/v1/reminders/{rid}", headers=h("alice")).status_code == 204
     assert client.delete(f"/v1/reminders/{rid}", headers=h("alice")).status_code == 404
     assert all(r["id"] != rid for r in client.get("/v1/bootstrap", headers=h("alice")).json()["reminders"])
+
+
+def test_estimate_draft_edit_delete_and_photo_delete(clients):
+    client, _ = clients
+    vid = create_vehicle(client)
+    eid = client.post("/v1/estimates", headers=h("alice"), json={"vehicle_id": vid, "discipline": "pdr", "description": "Door ding"}).json()["id"]
+    edited = client.put(f"/v1/estimates/{eid}", json={"description": "Two door dings", "claim_number": "CLM-1"}, headers=h("alice"))
+    assert edited.status_code == 200 and edited.json()["description"] == "Two door dings" and edited.json()["claim_number"] == "CLM-1"
+    assert client.put(f"/v1/estimates/{eid}", json={"description": "x"}, headers=h("bob")).status_code == 404
+    pid = client.post(f"/v1/estimates/{eid}/photos", headers=h("alice"), files={"file": ("a.png", VALID_PNG, "image/png")}, data={"label": "hood"}).json()["id"]
+    settings = client.app.state.settings
+    from estimoto_plus.models import Photo
+    with client.app.state.session_factory() as db:
+        storage = db.get(Photo, pid).storage_name
+    assert (Path(settings.photo_dir) / storage).is_file()
+    assert client.delete(f"/v1/estimates/{eid}/photos/{pid}", headers=h("bob")).status_code == 404
+    assert client.delete(f"/v1/estimates/{eid}/photos/{pid}", headers=h("alice")).status_code == 204
+    assert not (Path(settings.photo_dir) / storage).exists()
+    assert client.get(f"/v1/estimates/{eid}/photos/{pid}", headers=h("alice")).status_code == 404
+    pid2 = client.post(f"/v1/estimates/{eid}/photos", headers=h("alice"), files={"file": ("b.png", VALID_PNG, "image/png")}, data={"label": "trunk"}).json()["id"]
+    with client.app.state.session_factory() as db:
+        storage2 = db.get(Photo, pid2).storage_name
+    assert client.delete(f"/v1/estimates/{eid}", headers=h("bob")).status_code == 404
+    assert client.delete(f"/v1/estimates/{eid}", headers=h("alice")).status_code == 204
+    assert not (Path(settings.photo_dir) / storage2).exists()
+    assert all(item["id"] != eid for item in client.get("/v1/bootstrap", headers=h("alice")).json()["estimates"])
+    # The vehicle is no longer pinned by the abandoned draft.
+    assert client.delete(f"/v1/vehicles/{vid}", headers=h("alice")).status_code == 204
+
+
+def test_shared_estimate_is_locked(clients):
+    client, _ = clients
+    vid = create_vehicle(client)
+    eid = client.post("/v1/estimates", headers=h("alice"), json={"vehicle_id": vid, "discipline": "pdr", "description": "x"}).json()["id"]
+    with client.app.state.session_factory() as db:
+        row = db.get(Estimate, eid)
+        row.delivery_status = "queued"
+        db.commit()
+    for response in (client.put(f"/v1/estimates/{eid}", json={"description": "y"}, headers=h("alice")),
+                     client.delete(f"/v1/estimates/{eid}", headers=h("alice"))):
+        assert response.status_code == 409
+        assert response.json()["detail"] == "This estimate has been shared and can no longer be changed."
+        assert response.json()["code"] == "estimate_locked"

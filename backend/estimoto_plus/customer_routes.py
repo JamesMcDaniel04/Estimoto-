@@ -1,4 +1,5 @@
 import hashlib
+import logging
 import json
 import os
 import re
@@ -10,7 +11,7 @@ from fastapi import APIRouter, Depends, Header, HTTPException, Request
 from starlette.datastructures import UploadFile
 from starlette.concurrency import run_in_threadpool
 from fastapi.responses import Response, JSONResponse
-from sqlalchemy import select, update
+from sqlalchemy import delete, select, update
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
 
@@ -27,6 +28,7 @@ from .calendar_scheduling import check_slots, legacy_payload, sync_view, preferr
 from .capture_contract import DOCUMENT_KEYS, allowed_keys, PDR_PANELS
 
 router = APIRouter(prefix="/v1")
+log = logging.getLogger(__name__)
 ESTIMATE_PHOTO_KEYS = DOCUMENT_KEYS
 PDR_PANEL_TYPES = ("hood", "fender_left", "front_door_left", "rear_door_left", "quarter_left", "trunk",
                    "quarter_right", "rear_door_right", "front_door_right", "fender_right", "roof")
@@ -98,6 +100,21 @@ def owned(db, model, identifier, customer):
     if obj is None or obj.customer_id != customer.id:
         raise HTTPException(404, "Not found.")
     return obj
+
+
+def editable_estimate(db, estimate_id, customer):
+    e = owned(db, Estimate, estimate_id, customer)
+    if e.delivery_status != "draft" or e.status != "draft" or e.processing_state != "not_started":
+        raise HTTPException(409, {"detail": "This estimate has been shared and can no longer be changed.", "code": "estimate_locked"})
+    return e
+
+
+def remove_photo_file(settings, storage_name):
+    try:
+        (Path(settings.photo_dir) / storage_name).unlink(missing_ok=True)
+    except OSError:
+        # The row is gone and the file has no route; the volume cleanup job retries.
+        log.warning("Private estimate photo cleanup failed")
 
 
 def matching_providers(db, specialty=None, postal_code=None, mobile_only=False, demo=False):
@@ -328,6 +345,35 @@ def create_estimate(body: EstimateCreate, c: Customer = Depends(current_customer
     return estimate_view(db, e)
 
 
+@router.put("/estimates/{estimate_id}")
+def update_estimate(estimate_id: str, body: EstimateUpdate, c: Customer = Depends(current_customer), db: Session = Depends(db_session)):
+    e = editable_estimate(db, estimate_id, c)
+    changes = body.model_dump(exclude_unset=True)
+    if "date_of_loss" in changes:
+        changes["date_of_loss"] = iso(changes["date_of_loss"])
+    for k, val in changes.items():
+        setattr(e, k, val)
+    e.updated_at = now()
+    db.commit()
+    return estimate_view(db, e)
+
+
+@router.delete("/estimates/{estimate_id}", status_code=204)
+def delete_estimate(estimate_id: str, request: Request, c: Customer = Depends(current_customer), db: Session = Depends(db_session)):
+    e = editable_estimate(db, estimate_id, c)
+    from .capture_models import CaptureReceipt, CaptureVinSuggestion
+    photos = db.scalars(select(Photo).where(Photo.estimate_id == e.id)).all()
+    names = [p.storage_name for p in photos]
+    for p in photos:
+        db.delete(p)
+    db.execute(delete(CaptureReceipt).where(CaptureReceipt.estimate_id == e.id))
+    db.execute(delete(CaptureVinSuggestion).where(CaptureVinSuggestion.estimate_id == e.id))
+    db.delete(e)
+    db.commit()
+    for name in names:
+        remove_photo_file(request.app.state.settings, name)
+
+
 @router.post("/estimates/{estimate_id}/submit")
 def submit_estimate(estimate_id: str, body: EstimateSubmit, request: Request,
                     idempotency_key: str | None = Header(default=None),
@@ -473,6 +519,18 @@ def get_photo(estimate_id: str, photo_id: str, request: Request, c: Customer = D
     if not path.is_file():
         raise HTTPException(404, "Not found.")
     return Response(path.read_bytes(), media_type=p.mime_type, headers={"Cache-Control": "private, no-store", "X-Content-Type-Options": "nosniff"})
+
+
+@router.delete("/estimates/{estimate_id}/photos/{photo_id}", status_code=204)
+def delete_photo(estimate_id: str, photo_id: str, request: Request, c: Customer = Depends(current_customer), db: Session = Depends(db_session)):
+    editable_estimate(db, estimate_id, c)
+    p = db.get(Photo, photo_id)
+    if not p or p.estimate_id != estimate_id:
+        raise HTTPException(404, "Not found.")
+    name = p.storage_name
+    db.delete(p)
+    db.commit()
+    remove_photo_file(request.app.state.settings, name)
 
 
 @router.post("/reminders", status_code=201)
