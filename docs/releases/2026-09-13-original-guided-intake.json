@@ -1,0 +1,53 @@
+{
+  "original_source_sha": "82b52bcbbdb801e952ec144d056c80dbd17af51e",
+  "branch": "codex/plus-launch-integration-20260913",
+  "api": {
+    "origin": "https://pdr-estimating-api.fly.dev",
+    "version_matches_source": true,
+    "ready_status": 200,
+    "deployment_exit_code": 0,
+    "release_machine": "2879640a9d2418",
+    "release_migrations_and_tenant_rls_audit": "passed",
+    "all_machine_images_match": true,
+    "application_and_required_worker_fleets_have_started_instances": true,
+    "capture_route_probe": {
+      "guidance_unauthenticated": 401,
+      "guidance_authenticated_non_multipart": 415,
+      "vin_photo_unauthenticated": 401,
+      "vin_photo_authenticated_non_multipart": 415
+    }
+  },
+  "customer_website": {
+    "origin": "https://www.estimoto.io",
+    "deployment_id": "dpl_Do5cLNa1LSAjoGp1F9ytCPsYpBEH",
+    "staged_url": "https://dashboard-iug0jd3q8-james-projects-e5405002.vercel.app",
+    "staged_version_verified_with_authenticated_cli": true,
+    "production_asset_version": {
+      "id": "mu0kmczs",
+      "sha": "82b52bcbbdb801e952ec144d056c80dbd17af51e"
+    },
+    "build_exit_code": 0,
+    "promote_exit_code": 0,
+    "bundle_budgets": "passed"
+  },
+  "local_verification": {
+    "focused_bridge_and_stateless_capture_tests": 31,
+    "guided_camera_ui_tests": 27,
+    "typescript_and_eslint": "passed",
+    "browser_retry_proof": "A failed gallery upload retained the same image and operation ID. Explicit retry succeeded and advanced to the VIN step.",
+    "vin_guide_visual_proof": "The 3D camera and visible teal callout point to the driver door jamb."
+  },
+  "scope": [
+    "Nine required customer photos including the VIN label",
+    "Original customer-link 3D guide, continuous capture and help",
+    "Stateless authenticated framing and VIN suggestions for the Plus bridge",
+    "PDR close and raking evidence paired without duplicate priced panels",
+    "Explicit mobile versus shop-visit handoffs and calendar reschedule payloads"
+  ],
+  "limits": [
+    "These route probes did not call an image or OCR provider.",
+    "Browser screenshots do not establish physical-device camera behavior.",
+    "No live customer-to-shop request was sent for this release verification.",
+    "This record covers original Estimoto API and customer website, not the separate Plus app release."
+  ]
+}
