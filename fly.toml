@@ -10,6 +10,9 @@ kill_timeout = "30s"
   ENVIRONMENT = "production"
   PHOTO_DIR = "/data/photos"
   WEB_DIR = "/app/web"
+  DISCOVERY_ENABLED = "true"
+  DISCOVERY_DAILY_REQUESTS = "30"
+  DISCOVERY_DAILY_BYTES = "8388608"
 
 [deploy]
   release_command = "alembic upgrade head"
