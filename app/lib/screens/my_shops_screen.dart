@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import '../domain/models.dart';
 import '../state/plus_controller.dart';
 import '../widgets/common.dart';
+import '../widgets/outreach_actions.dart';
 import '../widgets/workspace_widgets.dart';
 import 'shop_outreach_screen.dart';
 import '../widgets/dedicated_shop_choice.dart';
@@ -113,6 +114,30 @@ class _MyShopsScreenState extends WorkspaceState<MyShopsScreen> {
     if (active) await load();
   }
 
+  Future<void> discardDeviceDraft() async {
+    if (!await confirmDiscardDeviceDraft(context) || !active) return;
+    await perform(() async {
+      await workspace.discardPending('outreach-draft');
+      if (active) await load();
+    });
+  }
+
+  Future<void> discard(Json draft) async {
+    if (!await confirmDiscardOutreach(context) || !active) return;
+    await perform(() async {
+      await controller.repository.deleteShopOutreach(draft['id'] as String);
+      if (active) await load();
+    });
+  }
+
+  Future<void> withdraw(Json draft) async {
+    if (!await confirmWithdrawOutreach(context) || !active) return;
+    await perform(() async {
+      await controller.repository.withdrawShopOutreach(draft['id'] as String);
+      if (active) await load();
+    });
+  }
+
   Future<void> remove(Json shop) async {
     final confirmed = await showDialog<bool>(
       context: context,
@@ -177,9 +202,18 @@ class _MyShopsScreenState extends WorkspaceState<MyShopsScreen> {
               'A draft was interrupted. Recover its original details before starting another.',
             ),
             const SizedBox(height: 12),
-            OutlinedButton(
-              onPressed: busy ? null : schedule,
-              child: const Text('Recover scheduling draft'),
+            Wrap(
+              spacing: 8,
+              children: [
+                OutlinedButton(
+                  onPressed: busy ? null : schedule,
+                  child: const Text('Recover scheduling draft'),
+                ),
+                TextButton(
+                  onPressed: busy ? null : discardDeviceDraft,
+                  child: const Text('Discard draft'),
+                ),
+              ],
             ),
           ],
           const SectionHeading('Your saved shops'),
@@ -298,10 +332,36 @@ class _MyShopsScreenState extends WorkspaceState<MyShopsScreen> {
                     child: Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
-                        const SizedBox(width: double.infinity),
-                        Text(
-                          textOf(draft, 'shop_name'),
-                          style: Theme.of(context).textTheme.titleMedium,
+                        Row(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Expanded(
+                              child: Text(
+                                textOf(draft, 'shop_name'),
+                                style: Theme.of(context).textTheme.titleMedium,
+                              ),
+                            ),
+                            if (outreachDiscardable(draft) ||
+                                outreachWithdrawable(draft))
+                              PopupMenuButton<String>(
+                                tooltip: 'Request options',
+                                itemBuilder: (_) => [
+                                  if (outreachDiscardable(draft))
+                                    const PopupMenuItem(
+                                      value: 'discard',
+                                      child: Text('Discard request'),
+                                    ),
+                                  if (outreachWithdrawable(draft))
+                                    const PopupMenuItem(
+                                      value: 'withdraw',
+                                      child: Text('Withdraw request'),
+                                    ),
+                                ],
+                                onSelected: (value) => value == 'discard'
+                                    ? discard(draft)
+                                    : withdraw(draft),
+                              ),
+                          ],
                         ),
                         const SizedBox(height: 10),
                         StatusPill(outreachStatusLabel(draft)),

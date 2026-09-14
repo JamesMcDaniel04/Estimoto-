@@ -97,6 +97,14 @@ class CustomerWorkspace {
   }
 
   String _scope(String operation) => '$customerId/$operation';
+  String scopeFor(String operation) => _scope(operation);
+
+  /// Drops an interrupted write so a fresh request can be prepared.
+  Future<void> discardPending(String operation) async {
+    check();
+    await store.clear(_scope(operation));
+  }
+
   Future<PendingWorkspaceWrite?> pending(String operation) async {
     check();
     final result = await store.read(_scope(operation));

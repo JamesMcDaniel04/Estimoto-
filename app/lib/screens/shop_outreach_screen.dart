@@ -4,6 +4,7 @@ import '../domain/models.dart';
 import '../services/customer_workspace.dart';
 import '../state/plus_controller.dart';
 import '../widgets/common.dart';
+import '../widgets/outreach_actions.dart';
 import '../widgets/workspace_widgets.dart';
 import 'garage_forms.dart';
 import '../services/calendar_time.dart';
@@ -25,11 +26,15 @@ String outreachStatusLabel(Json draft) {
     'call_required' => 'Call the shop • not sent',
     'delivery_failed' => 'Delivery failed',
     'delivery_unknown' => 'Delivery unconfirmed',
+    'withdrawn' => 'Withdrawn',
     _ => 'Checking request status',
   };
 }
 
 String _statusDescription(Json draft) {
+  if (draft['status'] == 'withdrawn') {
+    return 'You withdrew this request. The shop’s confirmation link no longer works; no message was sent to the shop.';
+  }
   if (draft['status'] == 'call_required') {
     return 'No message was sent and no appointment was booked. Call the shop to discuss your preferred times.';
   }
@@ -528,6 +533,30 @@ class _ShopOutreachReviewState extends WorkspaceState<ShopOutreachReview> {
     });
   }
 
+  Future<void> discard() async {
+    if (draft == null) return;
+    final navigator = Navigator.of(context);
+    if (!await confirmDiscardOutreach(context) || !active || !mounted) return;
+    var done = false;
+    await perform(() async {
+      await controller.repository.deleteShopOutreach(draft!['id'] as String);
+      done = true;
+    });
+    if (done && active && mounted && navigator.canPop()) navigator.pop();
+  }
+
+  Future<void> withdraw() async {
+    if (draft == null || !await confirmWithdrawOutreach(context) || !active) {
+      return;
+    }
+    await perform(() async {
+      final result = await controller.repository.withdrawShopOutreach(
+        draft!['id'] as String,
+      );
+      if (active) setState(() => draft = result);
+    });
+  }
+
   Future<void> callShop() async {
     final value = Uri.tryParse(textOf(draft!, 'call_link'));
     if (value == null ||
@@ -714,6 +743,22 @@ class _ShopOutreachReviewState extends WorkspaceState<ShopOutreachReview> {
                 onPressed: callShop,
                 icon: Icons.phone_outlined,
               ),
+            if (outreachDiscardable(value)) ...[
+              const SizedBox(height: 12),
+              OutlinedButton.icon(
+                onPressed: busy ? null : discard,
+                icon: const Icon(Icons.delete_outline),
+                label: const Text('Discard request'),
+              ),
+            ],
+            if (outreachWithdrawable(value)) ...[
+              const SizedBox(height: 12),
+              OutlinedButton.icon(
+                onPressed: busy ? null : withdraw,
+                icon: const Icon(Icons.undo),
+                label: const Text('Withdraw request'),
+              ),
+            ],
           ],
           if (error != null) WorkspaceError(error!),
         ],

@@ -42,6 +42,12 @@ class _Repository extends DemoPlusRepository {
   Future<Json> getShopOutreach(String id) async =>
       detail == null ? Map.of(draft) : detail!.future;
   @override
+  Future<Json> withdrawShopOutreach(String id) async {
+    draft = {...draft, 'status': 'withdrawn'};
+    return Map.of(draft);
+  }
+
+  @override
   Future<Json> authorizeShopOutreach(String id, Json body, String key) async {
     keys.add(key);
     bodies.add(Map.of(body));
@@ -461,4 +467,68 @@ void main() {
       expect(tester.takeException(), isNull);
     },
   );
+
+  testWidgets('a draft scheduling request can be discarded from my shops', (
+    tester,
+  ) async {
+    final controller = await _controller();
+    final shop = await controller.repository.saveMyShop({
+      'name': 'Shop',
+      'email': 's@example.test',
+      'phone': '',
+    });
+    await controller.repository.createShopOutreach({
+      'shop_id': shop['id'],
+      'vehicle_id': controller.snapshot!.vehicles.first.id,
+      'service_summary': 'Brakes',
+      'proposed_slots': [
+        offsetTimestamp(DateTime.now().add(const Duration(days: 2))),
+      ],
+    }, 'draft-key');
+    await _mount(tester, MyShopsScreen(controller: controller));
+    expect(find.text('Draft • not sent'), findsOneWidget);
+    await _tap(tester, find.byTooltip('Request options').first);
+    await _tap(tester, find.text('Discard request'));
+    expect(find.text('Discard this request?'), findsOneWidget);
+    await _tap(tester, find.widgetWithText(TextButton, 'Discard'));
+    expect(find.text('Draft • not sent'), findsNothing);
+    expect(await controller.repository.listShopOutreach(), isEmpty);
+  });
+
+  testWidgets('a sent request can be withdrawn from its review screen', (
+    tester,
+  ) async {
+    final repository = _Repository();
+    final controller = await _controller(repository);
+    repository.draft = {
+      ...repository.draft,
+      'status': 'waiting_for_reply',
+      'delivery_status': 'provider_accepted',
+    };
+    await _mount(
+      tester,
+      ShopOutreachReview(controller: controller, draftId: 'draft-1'),
+    );
+    await _tap(tester, find.text('Withdraw request'));
+    expect(find.text('Withdraw this request?'), findsOneWidget);
+    await _tap(tester, find.widgetWithText(TextButton, 'Withdraw'));
+    expect(find.text('Withdrawn'), findsOneWidget);
+    expect(find.text('Withdraw request'), findsNothing);
+  });
+
+  testWidgets('an interrupted device draft can be discarded', (tester) async {
+    final controller = await _controller();
+    final workspace = CustomerWorkspace.forController(controller);
+    await workspace.store.write(
+      workspace.scopeFor('outreach-draft'),
+      PendingWorkspaceWrite(body: const {'x': 1}, key: 'k'),
+    );
+    await _mount(tester, MyShopsScreen(controller: controller));
+    expect(find.text('Recover scheduling draft'), findsOneWidget);
+    await _tap(tester, find.text('Discard draft'));
+    expect(find.text('Discard the saved draft?'), findsOneWidget);
+    await _tap(tester, find.widgetWithText(TextButton, 'Discard'));
+    expect(find.text('Recover scheduling draft'), findsNothing);
+    expect(await workspace.pending('outreach-draft'), isNull);
+  });
 }
