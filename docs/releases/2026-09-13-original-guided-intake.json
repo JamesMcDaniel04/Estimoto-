@@ -15,6 +15,12 @@
       "guidance_authenticated_non_multipart": 415,
       "vin_photo_unauthenticated": 401,
       "vin_photo_authenticated_non_multipart": 415
+    },
+    "live_synthetic_vin_provider_probe": {
+      "http_status": 200,
+      "suggestion_matched_generated_test_label": true,
+      "requires_confirmation": true,
+      "vehicle_mutation": false
     }
   },
   "customer_website": {
@@ -45,7 +51,7 @@
     "Explicit mobile versus shop-visit handoffs and calendar reschedule payloads"
   ],
   "limits": [
-    "These route probes did not call an image or OCR provider.",
+    "The authorization probes did not invoke image providers; the separate synthetic VIN probe did invoke the live OCR provider.",
     "Browser screenshots do not establish physical-device camera behavior.",
     "No live customer-to-shop request was sent for this release verification.",
     "This record covers original Estimoto API and customer website, not the separate Plus app release."

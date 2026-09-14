@@ -1,0 +1,36 @@
+{
+  "candidate_source_sha": "6c3a262b4dd4fc9dcecbcd85844f78fb7f239082",
+  "original_bridge_source_sha": "82b52bcbbdb801e952ec144d056c80dbd17af51e",
+  "plus_migration_head": "32ac7f618b90",
+  "backend_suite": {
+    "passed": 271,
+    "skipped": 0,
+    "duration_seconds": 42.86,
+    "exit_code": 0,
+    "isolated_postgresql_enabled": true,
+    "actual_original_bridge_contract_tests_enabled": true,
+    "warning": "Upstream Starlette TestClient uses a deprecated AnyIO BlockingPortal alias."
+  },
+  "guarded_smoke_self_tests": {
+    "passed": 7,
+    "workflow_assertions": 72,
+    "http_calls": 44,
+    "public_listings_before_display_cap": 130,
+    "combined_displayed_listings": 100,
+    "outbound_rows_created": 0,
+    "external_sockets": "forbidden"
+  },
+  "scope": [
+    "Private guided photo storage, idempotency and uncertain commit recovery",
+    "Explicit current-photo VIN confirmation",
+    "Thirty-mile local directory and combined 100-listing cap",
+    "Dedicated-shop references and customer isolation",
+    "Calendar scheduling races and narrow provider integration boundaries",
+    "Fresh schema migrations and private table access"
+  ],
+  "limits": [
+    "Local validation does not establish deployment, mobile camera behavior, or actual calendar authorization.",
+    "Google Calendar capability remains disabled until the correct provider configuration is supplied.",
+    "The live release and signed mobile artifacts have separate evidence records."
+  ]
+}
