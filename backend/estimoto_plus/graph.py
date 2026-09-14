@@ -50,6 +50,23 @@ class RecordInput(BaseModel):
         return parsed.isoformat()
 
 
+class RecordUpdate(BaseModel):
+    model_config = ConfigDict(extra="forbid", str_strip_whitespace=True)
+    service_type: ServiceType | None = None
+    service_date: str | None = None
+    mileage: int | None = Field(default=None, ge=0, le=9999999, strict=True)
+    cost_cents: int | None = Field(default=None, ge=0, le=100_000_000, strict=True)
+    shop_name: str | None = Field(default=None, max_length=200)
+    parts_source: str | None = Field(default=None, max_length=200)
+    parts_description: str | None = Field(default=None, max_length=200)
+    notes: str | None = Field(default=None, max_length=1000)
+
+    @field_validator("service_date")
+    @classmethod
+    def past_date(cls, value):
+        return value if value is None else RecordInput.past_date(value)
+
+
 class PreferenceInput(BaseModel):
     model_config = ConfigDict(extra="forbid")
     share_aggregate_insights: bool = Field(strict=True)
@@ -175,6 +192,31 @@ def create_record(body: RecordInput, idempotency_key: str | None = Header(defaul
     db.add(record)
     db.flush()
     project_record(db, record, vehicle)
+    db.commit()
+    return record_view(record)
+
+
+@router.put("/v1/knowledge/records/{record_id}")
+def update_record(record_id: str, body: RecordUpdate, c: Customer = Depends(current_customer), db: Session = Depends(db_session)):
+    lock_customer(db, c.id)
+    record = db.get(KnowledgeRecord, record_id)
+    if record is None or record.customer_id != c.id:
+        raise HTTPException(404, "History not found.")
+    from .customer_routes import consume_rate
+    consume_rate(db, c.id, "knowledge_update", 60)
+    for k, val in body.model_dump(exclude_unset=True).items():
+        setattr(record, k, val)
+    db.flush()
+    # Rebuild the derived graph from the edited source: drop this record's
+    # edges, remove nodes nothing else references (including the stale
+    # service node), then project exactly as creation does.
+    db.execute(delete(GraphEdge).where(GraphEdge.customer_id == c.id, GraphEdge.record_id == record.id))
+    db.flush()
+    linked = select(GraphEdge.id).where(GraphEdge.customer_id == c.id,
+                                      or_(GraphEdge.from_id == GraphEntity.id, GraphEdge.to_id == GraphEntity.id)).exists()
+    db.execute(delete(GraphEntity).where(GraphEntity.customer_id == c.id, ~linked))
+    db.flush()
+    project_record(db, record, db.get(Vehicle, record.vehicle_id))
     db.commit()
     return record_view(record)
 

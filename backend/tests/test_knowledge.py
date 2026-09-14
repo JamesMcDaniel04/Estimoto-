@@ -180,3 +180,27 @@ def test_scheduling_intent_takes_priority_over_history(clients, message):
     result = client.post("/v1/assistant", headers=h("alice"), json={"vehicle_id": vehicle, "message": message}).json()
     assert result["intent"] == "shop_outreach"
     assert "review and authorize" in result["reply"]
+
+
+def test_history_record_update_keeps_receipts_and_reprojects_graph(clients):
+    client, _ = clients
+    vehicle = create_vehicle(client)
+    record = add(client, vehicle, shop_name="Old Shop", parts_source="Old Parts").json()
+    rid = record["id"]
+    from test_receipts import upload
+    assert upload(client, rid).status_code == 201
+    updated = client.put(f"/v1/knowledge/records/{rid}", headers=h("alice"),
+                         json={"shop_name": "New Shop", "cost_cents": 12345, "notes": "changed", "mileage": 63000})
+    assert updated.status_code == 200, updated.text
+    body = updated.json()
+    assert body["shop_name"] == "New Shop" and body["cost_cents"] == 12345 and body["notes"] == "changed"
+    assert body["parts_source"] == "Old Parts" and len(body["receipts"]) == 1
+    graph = client.get("/v1/knowledge/graph", headers=h("alice")).json()
+    titles = {e["title"] for e in graph["entities"]}
+    assert "New Shop" in titles and "Old Shop" not in titles
+    service = next(e for e in graph["entities"] if e["kind"] == "service")
+    assert service["attributes"]["mileage"] == 63000
+    assert len(graph["relationships"]) == 4
+    assert client.put(f"/v1/knowledge/records/{rid}", headers=h("bob"), json={"shop_name": "x"}).status_code == 404
+    assert client.put(f"/v1/knowledge/records/{rid}", headers=h("alice"), json={"service_date": "2099-01-01"}).status_code == 422
+    assert client.put(f"/v1/knowledge/records/{rid}", headers=h("alice"), json={"vehicle_id": "other"}).status_code == 422
