@@ -5,6 +5,7 @@ import 'screens/estimates_screen.dart';
 import 'screens/estibot_screen.dart';
 import 'screens/repairs_screen.dart';
 import 'screens/find_help_screen.dart';
+import 'screens/settings_screen.dart';
 import 'state/plus_controller.dart';
 import 'theme.dart';
 import 'widgets/common.dart';
@@ -111,17 +112,20 @@ class _HomeShellState extends State<_HomeShell> with WidgetsBindingObserver {
               onPressed: c.loading ? null : c.refresh,
               icon: const Icon(Icons.refresh, size: 22),
             ),
-            if (widget.onExit != null)
-              PopupMenuButton<String>(
-                tooltip: 'Account options',
-                itemBuilder: (_) => [
+            PopupMenuButton<String>(
+              tooltip: 'Account options',
+              itemBuilder: (_) => [
+                const PopupMenuItem(value: 'settings', child: Text('Settings')),
+                if (widget.onExit != null)
                   PopupMenuItem(
                     value: 'exit',
                     child: Text(c.isDemo ? 'Leave demo' : 'Sign out'),
                   ),
-                ],
-                onSelected: (_) => widget.onExit!(),
-              ),
+              ],
+              onSelected: (value) => value == 'settings'
+                  ? SettingsScreen.open(context, c, onExit: widget.onExit)
+                  : widget.onExit?.call(),
+            ),
           ],
         ),
         body: SafeArea(
@@ -184,7 +188,7 @@ class _HomeShellState extends State<_HomeShell> with WidgetsBindingObserver {
                     : IndexedStack(
                         index: c.tab,
                         children: [
-                          GarageScreen(controller: c),
+                          GarageScreen(controller: c, onExit: widget.onExit),
                           EstimatesScreen(controller: c),
                           EstibotScreen(controller: c),
                           RepairsScreen(controller: c),

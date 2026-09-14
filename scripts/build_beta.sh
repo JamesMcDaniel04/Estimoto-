@@ -14,8 +14,10 @@ fi
 git rev-parse HEAD
 cd app
 flutter pub get --enforce-lockfile
-flutter build ipa --release --no-pub --export-options-plist=ios/ExportOptions.plist --dart-define=PLUS_DEMO=true
-flutter build apk --release --no-pub --dart-define=PLUS_DEMO=true
-flutter build appbundle --release --no-pub --dart-define=PLUS_DEMO=true
-flutter build web --no-pub --dart-define=PLUS_DEMO=true
+PLUS_VERSION_NAME=$(sed -n 's/^version: \([0-9.]*\)+.*/\1/p' pubspec.yaml)
+PLUS_BUILD_NUMBER=$(sed -n 's/^version: [0-9.]*+\([0-9]*\).*/\1/p' pubspec.yaml)
+flutter build ipa --release --no-pub --export-options-plist=ios/ExportOptions.plist --dart-define=PLUS_DEMO=true --dart-define=PLUS_VERSION_NAME="$PLUS_VERSION_NAME" --dart-define=PLUS_BUILD_NUMBER="$PLUS_BUILD_NUMBER"
+flutter build apk --release --no-pub --dart-define=PLUS_DEMO=true --dart-define=PLUS_VERSION_NAME="$PLUS_VERSION_NAME" --dart-define=PLUS_BUILD_NUMBER="$PLUS_BUILD_NUMBER"
+flutter build appbundle --release --no-pub --dart-define=PLUS_DEMO=true --dart-define=PLUS_VERSION_NAME="$PLUS_VERSION_NAME" --dart-define=PLUS_BUILD_NUMBER="$PLUS_BUILD_NUMBER"
+flutter build web --no-pub --dart-define=PLUS_DEMO=true --dart-define=PLUS_VERSION_NAME="$PLUS_VERSION_NAME" --dart-define=PLUS_BUILD_NUMBER="$PLUS_BUILD_NUMBER"
 echo 'Built demo beta artifacts. Verify embedded identities, signing and hashes before distribution.'

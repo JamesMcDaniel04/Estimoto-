@@ -16,7 +16,7 @@ Future<void> editProfile(BuildContext context, PlusController controller) =>
     showModalBottomSheet<void>(
       context: context,
       isScrollControlled: true,
-      builder: (_) => _ProfileForm(controller: controller),
+      builder: (_) => ProfileForm(controller: controller),
     );
 Future<void> addReminder(BuildContext context, PlusController controller) =>
     showModalBottomSheet<void>(
@@ -203,14 +203,26 @@ class _VehicleFormState extends State<_VehicleForm> {
   );
 }
 
-class _ProfileForm extends StatefulWidget {
-  const _ProfileForm({required this.controller});
+/// Name, phone, ZIP and contact preference for the signed-in customer.
+///
+/// As a bottom sheet (the default) it closes itself after saving. With
+/// [inline] it renders bare fields for a host page and reports success
+/// through [onSaved] instead of popping the route.
+class ProfileForm extends StatefulWidget {
+  const ProfileForm({
+    super.key,
+    required this.controller,
+    this.inline = false,
+    this.onSaved,
+  });
   final PlusController controller;
+  final bool inline;
+  final VoidCallback? onSaved;
   @override
-  State<_ProfileForm> createState() => _ProfileFormState();
+  State<ProfileForm> createState() => _ProfileFormState();
 }
 
-class _ProfileFormState extends State<_ProfileForm> {
+class _ProfileFormState extends State<ProfileForm> {
   late final TextEditingController name, phone, postal;
   bool busy = false;
   String? error;
@@ -248,7 +260,13 @@ class _ProfileFormState extends State<_ProfileForm> {
         'contact_preference': preference,
       });
       await widget.controller.refresh();
-      if (mounted) Navigator.pop(context);
+      if (!mounted) return;
+      if (widget.inline) {
+        setState(() => busy = false);
+        widget.onSaved?.call();
+      } else {
+        Navigator.pop(context);
+      }
     } catch (e) {
       if (mounted) {
         setState(() {
@@ -260,15 +278,16 @@ class _ProfileFormState extends State<_ProfileForm> {
   }
 
   @override
-  Widget build(BuildContext context) => FormSheet(
-    title: 'Your profile',
-    child: Form(
+  Widget build(BuildContext context) {
+    final fields = Form(
       key: form,
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Text(widget.controller.snapshot!.profile.email),
-          const SizedBox(height: 20),
+          if (!widget.inline) ...[
+            Text(widget.controller.snapshot!.profile.email),
+            const SizedBox(height: 20),
+          ],
           TextFormField(
             controller: name,
             decoration: const InputDecoration(labelText: 'Name'),
@@ -277,11 +296,23 @@ class _ProfileFormState extends State<_ProfileForm> {
                 (v?.trim().isEmpty ?? true) ? 'Enter your name' : null,
           ),
           const SizedBox(height: 12),
-          TextFormField(
-            controller: phone,
-            decoration: const InputDecoration(labelText: 'Phone (optional)'),
-            keyboardType: TextInputType.phone,
-            maxLength: 30,
+          ListenableBuilder(
+            listenable: phone,
+            builder: (context, _) => TextFormField(
+              controller: phone,
+              decoration: InputDecoration(
+                labelText: 'Phone (optional)',
+                suffixIcon: phone.text.isEmpty
+                    ? null
+                    : IconButton(
+                        tooltip: 'Clear phone',
+                        icon: const Icon(Icons.clear),
+                        onPressed: busy ? null : phone.clear,
+                      ),
+              ),
+              keyboardType: TextInputType.phone,
+              maxLength: 30,
+            ),
           ),
           const SizedBox(height: 12),
           TextFormField(
@@ -315,8 +346,11 @@ class _ProfileFormState extends State<_ProfileForm> {
           BusyButton(busy: busy, label: 'Save profile', onPressed: save),
         ],
       ),
-    ),
-  );
+    );
+    return widget.inline
+        ? fields
+        : FormSheet(title: 'Your profile', child: fields);
+  }
 }
 
 class _ReminderForm extends StatefulWidget {

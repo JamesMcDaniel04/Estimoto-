@@ -10,10 +10,12 @@ import 'estimate_forms.dart';
 import 'my_shops_screen.dart';
 import 'history_screen.dart';
 import 'vehicle_value_screen.dart';
+import 'settings_screen.dart';
 
 class GarageScreen extends StatelessWidget {
-  const GarageScreen({super.key, required this.controller});
+  const GarageScreen({super.key, required this.controller, this.onExit});
   final PlusController controller;
+  final VoidCallback? onExit;
   @override
   Widget build(BuildContext context) {
     final data = controller.snapshot!;
@@ -30,7 +32,8 @@ class GarageScreen extends StatelessWidget {
           'Your cars. Your care. All together.',
           trailing: IconButton.filledTonal(
             tooltip: 'Your profile',
-            onPressed: () => editProfile(context, controller),
+            onPressed: () =>
+                SettingsScreen.open(context, controller, onExit: onExit),
             icon: const Icon(Icons.person_outline),
           ),
         ),
