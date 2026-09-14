@@ -10,6 +10,7 @@ import resource
 import subprocess
 import sys
 import tempfile
+from .receipt_work_items import parse_work_items
 
 TOTAL = re.compile(r'(?<!\w)(grand[ \t]+total|invoice[ \t]+total|total(?:[ \t]+(?:amount(?:[ \t]+paid)?|paid|due|price|charges))?|amount[ \t]+paid)'
     r'[\s:.]*(?:(?:USD|US\$|\$)\s*)?((?:\d{1,3}(?:,\d{3})+|\d+)\.\d{2})(?![\d.,])', re.I)
@@ -77,11 +78,11 @@ def extract(data, mime, directory=None):
             text = command(['pdftotext', '-layout', '-nopgbrk', '-enc', 'UTF-8', str(original), '-']).decode('utf-8')
             found = parse_total(text)
             if found['status'] != 'not_found':
-                return {**found, 'source': 'pdf_text'}
+                return {**found, **parse_work_items(text), 'source': 'pdf_text'}
             from pypdf import PdfReader
             pages = len(PdfReader(BytesIO(data)).pages)
             if pages > 3:
-                return {'status': 'not_found', 'source': 'pdf_text'}
+                return {'status': 'not_found', **parse_work_items(text), 'source': 'pdf_text'}
             command(['pdftoppm', '-scale-to', '2200', '-png', str(original), str(root / 'page')])
             images = sorted(root.glob('page-*.png'))
             source = 'scanned_pdf_ocr'
@@ -93,7 +94,7 @@ def extract(data, mime, directory=None):
         for page in images:
             page_lines, page_confidence = ocr(page)
             lines.extend(page_lines); confidence.extend(page_confidence)
-        return {**parse_total('\n'.join(lines), confidence), 'source': source}
+        return {**parse_total('\n'.join(lines), confidence), **parse_work_items('\n'.join(lines), confidence), 'source': source}
 
 
 def main():

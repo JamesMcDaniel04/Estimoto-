@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import '../domain/models.dart';
 import '../screens/history_screen.dart';
 import '../services/receipt_upload.dart';
+import 'receipt_work_history.dart';
 import '../state/plus_controller.dart';
 
 class HistoryCostSummary extends StatefulWidget {
@@ -199,6 +200,11 @@ class _HistoryCostSummaryState extends State<HistoryCostSummary> {
                 icon: const Icon(Icons.add),
                 label: const Text('Add past work / receipt'),
               ),
+              if (!loading && !failed)
+                ReceiptWorkHistory(
+                  records: rows,
+                  controller: widget.controller,
+                ),
             ],
           ),
         ),

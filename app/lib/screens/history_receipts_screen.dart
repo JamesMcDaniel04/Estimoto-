@@ -14,6 +14,7 @@ import '../services/receipt_pdf.dart';
 import '../state/plus_controller.dart';
 import '../widgets/common.dart';
 import '../widgets/workspace_widgets.dart';
+import '../widgets/receipt_work_items.dart';
 
 enum ReceiptChoice { camera, gallery, pdf }
 
@@ -395,13 +396,21 @@ class _HistoryReceiptsScreenState extends State<HistoryReceiptsScreen>
           ),
         if (status == 'needs_review' && amount is int)
           const Text('Check this amount against the receipt before using it.'),
+        const SizedBox(height: 12),
+        const Text(
+          'Work listed on this receipt',
+          style: TextStyle(fontWeight: FontWeight.w700),
+        ),
+        ReceiptWorkItems(receipt: receipt),
         Wrap(
           spacing: 8,
           children: [
-            if (!widget.controller.isDemo && (amount is! int))
+            if (!widget.controller.isDemo)
               TextButton(
                 onPressed: busy ? null : () => parseTotal(receipt),
-                child: const Text('Read receipt total'),
+                child: Text(
+                  amount is! int ? 'Read receipt total' : 'Read work details',
+                ),
               ),
             TextButton(
               onPressed: busy ? null : editCost,

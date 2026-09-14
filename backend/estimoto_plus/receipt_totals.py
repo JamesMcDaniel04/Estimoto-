@@ -25,7 +25,7 @@ def extract_total(data, mime):
                 os.killpg(process.pid, signal.SIGKILL)
                 process.communicate()
                 return {'status': 'unavailable'}
-            if process.returncode or len(output) > 4096:
+            if process.returncode or len(output) > 65536:
                 return {'status': 'unavailable'}
             result = json.loads(output)
             if not isinstance(result, dict) or result.get('status') not in {
@@ -34,6 +34,15 @@ def extract_total(data, mime):
             amount = result.get('amount_cents')
             if amount is not None and (type(amount) is not int or not 0 <= amount <= 100_000_000 or result.get('currency') != 'USD'):
                 return {'status': 'needs_review'}
+            items = result.get('work_items', [])
+            if not isinstance(items, list) or len(items) > 40 or any(
+                not isinstance(item, dict) or not isinstance(item.get('title'), str) or len(item['title']) > 180
+                or any(not isinstance(item.get(key, []), list) or len(item.get(key, [])) > 24
+                    or any(not isinstance(v, str) or len(v) > 180 for v in item.get(key, [])) for key in ('tasks', 'parts'))
+                or (item.get('amount_cents') is not None and (type(item['amount_cents']) is not int or not 0 <= item['amount_cents'] <= 100_000_000))
+                for item in items
+            ):
+                result = {**result, 'work_items': [], 'items_status': 'needs_review'}
             return result
     except Exception:
         return {'status': 'unavailable'}

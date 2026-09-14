@@ -1,0 +1,7 @@
+Estimoto+ build 13: receipt work details
+
+Uploaded repair PDFs and receipt photos now show their listed service tasks and parts on the Repairs page, beneath Recorded costs. Each entry links to its private receipts. Item amounts are shown for reference and never added to the recorded total a second time.
+
+Older uploaded receipts can be re-read from the receipt screen. Existing manual costs are preserved. Unclear receipt text is marked for review, and receipts stay saved even when details cannot be read.
+
+Please test uploading a PDF or receipt photo, opening Repairs, reviewing listed work, and returning to the source receipt. Changing vehicles or accounts must not show the previous vehicle’s private work.

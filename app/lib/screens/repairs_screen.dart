@@ -40,7 +40,7 @@ class RepairsScreen extends StatelessWidget {
         if (data.repairs.isEmpty && data.requests.isEmpty)
           EmptyState(
             icon: Icons.build_circle_outlined,
-            title: 'Your repair story starts here',
+            title: 'Need help with your next repair?',
             message:
                 'Connect with a provider to start a request. Updates from participating shops will appear here.',
             action: 'Find help',
