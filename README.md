@@ -38,7 +38,7 @@ Open `http://127.0.0.1:4318`. Production customer sessions use the dedicated aut
 | Find Help | Participating shops/techs and reviewed local businesses within 30 miles; up to 30 results, real shop artwork, contact details, mini profiles and vehicle-specific dedicated shops |
 | Estibot | Guided estimate and routine-care topics, technician matching, saved-shop scheduling, private graph retrieval over service history, and labeled YouTube search links |
 | My shops | Private shop contacts, reviewed customer-authorized scheduling requests that can be discarded or withdrawn, and explicit shop acceptance |
-| Service history | Customer-reported service, shop and parts-source records you can edit in place; receipts; per-vehicle valuation history; optional aggregated contributions |
+| Service history | Repair, maintenance and modification records with costs you can edit in place, private receipt photos/PDFs directly from the entry form, shop and parts details, per-vehicle valuation history; optional aggregated contributions |
 | Foundation | Separate `io.estimoto.plus` iOS/Android app, Supabase Auth client, customer ownership checks, migrations, durable request outbox and bridge contract |
 
 Submitting a service request is not an appointment. A provider must confirm acceptance and schedule. Estibot presents a review screen before sharing contact and vehicle details.

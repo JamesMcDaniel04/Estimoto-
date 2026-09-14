@@ -1,27 +1,27 @@
-# Live customer preview — build 10, September 14, 2026
+# Live customer preview — build 11, September 14, 2026
 
-Estimoto + build 10 is live on web and the permanent Android download, from
-`62683757a569c3c82e37bbbf03be6658d780f77f`. Network shops accepting requests have a blue
-Request help button on the card; tapping the rest of the card opens its profile.
-This release also includes the concurrently merged Settings screen. iOS build 10
-is VALID and available internally; external review remains pending.
+Estimoto + build 11 is live on web and the permanent Android download, from
+`9c53dd85889938dd40a8195b89dc4a43bc98f4f9`. Receipt photo/PDF controls are directly on
+Add service history, with a fixed Save button and an inline saved-entry receipt
+editor. Request help cards, shop profiles, Settings and the updated logo remain.
+iOS build 11 is VALID internally; external review remains pending.
 
 [Download latest Android](https://estimoto-plus-api.fly.dev/android/download) ·
-[Mobile delivery](mobile-release.md) · [Build-10 evidence](releases/2026-09-14-build10.json) ·
+[Mobile delivery](mobile-release.md) · [Build-11 evidence](releases/2026-09-14-build11.json) ·
 [Audit follow-up](qa/2026-09-13-audit-closure.md)
 
 ## Delivered surfaces
 
 | Surface | Verified state |
 | --- | --- |
-| Customer API/web | `/version` matched `6268375`; `/ready` is ready at schema `a63e90b72d14`. Served JavaScript matches the local build. |
-| Android customer app | Signed 0.1.0 (10); exact public APK installed over build 9 on an emulator. Card request button and separate profile navigation verified in demo. |
-| iOS customer app | Build 10 VALID, exact 561-character notes and both groups verified. Internal `IN_BETA_TESTING`; external `READY_FOR_BETA_SUBMISSION`. Build 2 review preserved. |
-| Repository | `main` includes the badge change, the concurrently merged Settings commits and release source `6268375`; no force-push. |
-| Hosted CI | [Run 34815970821](https://github.com/JamesMcDaniel04/Estimoto-plus/actions/runs/34815970821) has no executed steps; check `103886600083` confirms the existing billing block. Local verification is recorded separately. |
+| Customer API/web | `/version` matched `9c53dd8`; `/ready` is ready at schema `a63e90b72d14`. Served JavaScript matches the local build. |
+| Android customer app | Signed 0.1.0 (11); exact public APK installed over build 10 on an emulator. Native PDF selection, live private upload, render, cancellation and reopened history verified. |
+| iOS customer app | Build 11 VALID, exact 592-character notes and both groups verified. Internal IN_BETA_TESTING; external READY_FOR_BETA_SUBMISSION. Build 2 review preserved. |
+| Repository | `main` includes receipt flow and release source `9c53dd8`; no force-push. |
+| Hosted CI | [Run 34817696365](https://github.com/JamesMcDaniel04/Estimoto-plus/actions/runs/34817696365) has no executed steps; check `103891868936` confirms the existing billing block. Local verification is separate. |
 | Original Estimoto mobile | Separate build 232, source `a0a2af9cfb8c88cb3b7eb9860a42554dcf57714f`, shipped with 38 exact-tab tests and external approval. Its approval does not approve Plus. |
 
-## Customer editing in build 11
+## Customer editing after build 11
 
 Reminders, estimate drafts and their photos, scheduling requests, service
 history entries and valuation lookups can now be edited, withdrawn or deleted
@@ -39,14 +39,22 @@ drafts accept photos through the simple picker, the sample calendar can be
 disconnected, and the guided camera reports a typed unavailable code.
 Backend migration `b7f2c9d4e1a0` adds `vehicle_valuation_history`.
 
-## Build 10 validation
+## Build 11 validation
 
-All 217 app tests and analysis passed after integrating Settings; 19 capture-web
-tests and the capture build passed. The exact public Android APK was installed
-over build 9. Native demo checks verified the card's Request help button opens
-the review form and that tapping the card body opens the profile. No real
-request or shop contact was sent. Build-9 evidence below remains historical.
-The delivered email already uses the permanent URL, which now serves build 10.
+All 227 app tests and analysis passed, plus 15 focused backend receipt/PDF tests,
+one Chrome picker test, 19 capture-web tests and its build. The native live upload
+used a scoped synthetic customer and a labeled PDF, with one record/attachment,
+exact byte matching and rejected anonymous access. Cleanup removed the account,
+vehicle, history, file and derived data; old-token reads and writes returned 401.
+Web demo checks verified visible controls, the inline save and return to history.
+No real customer mailbox, physical-device or shop-contact result is claimed.
+
+## Historical build 10
+
+[Build 10](releases/2026-09-14-build10.json) restored the network Request help
+card action and included Settings, with 217 app tests and its own delivery proof.
+Its source `6268375` and earlier records remain historical. The delivered invite
+uses the same permanent URL, which now serves build 11; no duplicate email was sent.
 
 ## What changed in build 9
 
@@ -64,7 +72,7 @@ No new Auth account,
 shop outreach or live customer mutation was used for build-9 checks. These demo
 checks do not establish a live customer's saved-shop or request outcome.
 
-Android build 10 uses the same permanent URL already present in the delivered
+Android build 11 uses the same permanent URL already present in the delivered
 build-8 invite. No duplicate email was sent.
 
 ## What changed in build 8

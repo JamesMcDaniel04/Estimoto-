@@ -1,34 +1,46 @@
-# Mobile customer preview — build 10
+# Mobile customer preview — build 11
 
-Package `io.estimoto.plus`, source `62683757a569c3c82e37bbbf03be6658d780f77f`.
+Package `io.estimoto.plus`, source `9c53dd85889938dd40a8195b89dc4a43bc98f4f9`.
 [Download latest Android](https://estimoto-plus-api.fly.dev/android/download) ·
-[Build-10 evidence](releases/2026-09-14-build10.json) ·
-[Release notes](releases/0.1.0-10-beta-notes.md)
+[Build-11 evidence](releases/2026-09-14-build11.json) ·
+[Release notes](releases/0.1.0-11-beta-notes.md)
 
-Network shop cards again show Request help when accepting requests. The button
-opens request review; tapping the card body opens its profile. This build includes
-Settings and displays version 0.1.0 (10). All 217 app tests and analysis passed;
-19 capture-web tests and its build passed. Backend code is unchanged from build 9.
+Add service history now exposes Take photo, Choose photo and Choose PDF above
+the optional details, with Save history entry fixed at the bottom. A receipt
+action saves the entered details first, then opens the inline receipt editor.
+Canceling selection retains the saved entry; pending uploads keep their retry
+identity. The browser requires a fresh picker click after the save.
+
+All 227 app tests, analysis, 15 focused backend receipt/PDF checks, one Chrome
+picker check and 19 capture-web tests passed. The capture build passed.
 
 | Artifact | Bytes | SHA-256 |
 | --- | ---: | --- |
-| APK | 62,534,023 | `dc4670b561cbd0736baf44a27334c4d1b24098d79afbdc629a6d8cbfa07d6bf3` |
-| AAB | 60,332,076 | `966823ba7683cffe367a47d1f7a31f95e8ab03ccde28347b68ea8827948ebfd1` |
-| IPA | 25,901,352 | `e3ceff8c3d85798f5c877e895caa8b49eb11188a4ac3632003c50d7e245d2fc6` |
+| APK | 62,534,023 | `b935330a70aae1e4d297399a4116ecfd8372e1d46a231a383f262839d5512e41` |
+| AAB | 60,328,339 | `8f1d35a9f735434cefae8e7eef2d68fdf344c709dca8caebb597e60f3703d19a` |
+| IPA | 25,900,287 | `2a2ecf658eb91513563098c539ed637d2d8a717d4e945735f3cb33baf2d68288` |
 
 The Android signer remains `e6d106fccc6c0e77e04a46c64f8edffdafb11b502d4857e51606c725086581dd`.
-The exact public APK installed over build 9 on an emulator; its request-button
-and card-profile flows were checked in demo. No real request was sent. The
-existing delivered invite now downloads build 10 through the same URL.
+The exact public APK installed over build 10 on an emulator. A scoped synthetic
+customer selected a labeled PDF through Android's native file picker, uploaded
+it to the live service, rendered it privately, canceled another selection and
+reopened the saved entry. The server held one record and one receipt; bytes
+matched the fixture, and anonymous access returned 401. The account, vehicle,
+record, receipt file and derived data were removed; the old token then returned
+401 for reads and writes. No shop request or email was sent.
 
-Apple build `63747bc9-e640-46f0-810c-b1aeb6ea1a74` is VALID with exact
-561-character notes and both tester groups. Internal state is
-IN_BETA_TESTING; external state is READY_FOR_BETA_SUBMISSION. Build 2 remains in
-review; no new external submission was attempted. Physical-device and real
-customer mailbox proof remain unverified.
+Apple build `8c5faefa-35cf-4df4-b008-3cce5c6ff57f` is VALID with exact
+592-character notes and both tester groups. Internal state is IN_BETA_TESTING;
+external state is READY_FOR_BETA_SUBMISSION. Build 2's review remains pending.
+The permanent Android URL in the existing delivered invite serves build 11.
+Physical-device and real customer mailbox proof remain separate.
 
-The following build-9 record is historical; its source, hashes and QA have not
-been relabeled as build-10 evidence.
+## Historical build 10
+
+[Build-10 evidence](releases/2026-09-14-build10.json) records source
+`62683757a569c3c82e37bbbf03be6658d780f77f`, the network Request help card button,
+Settings, 217 app tests and its own signed artifacts. The build-9 record below
+is also historical; earlier evidence has not been relabeled as build 11.
 
 ## Android 0.1.0 (9)
 
@@ -57,7 +69,7 @@ saved-shop outcome, real mailbox/code entry or a physical-device install.
 
 The fresh invite was sent once for build 8, accepted at 06:16:05 UTC and confirmed
 `delivered` by Resend readback at 06:16:26 UTC, September 14. Its permanent URL
-now serves build 10. No duplicate email was sent. Recipient details, the provider
+uses the permanent URL shown above. No duplicate email was sent. Recipient details, the provider
 message ID and send journal stay private. Delivery does not prove that the
 recipient opened the email or installed the APK.
 

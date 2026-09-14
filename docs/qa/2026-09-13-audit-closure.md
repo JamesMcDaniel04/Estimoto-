@@ -1,10 +1,10 @@
 # Launch audit follow-up — builds 8 and 9
 
-Current delivery: [build 10](../releases/2026-09-14-build10.json) restores the
-network request button and includes Settings. Its 217 app tests/analysis and
-published artifact checks are recorded separately. The build-8/9 audit evidence
-below remains historical; build 10 changes no backend code.
-
+Current delivery: [build 11](../releases/2026-09-14-build11.json) exposes receipt
+uploads directly on the history form. Its 227 app tests, focused backend and
+browser checks, native live PDF upload and published artifacts are recorded
+separately. The build-8/9 audit evidence below remains historical; build 11
+changes no backend code.
 
 The September 13 audit examined Plus build 7 (`ebb7f47275b018f276744322bbb2c191438e4f7a`).
 Build 8 was published from `e5d0e4ad40ba93866e1905f55c6046d6b4824588`; the full
