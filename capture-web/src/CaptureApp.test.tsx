@@ -1,16 +1,22 @@
-import { fireEvent, render, screen, waitFor, within } from "@testing-library/react";
+import { act, cleanup, fireEvent, render, screen, waitFor, within } from "@testing-library/react";
 import "@testing-library/jest-dom/vitest";
-import { expect, it, vi } from "vitest";
+import { afterEach, expect, it, vi } from "vitest";
 import { CaptureApp } from "./CaptureApp";
 import { RPCError, type CaptureRPC } from "./rpc";
+import { useState, type ReactNode } from "react";
 import type { PhotoStep } from "./shared/template";
+
+afterEach(cleanup);
 
 const camera = vi.hoisted(() => ({ save: null as null | ((key: string, panel: string, file: File) => Promise<boolean>) }));
 vi.mock("./shared/GuidedCamera", () => ({ default: (props: {
   steps: PhotoStep[]; needsDamagePanel?: boolean; onDamagePanel?: (panel: string) => void;
   onCapture: (key: string, panel: string, file: File) => Promise<boolean>;
-}) => { camera.save = props.onCapture; return <div data-testid="guided-camera">
+  renderAssist?: (context: { capture_key: string; body_style: string }, disabled: boolean) => ReactNode;
+}) => { const [helpKey, setHelpKey] = useState("vin"); camera.save = props.onCapture; return <div data-testid="guided-camera">
   <span>{props.steps.map((step) => step.key).join(",")}</span>
+  {props.renderAssist?.({ capture_key: helpKey, body_style: "sedan" }, true)}
+  <button onClick={() => setHelpKey("engine_bay")}>Advance camera step</button>
   {props.needsDamagePanel && <button onClick={() => props.onDamagePanel?.("hood")}>Choose hood</button>}
 </div>; } }));
 
@@ -98,4 +104,56 @@ it.each([true, false])("releases only a proven superseded photo and preserves un
   if (superseded) expect(operations[1]).not.toBe(operations[0]);
   else expect(operations[1]).toBe(operations[0]);
   expect(request.mock.calls.filter(([method]) => method === "captureState")).toHaveLength(superseded ? 3 : 1);
+});
+
+
+it.each(["reply", "failure", "empty"])("keeps a help question and exposes pending then %s even without camera access", async (outcome) => {
+  let resolve!: (value: unknown) => void;
+  let reject!: (reason: Error) => void;
+  const pending = new Promise((yes, no) => { resolve = yes; reject = no; });
+  const request = vi.fn(async (method: string) => method === "captureState"
+    ? { estimate_id: "draft", discipline: "collision", vehicle, photos: [], vin_suggestion: null }
+    : pending);
+  render(<CaptureApp rpc={{ request, ready: vi.fn(), close: vi.fn() } as unknown as Pick<CaptureRPC, "request" | "ready" | "close">} />);
+  fireEvent.click(await screen.findByRole("button", { name: "Open guided camera" }));
+  expect(screen.getByText("Ask Estibot about this photo")).toHaveAttribute("tabindex", "0");
+  fireEvent.click(screen.getByText("Ask Estibot about this photo"));
+  const input = screen.getByRole("textbox", { name: "Your photo question" });
+  fireEvent.change(input, { target: { value: "Where is the VIN label?" } });
+  fireEvent.click(screen.getByRole("button", { name: "Ask" }));
+  expect(await screen.findByRole("status")).toHaveTextContent("Asking Estibot");
+  expect(input).toHaveValue("Where is the VIN label?");
+  expect(screen.getByRole("button", { name: "Ask" })).toBeDisabled();
+  expect(request).toHaveBeenCalledWith("askCaptureHelp", { capture_key: "vin", question: "Where is the VIN label?" });
+  if (outcome === "failure") reject(new Error("Timed out"));
+  else resolve({ reply: outcome === "empty" ? "" : "Open the driver’s door and look at the jamb." });
+  await waitFor(() => expect(screen.getByRole("status")).toHaveTextContent(outcome === "reply" ? "Open the driver’s door" : "Capture help is unavailable"));
+  expect(input).toHaveValue("Where is the VIN label?");
+  expect(screen.getByRole("button", { name: "Ask" })).toBeEnabled();
+});
+
+
+it("starts fresh help for the next photo and ignores the previous photo's late reply", async () => {
+  let oldReply!: (value: unknown) => void;
+  const oldPending = new Promise((resolve) => { oldReply = resolve; });
+  const request = vi.fn(async (method: string, params: Record<string, unknown>) => {
+    if (method === "captureState") return { estimate_id: "draft", discipline: "collision", vehicle, photos: [], vin_suggestion: null };
+    return params.capture_key === "vin" ? oldPending : { reply: "Include the whole engine bay." };
+  });
+  render(<CaptureApp rpc={{ request, ready: vi.fn(), close: vi.fn() } as unknown as Pick<CaptureRPC, "request" | "ready" | "close">} />);
+  fireEvent.click(await screen.findByRole("button", { name: "Open guided camera" }));
+  fireEvent.click(screen.getByText("Ask Estibot about this photo"));
+  fireEvent.change(screen.getByRole("textbox", { name: "Your photo question" }), { target: { value: "Where is the VIN?" } });
+  fireEvent.click(screen.getByRole("button", { name: "Ask" }));
+  await screen.findByText("Asking Estibot…");
+  fireEvent.click(screen.getByRole("button", { name: "Advance camera step" }));
+  fireEvent.click(screen.getByText("Ask Estibot about this photo"));
+  expect(screen.getByRole("textbox", { name: "Your photo question" })).toHaveValue("");
+  expect(screen.queryByRole("status")).not.toBeInTheDocument();
+  fireEvent.change(screen.getByRole("textbox", { name: "Your photo question" }), { target: { value: "How wide should I frame the engine?" } });
+  fireEvent.keyDown(screen.getByRole("textbox", { name: "Your photo question" }), { key: "Enter" });
+  expect(await screen.findByRole("status")).toHaveTextContent("Include the whole engine bay.");
+  await act(async () => { oldReply({ reply: "Old VIN advice." }); });
+  await waitFor(() => expect(screen.getByRole("status")).toHaveTextContent("Include the whole engine bay."));
+  expect(screen.queryByText("Old VIN advice.")).not.toBeInTheDocument();
 });

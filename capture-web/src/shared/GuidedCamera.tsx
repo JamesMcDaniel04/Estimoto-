@@ -24,6 +24,7 @@ type Props = {
   onCapture: (key: string, panel: string, file: File) => Promise<boolean>;
   onClose: () => void;
   brandName?: string;
+  photoAccept?: string;
   renderAssist?: (context: { capture_key: string; body_style: string }, disabled: boolean) => ReactNode;
   onComplete?: () => void;
   completing?: boolean;
@@ -54,7 +55,7 @@ async function snapshot(video: HTMLVideoElement, key: string): Promise<File> {
   return new File([blob], `${key}.jpg`, { type: "image/jpeg" });
 }
 
-export default function GuidedCamera({ steps, uploaded, body, onBodyChange, checkFrame, onCapture, onClose, brandName = "Estimoto", renderAssist, onComplete, completing, error, needsDamagePanel, onDamagePanel }: Props) {
+export default function GuidedCamera({ steps, uploaded, body, onBodyChange, checkFrame, onCapture, onClose, brandName = "Estimoto", photoAccept = "image/jpeg,image/png,image/webp", renderAssist, onComplete, completing, error, needsDamagePanel, onDamagePanel }: Props) {
   const [index, setIndex] = useState(() => Math.max(0, steps.findIndex((step) => !uploaded[step.key])));
   const [saved, setSaved] = useState<Record<string, boolean>>({ ...uploaded });
   const [skipped, setSkipped] = useState<Record<string, boolean>>({});
@@ -320,7 +321,7 @@ export default function GuidedCamera({ steps, uploaded, body, onBodyChange, chec
         {!complete && !cameraError && <>
           <button type="button" disabled={!loaded || busy || paused} onClick={() => void capture(false)} className="capture-shutter"><Camera className="h-5 w-5" />{busy ? "Checking / saving…" : retry ? "Retry saving photo" : "Take photo now"}</button>
         </>}
-        {!complete && <><input ref={manualInput} className="sr-only" type="file" accept="image/jpeg,image/png,image/webp" aria-label="Upload photo for current view" disabled={busy || retry} onChange={(event) => { const file = event.currentTarget.files?.[0] ?? null; event.currentTarget.value = ""; void uploadManually(file); }} /><button type="button" disabled={busy || retry} className="mt-2 rounded-full border border-slate-300 p-3 text-sm font-semibold text-brand disabled:opacity-50" onClick={() => manualInput.current?.click()}>Upload a photo instead</button></>}
+        {!complete && <><input ref={manualInput} className="sr-only" type="file" accept={photoAccept} aria-label="Upload photo for current view" disabled={busy || retry} onChange={(event) => { const file = event.currentTarget.files?.[0] ?? null; event.currentTarget.value = ""; void uploadManually(file); }} /><button type="button" disabled={busy || retry} className="mt-2 rounded-full border border-slate-300 p-3 text-sm font-semibold text-brand disabled:opacity-50" onClick={() => manualInput.current?.click()}>Upload a photo instead</button></>}
         {!complete && retry && (cameraError || !loaded) && <button type="button" disabled={busy || paused} className="mt-2 rounded-full bg-brand p-3 text-sm font-semibold text-white disabled:opacity-50" onClick={() => void uploadManually(pending.current)}>Retry saving photo</button>}
         {!complete && step?.optional && <button type="button" disabled={busy || retry} onClick={skipOptional} className="mt-2 rounded-full border border-slate-300 p-3 text-sm font-semibold text-brand disabled:opacity-50">Skip optional photo</button>}
         {complete && !needsDamagePanel && <button type="button" disabled={completing} onClick={onComplete ?? close} className="flex w-full items-center justify-center gap-2 rounded-full bg-brand p-4 text-base font-semibold text-white"><Check />{completing ? "Preparing your estimate…" : onComplete ? "Continue to estimate" : "Done"}</button>}

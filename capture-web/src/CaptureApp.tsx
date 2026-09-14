@@ -15,18 +15,35 @@ function CaptureHelp({ keyName, rpc }: { keyName: string; rpc: CaptureHostAPI })
   const [question, setQuestion] = useState("");
   const [reply, setReply] = useState("");
   const [busy, setBusy] = useState(false);
-  return <form className="capture-help" onSubmit={(event) => {
-    event.preventDefault();
+  const status = useRef<HTMLParagraphElement>(null);
+  const active = useRef(true);
+  useEffect(() => { active.current = true; return () => { active.current = false; }; }, []);
+  useEffect(() => { status.current?.scrollIntoView?.({ block: "nearest" }); }, [busy, reply]);
+  const ask = () => {
     if (!question.trim() || busy) return;
+    setReply("");
     setBusy(true);
     void rpc.request<{ reply: string }>("askCaptureHelp", { capture_key: keyName, question: question.trim().slice(0, 500) })
-      .then((answer) => setReply(answer.reply)).catch(() => setReply("Capture help is unavailable. Follow the on-screen guide or use an existing photo."))
-      .finally(() => setBusy(false));
-  }}>
-    <label htmlFor="capture-question">Ask Estibot about this photo</label>
-    <div><input id="capture-question" value={question} maxLength={500} onChange={(event) => setQuestion(event.target.value)} placeholder="How do I avoid glare?" /><button disabled={busy || !question.trim()}>Ask</button></div>
-    {reply && <p role="status">{reply}</p>}
-  </form>;
+      .then((answer) => {
+        if (!active.current) return;
+        if (typeof answer?.reply !== "string" || !answer.reply.trim()) throw new Error("Empty help response");
+        setReply(answer.reply);
+      }).catch(() => { if (active.current) setReply("Capture help is unavailable. Follow the on-screen guide or use an existing photo. You can ask again."); })
+      .finally(() => { if (active.current) setBusy(false); });
+  };
+  // Explicit button/Enter handling also works in an embedded camera whose host
+  // blocks native form submission. Asking for help never navigates the guide.
+  return <details className="capture-help">
+    <summary tabIndex={0}>Ask Estibot about this photo</summary>
+    <section aria-label="Photo help">
+      <label htmlFor="capture-question">Your photo question</label>
+      <div className="capture-help-question"><input id="capture-question" value={question} maxLength={500}
+        onChange={(event) => setQuestion(event.target.value)} placeholder="How do I avoid glare?"
+        onKeyDown={(event) => { if (event.key === "Enter") { event.preventDefault(); ask(); } }} />
+        <button type="button" disabled={busy || !question.trim()} onClick={ask}>Ask</button></div>
+      {(busy || reply) && <p ref={status} role="status" aria-live="polite">{busy ? "Asking Estibot…" : reply}</p>}
+    </section>
+  </details>;
 }
 
 export function CaptureApp({ rpc }: { rpc: CaptureHostAPI }) {
@@ -176,11 +193,11 @@ export function CaptureApp({ rpc }: { rpc: CaptureHostAPI }) {
       {state.vehicle.vin && <p>Saved vehicle VIN: {state.vehicle.vin}</p>}
     </section>}
     {error && <p role="alert">{error}</p>}
-    {cameraSteps && !paused && <GuidedCamera steps={cameraSteps} uploaded={saved} body={bodyStyle} brandName="Estimoto +" onBodyChange={setBodyStyle}
+    {cameraSteps && !paused && <GuidedCamera steps={cameraSteps} uploaded={saved} body={bodyStyle} brandName="Estimoto +" photoAccept="image/*" onBodyChange={setBodyStyle}
       checkFrame={checkFrame} onCapture={saveFrame} onClose={() => setCameraSteps(null)} onComplete={() => setCameraSteps(null)}
       needsDamagePanel={needsDamagePanel}
       onDamagePanel={(panel) => setCameraSteps([...required, ...hailAreaSteps(panel)])}
-      renderAssist={(context) => <CaptureHelp keyName={context.capture_key} rpc={rpc} />}
+      renderAssist={(context) => <CaptureHelp key={context.capture_key} keyName={context.capture_key} rpc={rpc} />}
     />}
   </main>;
 }
