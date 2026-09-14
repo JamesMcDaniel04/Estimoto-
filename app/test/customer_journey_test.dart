@@ -189,7 +189,9 @@ void main() {
     expect(draft.amountCents, isNull);
     expect(draft.json['date_of_loss'], isNull);
     expect(find.byKey(const Key('open-guided-capture')), findsOneWidget);
-    expect(find.byKey(const Key('capture-camera')), findsNothing);
+    // The demo cannot open the guided camera, so the simple picker stays
+    // available for attaching sample photos to the draft.
+    expect(find.byKey(const Key('capture-camera')), findsOneWidget);
     expect(tester.takeException(), isNull);
   });
 

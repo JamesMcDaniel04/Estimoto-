@@ -1,5 +1,6 @@
 import 'dart:convert';
 import 'dart:math';
+import 'package:flutter/foundation.dart';
 import 'package:flutter/services.dart';
 import '../domain/models.dart';
 import 'demo_seed.dart';
@@ -583,6 +584,8 @@ class DemoPlusRepository extends PlusRepository {
   String _id() =>
       'demo-${DateTime.now().microsecondsSinceEpoch}-${_random.nextInt(1 << 30)}';
   List<Json> _rows(String key) => (_state[key] as List).cast<Json>();
+  @visibleForTesting
+  Json debugEstimateRow(String id) => _find('estimates', id);
   Json _find(String key, String id) =>
       _rows(key).where((row) => row['id'] == id).firstOrNull ??
       (throw const PlusApiException('This item is no longer available.', 404));

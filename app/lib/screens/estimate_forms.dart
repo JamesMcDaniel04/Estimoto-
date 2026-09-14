@@ -37,9 +37,21 @@ Future<void> newEstimate(
   }
 }
 
+/// Opens the shared estimate form prefilled for an unshared draft.
+Future<void> editEstimate(
+  BuildContext context,
+  PlusController controller,
+  CustomerEstimate estimate,
+) => showModalBottomSheet<String>(
+  context: context,
+  isScrollControlled: true,
+  builder: (_) => _EstimateForm(controller: controller, estimate: estimate),
+);
+
 class _EstimateForm extends StatefulWidget {
-  const _EstimateForm({required this.controller});
+  const _EstimateForm({required this.controller, this.estimate});
   final PlusController controller;
+  final CustomerEstimate? estimate;
   @override
   State<_EstimateForm> createState() => _EstimateFormState();
 }
@@ -51,10 +63,18 @@ class _EstimateFormState extends WorkspaceState<_EstimateForm> {
   final claim = TextEditingController();
   DateTime? lossDate;
   late String discipline;
+  bool get editing => widget.estimate != null;
   @override
   void initState() {
     super.initState();
-    discipline = widget.controller.discipline;
+    final e = widget.estimate;
+    discipline = e?.discipline ?? widget.controller.discipline;
+    if (e != null) {
+      description.text = e.description;
+      claim.text = textOf(e.json, 'claim_number');
+      final loss = textOf(e.json, 'date_of_loss');
+      if (loss.isNotEmpty) lossDate = DateTime.tryParse(loss);
+    }
   }
 
   @override
@@ -65,7 +85,9 @@ class _EstimateFormState extends WorkspaceState<_EstimateForm> {
   }
 
   Future<void> save() async {
-    if (!active || busy || controller.selectedVehicle == null) return;
+    if (!active || busy || (!editing && controller.selectedVehicle == null)) {
+      return;
+    }
     if (description.text.trim().length < 5) {
       setState(() => error = 'Describe the damage in a few words.');
       return;
@@ -75,15 +97,25 @@ class _EstimateFormState extends WorkspaceState<_EstimateForm> {
       error = null;
     });
     try {
-      final result = await widget.controller.repository.createEstimate({
-        'vehicle_id': widget.controller.selectedVehicle!.id,
-        'discipline': discipline,
-        'description': description.text.trim(),
-        'claim_number': claim.text.trim(),
-        'date_of_loss': lossDate?.toIso8601String().substring(0, 10),
-      });
+      final Json result;
+      if (editing) {
+        result = await widget.controller.repository
+            .updateEstimate(widget.estimate!.id, {
+              'description': description.text.trim(),
+              'claim_number': claim.text.trim(),
+              'date_of_loss': lossDate?.toIso8601String().substring(0, 10),
+            });
+      } else {
+        result = await widget.controller.repository.createEstimate({
+          'vehicle_id': widget.controller.selectedVehicle!.id,
+          'discipline': discipline,
+          'description': description.text.trim(),
+          'claim_number': claim.text.trim(),
+          'date_of_loss': lossDate?.toIso8601String().substring(0, 10),
+        });
+      }
       if (!active) return;
-      widget.controller.selectDiscipline(discipline);
+      if (!editing) widget.controller.selectDiscipline(discipline);
       await widget.controller.refresh();
       if (active && mounted) Navigator.pop(context, result['id'] as String);
     } catch (e) {
@@ -100,12 +132,14 @@ class _EstimateFormState extends WorkspaceState<_EstimateForm> {
   Widget build(BuildContext context) => !current
       ? unavailable
       : FormSheet(
-          title: 'Start an estimate',
+          title: editing ? 'Edit estimate details' : 'Start an estimate',
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              VehiclePicker(controller: widget.controller),
-              const SizedBox(height: 20),
+              if (!editing) ...[
+                VehiclePicker(controller: widget.controller),
+                const SizedBox(height: 20),
+              ],
               SizedBox(
                 width: double.infinity,
                 child: SegmentedButton<String>(
@@ -122,7 +156,7 @@ class _EstimateFormState extends WorkspaceState<_EstimateForm> {
                     ),
                   ],
                   selected: {discipline},
-                  onSelectionChanged: busy
+                  onSelectionChanged: busy || editing
                       ? null
                       : (v) => setState(() => discipline = v.first),
                 ),
@@ -176,8 +210,10 @@ class _EstimateFormState extends WorkspaceState<_EstimateForm> {
                 ),
               ),
               const SizedBox(height: 18),
-              const Text(
-                'Your saved vehicle and insurance details stay in your garage. Next, add photos to this draft.',
+              Text(
+                editing
+                    ? 'Your saved photos stay attached. Changes apply only while this draft is unshared.'
+                    : 'Your saved vehicle and insurance details stay in your garage. Next, add photos to this draft.',
               ),
               const SizedBox(height: 20),
               if (error != null)
@@ -192,8 +228,8 @@ class _EstimateFormState extends WorkspaceState<_EstimateForm> {
                 ),
               BusyButton(
                 busy: busy,
-                label: 'Save draft & add photos',
-                icon: Icons.add_a_photo_outlined,
+                label: editing ? 'Save changes' : 'Save draft & add photos',
+                icon: editing ? Icons.check : Icons.add_a_photo_outlined,
                 onPressed: save,
               ),
             ],
@@ -221,6 +257,47 @@ class _EstimateDetailScreenState extends WorkspaceState<EstimateDetailScreen> {
   @override
   PlusController get controller => widget.controller;
   bool uploading = false;
+
+  bool _editable(CustomerEstimate estimate) =>
+      estimate.status == 'draft' &&
+      textOf(estimate.json, 'delivery_status', 'draft') == 'draft';
+
+  Future<void> _delete(CustomerEstimate estimate) async {
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: const Text('Delete this draft?'),
+        content: const Text(
+          'Its saved photos are removed too. Nothing has been sent to a shop.',
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context, false),
+            child: const Text('Keep'),
+          ),
+          TextButton(
+            onPressed: () => Navigator.pop(context, true),
+            child: const Text('Delete'),
+          ),
+        ],
+      ),
+    );
+    if (confirmed != true || !active || !mounted) return;
+    final navigator = Navigator.of(context);
+    var deleted = false;
+    await perform(() async {
+      await widget.controller.repository.deleteEstimate(estimate.id);
+      deleted = true;
+      await widget.controller.refresh();
+    });
+    if (deleted && active && mounted && navigator.canPop()) navigator.pop();
+  }
+
+  Future<void> _removePhoto(CustomerEstimate estimate, String photoId) =>
+      perform(() async {
+        await widget.controller.repository.deletePhoto(estimate.id, photoId);
+        await widget.controller.refresh();
+      });
   Future<void> _review(CustomerEstimate estimate) async {
     if (!active) return;
     final edit = await showModalBottomSheet<bool>(
@@ -264,6 +341,35 @@ class _EstimateDetailScreenState extends WorkspaceState<EstimateDetailScreen> {
                         : () => widget.controller.refresh(),
                     icon: const Icon(Icons.refresh),
                   ),
+                  if (estimate != null)
+                    PopupMenuButton<String>(
+                      tooltip: 'Estimate options',
+                      itemBuilder: (_) => _editable(estimate)
+                          ? const [
+                              PopupMenuItem(
+                                value: 'edit',
+                                child: Text('Edit details'),
+                              ),
+                              PopupMenuItem(
+                                value: 'delete',
+                                child: Text('Delete draft'),
+                              ),
+                            ]
+                          : const [
+                              PopupMenuItem(
+                                enabled: false,
+                                value: 'locked',
+                                child: Text(
+                                  'This estimate has been shared and can no longer be changed.',
+                                ),
+                              ),
+                            ],
+                      onSelected: (value) => value == 'edit'
+                          ? editEstimate(context, widget.controller, estimate)
+                          : value == 'delete'
+                          ? _delete(estimate)
+                          : null,
+                    ),
                 ],
               ),
               body: estimate == null || snapshot == null
@@ -318,7 +424,7 @@ class _EstimateDetailScreenState extends WorkspaceState<EstimateDetailScreen> {
                             controller: widget.controller,
                             estimate: estimate,
                             captureService: widget.captureService,
-                            recoveryOnly: true,
+                            recoveryOnly: !widget.controller.isDemo,
                             onBusyChanged: (value) {
                               if (mounted) setState(() => uploading = value);
                             },
@@ -389,6 +495,9 @@ class _EstimateDetailScreenState extends WorkspaceState<EstimateDetailScreen> {
                           EstimatePhotoGallery(
                             controller: controller,
                             estimate: estimate,
+                            editable: _editable(estimate),
+                            onDelete: (photoId) =>
+                                _removePhoto(estimate, photoId),
                           ),
                           const SizedBox(height: 26),
                           if (!estimatePhotosReady(snapshot, estimate))

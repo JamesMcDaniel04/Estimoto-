@@ -482,10 +482,6 @@ class _EstimateCaptureGuideState extends State<EstimateCaptureGuide> {
               title: const Text('Damaged panel'),
               subtitle: Text(damageNeeded ? 'Still needed for PDR' : 'Saved'),
             ),
-          EstimatePhotoGallery(
-            controller: widget.controller,
-            estimate: widget.estimate,
-          ),
         ],
       ],
     );
@@ -497,9 +493,35 @@ class EstimatePhotoGallery extends StatelessWidget {
     super.key,
     required this.controller,
     required this.estimate,
+    this.editable = false,
+    this.onDelete,
   });
   final PlusController controller;
   final CustomerEstimate estimate;
+  final bool editable;
+  final Future<void> Function(String photoId)? onDelete;
+
+  Future<void> _confirmDelete(BuildContext context, String photoId) async {
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: const Text('Remove this photo?'),
+        content: const Text('You can take it again from the guided photos.'),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context, false),
+            child: const Text('Keep'),
+          ),
+          TextButton(
+            onPressed: () => Navigator.pop(context, true),
+            child: const Text('Remove'),
+          ),
+        ],
+      ),
+    );
+    if (confirmed == true) await onDelete!(photoId);
+  }
+
   @override
   Widget build(BuildContext context) => Column(
     crossAxisAlignment: CrossAxisAlignment.start,
@@ -540,6 +562,14 @@ class EstimatePhotoGallery extends StatelessWidget {
                       captureLabel(textOf(photo, 'label')),
                       style: Theme.of(context).textTheme.bodySmall,
                     ),
+                    if (editable && onDelete != null)
+                      IconButton(
+                        tooltip: 'Remove photo',
+                        visualDensity: VisualDensity.compact,
+                        icon: const Icon(Icons.delete_outline, size: 20),
+                        onPressed: () =>
+                            _confirmDelete(context, textOf(photo, 'id')),
+                      ),
                   ],
                 ),
               ),
