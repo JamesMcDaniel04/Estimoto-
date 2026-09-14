@@ -65,3 +65,45 @@ def test_vehicle_matching_changes_with_owned_vehicle_make(clients):
     rows=c.get('/v1/discovery',headers=h('alice'),params={'vehicle_id':vehicle}).json()['providers']
     assert len(rows)==4
     assert all(r['vehicle_match']['status']=='not_verified' for r in rows)
+
+
+def test_secondary_map_endpoint_recovers_cold_zip_and_shares_budget(clients):
+    import httpx
+    from estimoto_plus.discovery_models import DirectoryBudget
+    from estimoto_plus.models import now
+    c,_=clients
+    _,stub=setup(c)
+    calls=[]
+    def transport(request):
+        calls.append(request.url.host)
+        if request.url.host=='overpass-api.de':
+            return httpx.Response(503,content=b'busy')
+        if request.url.host=='overpass.private.coffee':
+            return httpx.Response(200,json={'elements':stub.elements})
+        return stub(request)
+    c.app.state.discovery_transport=httpx.MockTransport(transport)
+    result=c.get('/v1/discovery',headers=h('alice')).json()
+    assert result['status']=='ready' and len(result['providers'])==2
+    assert calls.count('overpass-api.de')==calls.count('overpass.private.coffee')==1
+    with c.app.state.session_factory() as db:
+        assert db.get(DirectoryBudget,now().date().isoformat()).attempts==2
+    previous=list(calls)
+    assert c.get('/v1/discovery',headers=h('alice')).json()['status']=='ready'
+    assert calls==previous
+
+
+def test_secondary_endpoint_cannot_bypass_daily_budget(clients):
+    import httpx
+    c,_=clients
+    _,stub=setup(c)
+    c.app.state.settings.discovery_daily_requests=1
+    calls=[]
+    def transport(request):
+        calls.append(request.url.host)
+        if request.url.host=='api.zippopotam.us':
+            return stub(request)
+        return httpx.Response(503,content=b'busy')
+    c.app.state.discovery_transport=httpx.MockTransport(transport)
+    assert c.get('/v1/discovery',headers=h('alice')).json()['status']=='unavailable'
+    assert calls.count('overpass-api.de')==1
+    assert 'overpass.private.coffee' not in calls

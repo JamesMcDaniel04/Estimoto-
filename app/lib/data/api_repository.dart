@@ -203,7 +203,7 @@ class ApiPlusRepository extends PlusRepository {
         'mobile_only': (query['mobile_only'] == true).toString(),
       },
     ).toString(),
-    timeout: const Duration(seconds: 60),
+    timeout: const Duration(seconds: 90),
   );
   @override
   Future<List<Json>> listDiscoveryFavorites(String vehicleId) async => rowsOf(

@@ -97,7 +97,7 @@ class DirectoryStub:
             lat = '39.82' if postal == '80221' else '39.734'
             return httpx.Response(200, json={'post code': postal, 'country abbreviation': 'US',
                 'places': [{'latitude': lat, 'longitude': '-105.0259', 'place name': 'Denver', 'state abbreviation': 'CO'}]})
-        assert request.url.host == 'overpass-api.de'
+        assert request.url.host in ('overpass-api.de', 'overpass.private.coffee')
         assert request.method == 'POST'
         return httpx.Response(200, json={'elements': self.elements})
 
@@ -221,7 +221,7 @@ def test_radius_is_fixed_and_boundary_distance_is_not_service_coverage(clients):
 def test_malformed_or_partial_directory_does_not_claim_complete_search(clients, bad):
     client, _ = clients
     _, stub = setup(client)
-    client.app.state.discovery_transport = httpx.MockTransport(lambda r: httpx.Response(200, json=bad) if r.url.host == 'overpass-api.de' else stub(r))
+    client.app.state.discovery_transport = httpx.MockTransport(lambda r: httpx.Response(200, json=bad) if r.url.host in ('overpass-api.de', 'overpass.private.coffee') else stub(r))
     result = client.get('/v1/discovery', headers=h('alice')).json()
     assert result['status'] == 'unavailable' and result['providers'] == []
 

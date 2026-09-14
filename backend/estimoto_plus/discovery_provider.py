@@ -8,6 +8,9 @@ from urllib.parse import urlsplit
 import httpx
 from .directory_media import MAX_FILES, commons_file, verified_commons_media
 
+PRIMARY_ENDPOINT = 'https://overpass-api.de/api/interpreter'
+SECONDARY_ENDPOINT = 'https://overpass.private.coffee/api/interpreter'
+
 RADIUS_MILES = 30
 RADIUS_METERS = 48280.32
 ATTRIBUTIONS = [{'name': '© OpenStreetMap contributors', 'url': 'https://www.openstreetmap.org/copyright',
@@ -152,11 +155,13 @@ def normalize_listing(element):
             'favorite': False, 'media': None}
 
 
-def fetch_listings(point, transport, *, limit=3 * 1024 * 1024, meter=None):
+def fetch_listings(point, transport, *, limit=3 * 1024 * 1024, meter=None, endpoint=PRIMARY_ENDPOINT):
+    if endpoint not in (PRIMARY_ENDPOINT, SECONDARY_ENDPOINT):
+        raise DirectoryUnavailable()
     lat, lon = coordinates({'lat': point[0], 'lon': point[1]})
     query = f'[out:json][timeout:20];nwr(around:{RADIUS_METERS},{lat:.6f},{lon:.6f})["shop"~"^(car_repair|tyres)$"];out center tags;'
     meter = meter if meter is not None else {'body_bytes': 0}
-    data = read_public('POST', 'https://overpass-api.de/api/interpreter', transport, form={'data': query}, limit=limit, meter=meter)
+    data = read_public('POST', endpoint, transport, form={'data': query}, limit=limit, meter=meter)
     elements = data.get('elements')
     if data.get('remark') or not isinstance(elements, list) or len(elements) > 10000:
         raise DirectoryUnavailable()

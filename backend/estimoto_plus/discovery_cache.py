@@ -4,7 +4,7 @@ from sqlalchemy import delete, func, or_, select, update
 from sqlalchemy.exc import IntegrityError
 from .calendar_scheduling import utc
 from .discovery_models import DirectoryBudget, DirectoryCache, PublicListing
-from .discovery_provider import DirectoryUnavailable, fetch_listings, fetch_zip, distance_miles, RADIUS_MILES
+from .discovery_provider import DirectoryUnavailable, fetch_listings, fetch_zip, distance_miles, RADIUS_MILES, SECONDARY_ENDPOINT
 from .models import now, uid
 
 FRESH = timedelta(days=1)
@@ -120,10 +120,19 @@ def zip_location(factory, transport, postal, *, allow_fetch=True):
 
 
 def public_directory(factory, transport, postal, point, settings):
+    secondary_key = 'osm:secondary:' + postal
+    secondary_fetch = lambda limit, meter: fetch_listings(point, transport, limit=limit, meter=meter, endpoint=SECONDARY_ENDPOINT)
+    saved_secondary = cached(factory, secondary_key, secondary_fetch, budget=settings, allow_fetch=False)
+    if saved_secondary[1] == 'ready':
+        return saved_secondary
     result = cached(factory, 'osm:' + postal,
                     lambda limit, meter: fetch_listings(point, transport, limit=limit, meter=meter), budget=settings)
     if result[0] is not None:
         return result
+    # Both endpoints acquire gate:osm and charge the same daily budget.
+    secondary = cached(factory, secondary_key, secondary_fetch, budget=settings)
+    if secondary[0] is not None:
+        return secondary
     # A failed new-ZIP lookup does not invalidate nearby recently indexed shops.
     # This remains explicitly partial/stale and never spends another provider call.
     with factory() as db:

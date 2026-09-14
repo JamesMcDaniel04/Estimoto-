@@ -132,7 +132,7 @@ checks and do not need the provider to be online.
 ## Provider limits and availability
 
 Outbound directory URLs are fixed HTTPS hosts:
-`api.zippopotam.us/us/{ZIP}` and `overpass-api.de/api/interpreter`. Requests contain
+`api.zippopotam.us/us/{ZIP}`, `overpass-api.de/api/interpreter` and the fallback `overpass.private.coffee/api/interpreter`. Requests contain
 only a ZIP or rounded coordinates/radius, never account, vehicle or favorite
 information. Redirects, arbitrary URLs, compressed responses and oversized or
 malformed bodies are rejected. Public contact URLs are display/action data only;
@@ -140,8 +140,8 @@ the server does not fetch them.
 
 Cache freshness is 24 hours, stale fallback is at most seven days, and failed
 lookups back off five minutes. Database leases serialize ZIP and OSM provider
-calls across API workers. A cold API lookup can take roughly 50 seconds at its
-provider timeout ceilings; clients use an explicit 60-second timeout and retain
+calls across API workers. A cold API lookup can take roughly 75 seconds at its
+provider timeout ceilings; clients use an explicit 90-second timeout and retain
 account/vehicle guards. Cache hits do not contact a provider. Each search can
 resolve at most four cold partner ZIPs and scans at most 500 partners; its public
 cache is capped at 128 records and its normalized OSM index at 20,000 records.
@@ -219,3 +219,9 @@ partner requests. Bluewater Performance and EuroWerkz list multiple makes on
 their official sites and use the same dynamic matcher as every other shop.
 The current official EuroWerkz profile supersedes its old map location.
 Contact review does not establish quality, exact model support or availability.
+
+
+The secondary Overpass endpoint is used only when the primary has no usable
+cache/result. Both share the `gate:osm` database lock, daily request/byte budget,
+response bounds and five-minute failure backoff. A fresh secondary cache serves
+repeat queries directly. No endpoint accepts a customer-supplied fetch URL.

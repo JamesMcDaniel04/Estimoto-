@@ -233,7 +233,7 @@ class _FindHelpScreenState extends WorkspaceState<FindHelpScreen> {
                 LinearProgressIndicator(),
                 SizedBox(height: 12),
                 Text(
-                  'Checking nearby listings. A fresh search can take up to a minute.',
+                  'Checking nearby listings. A fresh search can take up to 90 seconds.',
                 ),
               ],
             ),
