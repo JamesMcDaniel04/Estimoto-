@@ -6,6 +6,7 @@ import 'screens/estimates_screen.dart';
 import 'screens/estibot_screen.dart';
 import 'screens/repairs_screen.dart';
 import 'screens/find_help_screen.dart';
+import 'navigation/route_observer.dart';
 import 'screens/settings_screen.dart';
 import 'state/plus_controller.dart';
 import 'theme.dart';
@@ -22,6 +23,7 @@ class EstimotoPlusApp extends StatelessWidget {
     title: 'Estimoto +',
     debugShowCheckedModeBanner: false,
     theme: plusTheme(),
+    navigatorObservers: [plusRouteObserver],
     home: _HomeShell(controller: controller, onExit: onExit),
   );
 }

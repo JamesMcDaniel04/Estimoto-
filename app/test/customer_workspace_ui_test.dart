@@ -6,6 +6,7 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:estimoto_plus/data/demo_repository.dart';
 import 'package:estimoto_plus/data/repository.dart';
 import 'package:estimoto_plus/domain/models.dart';
+import 'package:estimoto_plus/navigation/route_observer.dart';
 import 'package:estimoto_plus/screens/my_shops_screen.dart';
 import 'package:estimoto_plus/screens/shop_outreach_screen.dart';
 import 'package:estimoto_plus/screens/history_screen.dart';
@@ -570,5 +571,46 @@ void main() {
     final saved = (await controller.repository.getKnowledge())['records'].first;
     expect(saved['shop_name'], 'New Shop');
     expect(saved['cost_cents'], 1000);
+  });
+
+  testWidgets('my shops reloads when a route above it pops', (tester) async {
+    final controller = await _controller();
+    final shop = await controller.repository.saveMyShop({
+      'name': 'Shop',
+      'email': 's@example.test',
+      'phone': '',
+    });
+    final draft = await controller.repository.createShopOutreach({
+      'shop_id': shop['id'],
+      'vehicle_id': controller.snapshot!.vehicles.first.id,
+      'service_summary': 'Brakes',
+      'proposed_slots': [
+        offsetTimestamp(DateTime.now().add(const Duration(days: 2))),
+      ],
+    }, 'draft-reload');
+    late BuildContext screenContext;
+    await tester.pumpWidget(
+      MaterialApp(
+        theme: plusTheme(),
+        navigatorObservers: [plusRouteObserver],
+        home: Builder(
+          builder: (context) {
+            screenContext = context;
+            return MyShopsScreen(controller: controller);
+          },
+        ),
+      ),
+    );
+    await tester.pumpAndSettle();
+    expect(find.text('Draft • not sent'), findsOneWidget);
+    final popped = Navigator.of(
+      screenContext,
+    ).push(MaterialPageRoute<void>(builder: (_) => const Scaffold()));
+    await tester.pumpAndSettle();
+    await controller.repository.deleteShopOutreach(draft['id'] as String);
+    Navigator.of(screenContext).pop();
+    await popped;
+    await tester.pumpAndSettle();
+    expect(find.text('Draft • not sent'), findsNothing);
   });
 }

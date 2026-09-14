@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import '../domain/models.dart';
 import '../state/plus_controller.dart';
 import '../widgets/common.dart';
+import '../navigation/route_observer.dart';
 import '../widgets/outreach_actions.dart';
 import '../widgets/workspace_widgets.dart';
 import 'shop_outreach_screen.dart';
@@ -32,9 +33,36 @@ class MyShopsScreen extends StatefulWidget {
   State<MyShopsScreen> createState() => _MyShopsScreenState();
 }
 
-class _MyShopsScreenState extends WorkspaceState<MyShopsScreen> {
+class _MyShopsScreenState extends WorkspaceState<MyShopsScreen>
+    with RouteAware {
   @override
   PlusController get controller => widget.controller;
+  ModalRoute<void>? _route;
+
+  @override
+  void didChangeDependencies() {
+    super.didChangeDependencies();
+    final route = ModalRoute.of(context);
+    if (route != null && !identical(route, _route)) {
+      if (_route != null) plusRouteObserver.unsubscribe(this);
+      _route = route;
+      plusRouteObserver.subscribe(this, route);
+    }
+  }
+
+  @override
+  void dispose() {
+    plusRouteObserver.unsubscribe(this);
+    super.dispose();
+  }
+
+  // A review screen that replaced the composer pops straight back here, so
+  // the push future that normally triggers a reload has long since completed.
+  @override
+  void didPopNext() {
+    if (active) load();
+  }
+
   List<Json> shops = [], requests = [];
   bool loading = true;
   bool pendingDraft = false;
