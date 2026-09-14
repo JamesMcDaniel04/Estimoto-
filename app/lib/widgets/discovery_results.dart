@@ -7,6 +7,7 @@ import '../screens/my_shops_screen.dart';
 import 'dedicated_shop_choice.dart';
 import 'common.dart';
 import 'workspace_widgets.dart';
+import 'shop_media.dart';
 
 String serviceModeLabel(String mode) => mode == 'mobile'
     ? 'Mobile service · provider comes to you'
@@ -316,32 +317,68 @@ class DiscoveryProviderCard extends StatelessWidget {
         const ['https', 'http'].contains(website.scheme) &&
         website.host.isNotEmpty &&
         website.userInfo.isEmpty;
+    final media = provider.media;
+    final identity = Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Text(provider.name, style: Theme.of(context).textTheme.titleMedium),
+        if (provider.distanceMiles != null)
+          Padding(
+            padding: const EdgeInsets.only(top: 4),
+            child: Text(
+              'About ${provider.distanceMiles!.toStringAsFixed(1)} mi from your ZIP center',
+              style: Theme.of(context).textTheme.bodySmall,
+            ),
+          ),
+        Padding(
+          padding: const EdgeInsets.only(top: 4),
+          child: Text(
+            provider.independent
+                ? 'Independent listing · OpenStreetMap'
+                : 'Participating Estimoto provider',
+            style: Theme.of(context).textTheme.bodySmall,
+          ),
+        ),
+      ],
+    );
     return Card(
       child: Padding(
-        padding: const EdgeInsets.all(20),
+        padding: const EdgeInsets.all(16),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            Icon(
-              provider.kind == 'technician'
-                  ? Icons.handyman_outlined
-                  : Icons.storefront_outlined,
-              size: 28,
+            LayoutBuilder(
+              builder: (context, constraints) {
+                final largeText =
+                    MediaQuery.textScalerOf(context).scale(17) > 23;
+                if (largeText && constraints.maxWidth < 340) {
+                  return Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      ShopMediaThumbnail(provider: provider, size: 64),
+                      const SizedBox(height: 10),
+                      identity,
+                    ],
+                  );
+                }
+                return Row(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    ShopMediaThumbnail(provider: provider),
+                    const SizedBox(width: 12),
+                    Expanded(child: identity),
+                  ],
+                );
+              },
             ),
-            const SizedBox(height: 12),
-            Text(provider.name, style: Theme.of(context).textTheme.titleMedium),
-            if (provider.distanceMiles != null)
-              Text(
-                'About ${provider.distanceMiles!.toStringAsFixed(1)} mi from your ZIP center',
+            if (provider.address.isNotEmpty)
+              Padding(
+                padding: const EdgeInsets.only(top: 10),
+                child: Text(
+                  provider.address,
+                  style: Theme.of(context).textTheme.bodySmall,
+                ),
               ),
-            if (provider.address.isNotEmpty) Text(provider.address),
-            const SizedBox(height: 12),
-            Text(
-              provider.independent
-                  ? 'Independent listing · OpenStreetMap'
-                  : 'Participating Estimoto provider',
-              style: Theme.of(context).textTheme.bodySmall,
-            ),
             if (provider.specialties.isNotEmpty)
               Padding(
                 padding: const EdgeInsets.only(top: 10),
@@ -385,7 +422,7 @@ class DiscoveryProviderCard extends StatelessWidget {
                 padding: const EdgeInsets.only(top: 12),
                 child: Text('Your dedicated shop: ${favorites.join(', ')}'),
               ),
-            const SizedBox(height: 14),
+            const SizedBox(height: 12),
             if (!provider.independent &&
                 provider.requestModes.isNotEmpty &&
                 onRequest != null)
@@ -420,6 +457,7 @@ class DiscoveryProviderCard extends StatelessWidget {
                     ),
                     child: const Text('Listing source'),
                   ),
+                if (media != null) ShopMediaCredit(media: media),
               ],
             ),
             OutlinedButton.icon(

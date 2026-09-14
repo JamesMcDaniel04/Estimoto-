@@ -52,6 +52,88 @@ class Vehicle {
   String get imageVersion => textOf(json, 'image_version');
 }
 
+/// Only owner-published logos or licensed Commons photos from the API contract.
+/// Website, arbitrary OSM image fields and private signed URLs are never images.
+class ProviderMedia {
+  const ProviderMedia._(this.url, this.kind, this.attribution, this.sourceUrl);
+  final Uri url, sourceUrl;
+  final String kind, attribution;
+
+  static ProviderMedia? fromJson(
+    Object? value, {
+    required String providerSource,
+    required String providerSourceId,
+  }) {
+    if (value is! Map) return null;
+    final url = value['url'], kind = value['kind'];
+    final attribution = value['attribution'], source = value['source_url'];
+    if (url is! String ||
+        kind is! String ||
+        attribution is! String ||
+        source is! String ||
+        attribution.trim().isEmpty ||
+        attribution.length > 1000 ||
+        RegExp(r'[\x00-\x1F\x7F]').hasMatch(attribution)) {
+      return null;
+    }
+    Uri? safeUri(String value) {
+      if (value.isEmpty || value.length > 2048 || value != value.trim()) {
+        return null;
+      }
+      final uri = Uri.tryParse(value);
+      if (uri == null ||
+          uri.scheme != 'https' ||
+          uri.userInfo.isNotEmpty ||
+          uri.hasFragment ||
+          uri.port != 443) {
+        return null;
+      }
+      return uri;
+    }
+
+    final imageUri = safeUri(url), sourceUri = safeUri(source);
+    if (imageUri == null || sourceUri == null || sourceUri.hasQuery) {
+      return null;
+    }
+    if (kind == 'logo' && providerSource == 'estimoto') {
+      if (!RegExp(
+            r'^[a-f0-9]{8}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{12}$',
+          ).hasMatch(providerSourceId) ||
+          imageUri.host != 'pdr-estimating-api.fly.dev' ||
+          imageUri.path != '/public/plus/providers/$providerSourceId/logo' ||
+          imageUri.hasQuery ||
+          sourceUri.host != 'www.estimoto.io' ||
+          !const ['', '/'].contains(sourceUri.path)) {
+        return null;
+      }
+    } else if (kind == 'photo' && providerSource == 'openstreetmap') {
+      final parts = imageUri.pathSegments;
+      if (imageUri.host != 'commons.wikimedia.org' ||
+          parts.length != 4 ||
+          parts[0] != 'wiki' ||
+          parts[1] != 'Special:Redirect' ||
+          parts[2] != 'file' ||
+          imageUri.query != 'width=320') {
+        return null;
+      }
+      final file = parts[3];
+      final sourceParts = sourceUri.pathSegments;
+      if (file.isEmpty ||
+          file.length > 255 ||
+          RegExp(r'[/\\?#\x00-\x1F\x7F]').hasMatch(file) ||
+          sourceUri.host != 'commons.wikimedia.org' ||
+          sourceParts.length != 2 ||
+          sourceParts[0] != 'wiki' ||
+          sourceParts[1] != 'File:$file') {
+        return null;
+      }
+    } else {
+      return null;
+    }
+    return ProviderMedia._(imageUri, kind, attribution.trim(), sourceUri);
+  }
+}
+
 class ProviderProfile {
   ProviderProfile.fromJson(this.json);
   final Json json;
@@ -68,6 +150,11 @@ class ProviderProfile {
       (json['postal_codes'] as List? ?? []).cast<String>();
   String get source => textOf(json, 'source', 'estimoto');
   String get sourceId => textOf(json, 'source_id', id);
+  ProviderMedia? get media => ProviderMedia.fromJson(
+    json['media'],
+    providerSource: source,
+    providerSourceId: sourceId,
+  );
   bool get independent => source != 'estimoto';
   List<String> get requestModes => independent || !acceptingRequests
       ? []
