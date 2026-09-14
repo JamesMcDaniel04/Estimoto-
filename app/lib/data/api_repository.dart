@@ -194,6 +194,8 @@ class ApiPlusRepository extends PlusRepository {
         if (query['postal_code'] != null)
           'postal_code': query['postal_code'].toString(),
         'radius_miles': '30',
+        if (query['q'] != null) 'q': query['q'].toString(),
+        'make_only': (query['make_only'] == true).toString(),
         if (query['vehicle_id'] != null)
           'vehicle_id': query['vehicle_id'].toString(),
         if (query['specialty'] != null)

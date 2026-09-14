@@ -10,19 +10,20 @@ from test_api import h
 from test_discovery import clients, setup
 
 
-def test_unreviewed_shop_is_absent_from_directory_assistant_and_favorites(clients):
+def test_unreviewed_shop_keeps_public_label_in_directory_assistant_and_favorites(clients):
     client, _ = clients
     vehicle, stub = setup(client)
     stub.unreviewed_ids.add(1)
     rows = client.get('/v1/discovery', headers=h('alice')).json()['providers']
-    assert [r['source_id'] for r in rows] == ['node:2']
+    assert {r['source_id'] for r in rows} == {'node:1', 'node:2'}
+    rows.sort(key=lambda r: r['source_id'], reverse=True)
     assert rows[0]['verification']['status'] == 'contact_confirmed'
     assert rows[0]['website'] == 'https://fixture.example/'
     result = client.post('/v1/assistant', headers=h('alice'), json={
         'message': 'Find a mechanic nearby', 'vehicle_id': vehicle}).json()
-    assert all(r['source_id'] != 'node:1' for r in result['providers'])
+    assert next(r for r in result['providers'] if r['source_id'] == 'node:1')['verification']['status'] == 'public_listing'
     assert client.put('/v1/discovery/favorites/mechanical', headers=h('alice'), json={
-        'vehicle_id': vehicle, 'source': 'openstreetmap', 'source_id': 'node:1'}).status_code == 422
+        'vehicle_id': vehicle, 'source': 'openstreetmap', 'source_id': 'node:1'}).status_code == 200
 
 
 @pytest.fixture

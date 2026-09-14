@@ -70,7 +70,7 @@ class DiscoveryDetails extends StatelessWidget {
     expandedCrossAxisAlignment: CrossAxisAlignment.start,
     children: [
       const Text(
-        'A curated selection of shops with checked business contact details and participating Estimoto providers. Distances are approximate straight-line distances from your ZIP center, not driving distance or mobile coverage. Confirm services and availability directly.',
+        'Public map listings, officially checked business profiles and participating Estimoto providers. A public listing alone does not verify services. Distances are approximate straight-line distances from your ZIP center, not driving distance or mobile coverage. Confirm services and availability directly.',
       ),
       if (textOf(data, 'checked_at').isNotEmpty)
         Padding(
@@ -95,13 +95,14 @@ class DiscoveryResults extends StatefulWidget {
     required this.postalCode,
     this.specialty,
     this.mobileOnly = false,
+    this.independentSearch = false,
     this.description = '',
   });
   final PlusController controller;
   final Json data;
   final String? vehicleId, specialty;
   final String postalCode, description;
-  final bool mobileOnly;
+  final bool mobileOnly, independentSearch;
   @override
   State<DiscoveryResults> createState() => _DiscoveryResultsState();
 }
@@ -114,7 +115,8 @@ class _DiscoveryResultsState extends WorkspaceState<DiscoveryResults> {
   bool get sameSearch =>
       active &&
       controller.selectedVehicle?.id == widget.vehicleId &&
-      controller.snapshot!.profile.postalCode == widget.postalCode;
+      (widget.independentSearch ||
+          controller.snapshot!.profile.postalCode == widget.postalCode);
   @override
   void initState() {
     super.initState();
@@ -228,7 +230,9 @@ class _DiscoveryResultsState extends WorkspaceState<DiscoveryResults> {
         onSaveContact: provider.independent
             ? () => saveContact(provider)
             : null,
-        onRequest: provider.requestModes.isEmpty
+        onRequest:
+            provider.requestModes.isEmpty ||
+                controller.snapshot!.profile.postalCode != widget.postalCode
             ? null
             : () {
                 if (!sameSearch) return;

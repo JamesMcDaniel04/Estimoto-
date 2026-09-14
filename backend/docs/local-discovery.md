@@ -1,10 +1,9 @@
 # Local customer shop discovery
 
 The authenticated `GET /v1/discovery` endpoint combines explicitly published
-Estimoto providers with reviewed businesses from a bounded public OpenStreetMap
-index. `DISCOVERY_ENABLED` controls the bootstrap `live_discovery` capability;
+Estimoto providers with public OpenStreetMap listings and reviewed official business profiles. `DISCOVERY_ENABLED` controls the bootstrap `live_discovery` capability;
 the default is disabled. Run `alembic upgrade head` before deploying the feature;
-current head is `a63e90b72d14`. No Maps credentials are needed. This describes
+current head is `b7f2c9d4e1a0`. No Maps credentials are needed. This describes
 current source behavior; [release status](../../docs/release-status.md) records
 which revision and catalog have actually been deployed.
 
@@ -13,12 +12,12 @@ which revision and catalog have actually been deployed.
 Query fields: `postal_code` (five-digit US ZIP, or saved profile ZIP),
 `radius_miles=30` (the only permitted radius), optional owned `vehicle_id`,
 optional `specialty` (`pdr`, `collision`, `maintenance`, `mechanical`) and
-`mobile_only`. Customer ownership is checked before directory I/O.
+`mobile_only`, `q` (up to 120 characters) and `make_only`. Text and make filters run before the result cap. Matching uses the selected owned vehicle dynamically. Customer ownership is checked before directory I/O.
 
 The envelope has `postal_code`, `radius_miles`, `distance_basis:zip_centroid`,
 `status:ready|stale|unavailable`, `exhaustive:false`, `truncated`, `checked_at`,
 `source_attributions`, `providers`, `shop_visit_alternatives`, and `message`.
-A completed search adds `result_limit:30` and `selection:reviewed_businesses`;
+A completed search adds `result_limit:30` and `selection:public_and_reviewed_businesses`;
 early unavailable responses may omit those selection fields. At most **30 total**
 listings are returned across the two arrays after filtering, ranking and dedupe.
 Distances are approximate straight-line miles from the ZIP center, not travel
@@ -48,10 +47,10 @@ own `request_modes` and the original search context when reviewing a request.
 ## Reviewed business profiles and artwork
 
 The versioned `estimoto_plus/shop_media/catalog.json` records business/contact
-verification separately from artwork. A public result must match its reviewed
-OSM source ID, name, address and exact map point. Its review date must be within
-90 days and cannot be in the future. A logo or matching chain name alone does
-not admit a shop. Moved, renamed or expired entries require renewed review.
+verification separately from artwork. A checked business badge requires an exact match to its reviewed
+OSM source ID, name, address and map point. Other public map listings remain
+visible with unverified-contact labels. Its review date must be within
+90 days and cannot be in the future. A logo or matching chain name alone does not verify a shop. Moved, renamed or expired entries require renewed review.
 The server does not perform runtime business-site searches to fill gaps.
 
 Mini profiles expose official `website`, `phone`, `description`, `service_details`
@@ -199,3 +198,24 @@ a non-200 response and was classified unavailable. That is not a successful live
 OSM proof. Production readiness still requires verified deployment/migration,
 provider availability or a fresh cache, and the customer UI/device checks. A
 synthetic bridge receipt is not a real shop receipt or a message send.
+
+
+## ZIP browsing and gaps in map coverage
+
+Find Help maintains a search ZIP separately from the profile service ZIP.
+Browsing and favorites work in other ZIPs. Requests require the saved
+service ZIP to match, with an explicit profile-edit action. The make filter
+and label follow the selected vehicle, including changes during a search.
+
+If a map fetch fails or the shared budget is exhausted, recent indexed
+shops within the search ZIP's radius may appear as partial/stale results.
+No extra provider calls bypass the budget. A Maps search link offers an
+external fallback without inventing directory results or ratings.
+
+`official_shops.py` supplements map omissions with dated official profiles.
+Their `official_website` identities can be saved as favorites; they have public
+contact links and documented ZIP-centroid coordinates, and cannot receive
+partner requests. Bluewater Performance and EuroWerkz list multiple makes on
+their official sites and use the same dynamic matcher as every other shop.
+The current official EuroWerkz profile supersedes its old map location.
+Contact review does not establish quality, exact model support or availability.

@@ -18,22 +18,48 @@ class FindHelpScreen extends StatefulWidget {
 class _FindHelpScreenState extends WorkspaceState<FindHelpScreen> {
   @override
   PlusController get controller => widget.controller;
-  String? specialty;
+  String? specialty, searchPostal;
+  String query = '';
+  bool makeOnly = false;
+  final zipInput = TextEditingController();
+  final queryInput = TextEditingController();
+  String get postal => searchPostal ?? controller.snapshot!.profile.postalCode;
   bool mobileOnly = false, loading = true;
   Json? result;
   int epoch = 0;
   String scope = '';
   String get currentScope =>
-      '${controller.selectedVehicle?.id}|${controller.snapshot?.profile.postalCode}|$specialty|$mobileOnly';
+      '${controller.selectedVehicle?.id}|${controller.selectedVehicle?.make}|${controller.snapshot?.profile.postalCode}|$postal|$query|$makeOnly|$specialty|$mobileOnly';
   @override
   void initState() {
     super.initState();
+    zipInput.text = postal;
+    load();
+  }
+
+  @override
+  void dispose() {
+    zipInput.dispose();
+    queryInput.dispose();
+    super.dispose();
+  }
+
+  void searchShops() {
+    final value = zipInput.text.trim();
+    if (!RegExp(r'^\d{5}(?:-\d{4})?$').hasMatch(value)) {
+      setState(() => error = 'Enter a valid US ZIP code.');
+      return;
+    }
+    searchPostal = value.substring(0, 5);
+    query = queryInput.text.trim();
     load();
   }
 
   @override
   void changed() {
     if (active && scope != currentScope) {
+      if (searchPostal == null) zipInput.text = postal;
+      if (controller.selectedVehicle == null) makeOnly = false;
       load();
     } else {
       super.changed();
@@ -43,8 +69,7 @@ class _FindHelpScreenState extends WorkspaceState<FindHelpScreen> {
   Future<void> load() async {
     if (!active) return;
     final run = ++epoch;
-    final postal = controller.snapshot!.profile.postalCode,
-        vehicle = controller.selectedVehicle?.id;
+    final postal = this.postal, vehicle = controller.selectedVehicle?.id;
     setState(() {
       scope = currentScope;
       loading = postal.isNotEmpty;
@@ -58,6 +83,8 @@ class _FindHelpScreenState extends WorkspaceState<FindHelpScreen> {
         'vehicle_id': ?vehicle,
         if (specialty != null) 'specialty': specialty,
         'mobile_only': mobileOnly,
+        'q': query,
+        'make_only': makeOnly,
       });
       if (!active || run != epoch || scope != currentScope) return;
       setState(() => result = value);
@@ -73,7 +100,7 @@ class _FindHelpScreenState extends WorkspaceState<FindHelpScreen> {
   @override
   Widget build(BuildContext context) {
     if (!current) return unavailable;
-    final postal = controller.snapshot!.profile.postalCode;
+    final postal = this.postal;
     return PageBody(
       children: [
         const PageHeading(
@@ -101,9 +128,39 @@ class _FindHelpScreenState extends WorkspaceState<FindHelpScreen> {
                     ),
                   ],
                 ),
+                const SizedBox(height: 12),
+                TextField(
+                  key: const Key('discovery-zip'),
+                  controller: zipInput,
+                  keyboardType: TextInputType.number,
+                  decoration: const InputDecoration(
+                    labelText: 'Search ZIP code',
+                  ),
+                  onSubmitted: (_) => searchShops(),
+                ),
+                const SizedBox(height: 12),
+                TextField(
+                  key: const Key('discovery-query'),
+                  controller: queryInput,
+                  maxLength: 120,
+                  decoration: const InputDecoration(
+                    labelText: 'Shop name or service',
+                    hintText: 'Shop name, brakes, diagnostics…',
+                  ),
+                  onSubmitted: (_) => searchShops(),
+                ),
+                FilledButton.icon(
+                  onPressed: searchShops,
+                  icon: const Icon(Icons.search),
+                  label: const Text('Search shops'),
+                ),
                 TextButton(
-                  onPressed: () => editProfile(context, controller),
-                  child: const Text('Change service ZIP'),
+                  onPressed: () {
+                    searchPostal = null;
+                    zipInput.text = controller.snapshot!.profile.postalCode;
+                    load();
+                  },
+                  child: const Text('Use saved service ZIP'),
                 ),
               ],
             ),
@@ -127,11 +184,32 @@ class _FindHelpScreenState extends WorkspaceState<FindHelpScreen> {
               ),
           ],
         ),
+        if (controller.selectedVehicle != null)
+          FilterChip(
+            label: Text('Lists ${controller.selectedVehicle!.make} services'),
+            selected: makeOnly,
+            onSelected: (value) {
+              makeOnly = value;
+              load();
+            },
+          ),
+        if (postal != controller.snapshot!.profile.postalCode)
+          Column(
+            children: [
+              const Text(
+                'Browsing this ZIP does not change your profile. To request service here, update your saved service ZIP.',
+              ),
+              TextButton(
+                onPressed: () => editProfile(context, controller),
+                child: const Text('Update service ZIP for requests'),
+              ),
+            ],
+          ),
         SwitchListTile.adaptive(
           contentPadding: EdgeInsets.zero,
           title: const Text('Come to me'),
           subtitle: const Text(
-            'Find providers listing mobile coverage for my ZIP',
+            'Find providers listing mobile coverage for the search ZIP',
           ),
           value: mobileOnly,
           onChanged: (value) {
@@ -143,8 +221,7 @@ class _FindHelpScreenState extends WorkspaceState<FindHelpScreen> {
           EmptyState(
             icon: Icons.location_searching,
             title: 'Where does your car need help?',
-            message:
-                'Add a service ZIP in your saved profile to find nearby shops.',
+            message: 'Enter a ZIP above to find nearby shops.',
             action: 'Add ZIP code',
             onAction: () => editProfile(context, controller),
           ),
@@ -171,12 +248,26 @@ class _FindHelpScreenState extends WorkspaceState<FindHelpScreen> {
             postalCode: postal,
             specialty: specialty,
             mobileOnly: mobileOnly,
+            independentSearch: true,
           ),
         if (postal.isNotEmpty)
           OutlinedButton.icon(
             onPressed: loading ? null : load,
             icon: const Icon(Icons.refresh),
             label: const Text('Refresh directory'),
+          ),
+        if (postal.isNotEmpty)
+          TextButton.icon(
+            onPressed: () => openExternal(
+              context,
+              Uri.https('www.google.com', '/maps/search/', {
+                'api': '1',
+                'query':
+                    '${query.isEmpty ? '${controller.selectedVehicle?.make ?? ''} auto repair' : query} near $postal',
+              }).toString(),
+            ),
+            icon: const Icon(Icons.map_outlined),
+            label: const Text('Search more shops on Maps'),
           ),
         const SizedBox(height: 12),
         OutlinedButton.icon(

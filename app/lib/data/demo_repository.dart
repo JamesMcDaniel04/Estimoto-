@@ -129,6 +129,21 @@ class DemoPlusRepository extends PlusRepository {
         ),
       });
     }
+    final terms = textOf(
+      query,
+      'q',
+    ).toLowerCase().split(RegExp(r'\s+')).where((s) => s.isNotEmpty);
+    listings.removeWhere(
+      (row) =>
+          (query['make_only'] == true &&
+              (row['vehicle_match'] as Map?)?['status'] != 'listed_make') ||
+          !terms.every(
+            (term) =>
+                '${row['name']} ${row['description']} ${(row['specialties'] as List).join(' ')}'
+                    .toLowerCase()
+                    .contains(term),
+          ),
+    );
     final mobile = query['mobile_only'] == true;
     final primary = mobile
         ? listings

@@ -4,7 +4,7 @@ from sqlalchemy import delete, func, or_, select, update
 from sqlalchemy.exc import IntegrityError
 from .calendar_scheduling import utc
 from .discovery_models import DirectoryBudget, DirectoryCache, PublicListing
-from .discovery_provider import DirectoryUnavailable, fetch_listings, fetch_zip
+from .discovery_provider import DirectoryUnavailable, fetch_listings, fetch_zip, distance_miles, RADIUS_MILES
 from .models import now, uid
 
 FRESH = timedelta(days=1)
@@ -120,5 +120,22 @@ def zip_location(factory, transport, postal, *, allow_fetch=True):
 
 
 def public_directory(factory, transport, postal, point, settings):
-    return cached(factory, 'osm:' + postal,
-                  lambda limit, meter: fetch_listings(point, transport, limit=limit, meter=meter), budget=settings)
+    result = cached(factory, 'osm:' + postal,
+                    lambda limit, meter: fetch_listings(point, transport, limit=limit, meter=meter), budget=settings)
+    if result[0] is not None:
+        return result
+    # A failed new-ZIP lookup does not invalidate nearby recently indexed shops.
+    # This remains explicitly partial/stale and never spends another provider call.
+    with factory() as db:
+        rows = db.scalars(select(PublicListing).where(PublicListing.fetched_at >= now() - STALE)
+                          .order_by(PublicListing.fetched_at.desc()).limit(MAX_LISTINGS)).all()
+        nearby = []
+        checked = None
+        for row in rows:
+            try:
+                if distance_miles(point, row.value['point']) <= RADIUS_MILES:
+                    nearby.append(row.value)
+                    checked = min(checked, utc(row.fetched_at)) if checked else utc(row.fetched_at)
+            except (DirectoryUnavailable, KeyError, TypeError, IndexError):
+                continue
+    return ({'listings': nearby}, 'stale', checked) if nearby else result

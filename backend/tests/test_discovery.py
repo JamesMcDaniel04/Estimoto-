@@ -52,7 +52,8 @@ def install_review_fixtures(client, monkeypatch):
     Exercise the real identity/expiry/contact enrichment path, with no network
     business research in unit tests. Negative tests remove approval explicitly.
     """
-    from estimoto_plus import reviewed_shops
+    from estimoto_plus import reviewed_shops, official_shops
+    monkeypatch.setattr(official_shops, 'catalog', lambda: {})
     from estimoto_plus.discovery_provider import normalize_listing
     from estimoto_plus.models import now
     def approved():
@@ -290,7 +291,7 @@ def test_daily_attempt_budget_shared_across_customers_and_postal_codes(clients):
     assert client.get('/v1/discovery', headers=h('alice')).json()['status'] == 'ready'
     # Cache hits spend neither a request nor body bytes.
     assert client.get('/v1/discovery', headers=h('bob'), params={'postal_code': '80204'}).json()['status'] == 'ready'
-    assert client.get('/v1/discovery', headers=h('bob'), params={'postal_code': '80221'}).json()['status'] == 'unavailable'
+    assert client.get('/v1/discovery', headers=h('bob'), params={'postal_code': '80221'}).json()['status'] == 'stale'
     assert len([r for r in stub.calls if r.url.host == 'overpass-api.de']) == 1
     with client.app.state.session_factory() as db:
         daily = db.get(DirectoryBudget, now().date().isoformat())

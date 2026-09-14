@@ -1,6 +1,6 @@
 """Current business/contact verification, independent of artwork availability.
 
-Only exact reviewed public identities enter discovery. No runtime web scraping,
+Only exact reviewed identities receive the checked business badge. No runtime web scraping,
 name-based logo guesses, inferred Google scores or customer data are involved.
 """
 from datetime import date, timedelta
@@ -115,3 +115,15 @@ def enrich_partner(row):
             re.sub(r'\D', '', row.get('phone') or '') == re.sub(r'\D', '', entry['phone'])):
         return {**row, 'website': entry['website']}
     return row
+
+
+def discovery_listing(row):
+    """A business review enriches public data; it is not nationwide admission."""
+    if not isinstance(row, dict) or row.get('source') != 'openstreetmap':
+        return None
+    verified = verified_listing(row)
+    if verified:
+        return verified
+    return {**row, 'verification': {'status': 'public_listing',
+            'scope': 'Public map listing. Contact and services have not been independently checked.'},
+            'accepting_requests': False, 'request_modes': []}

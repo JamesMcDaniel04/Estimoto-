@@ -221,6 +221,44 @@ class AssistantDiscoveryRepository extends DiscoveryRepository {
 }
 
 void main() {
+  testWidgets('search ZIP and name are independent of saved service ZIP', (
+    tester,
+  ) async {
+    final repo = DiscoveryRepository();
+    final c = await discoveryController(repo);
+    await mountDiscovery(tester, c);
+    await tester.pumpAndSettle();
+    await tester.enterText(find.byKey(const Key('discovery-zip')), '80229');
+    await tester.enterText(
+      find.byKey(const Key('discovery-query')),
+      'Bluewater',
+    );
+    await tapDiscovery(tester, find.text('Search shops'));
+    expect(repo.calls.last['postal_code'], '80229');
+    expect(repo.calls.last['q'], 'Bluewater');
+    expect(c.snapshot!.profile.postalCode, '80204');
+    expect(
+      find.textContaining('Your vehicle or service ZIP changed'),
+      findsNothing,
+    );
+    await tapDiscovery(tester, find.text('Lists Audi services'));
+    expect(repo.calls.last['make_only'], true);
+    expect(repo.calls.last['postal_code'], '80229');
+    final beforeEdit = repo.calls.length;
+    c.selectedVehicle!.json['make'] = 'BMW';
+    c.selectVehicle(c.selectedVehicle!.id);
+    await tester.pumpAndSettle();
+    expect(repo.calls.length, beforeEdit + 1);
+    expect(find.text('Lists BMW services'), findsOneWidget);
+    c.selectVehicle(c.snapshot!.vehicles.last.id);
+    await tester.pumpAndSettle();
+    expect(find.text('Lists Toyota services'), findsOneWidget);
+    expect(find.text('Lists Audi services'), findsNothing);
+    expect(repo.calls.last['vehicle_id'], c.snapshot!.vehicles.last.id);
+    expect(repo.calls.last['make_only'], true);
+    expect(tester.takeException(), isNull);
+  });
+
   setUp(() => FlutterSecureStorage.setMockInitialValues({}));
   setUpAll(() async {
     const directory = String.fromEnvironment('DISCOVERY_FONT_DIR');
@@ -622,6 +660,8 @@ void main() {
         'vehicle_id': 'vehicle',
         'specialty': 'pdr',
         'mobile_only': true,
+        'q': 'Audi',
+        'make_only': true,
       });
       await repo.listDiscoveryFavorites('vehicle');
       await repo.saveDiscoveryFavorite('pdr', {
@@ -637,6 +677,8 @@ void main() {
           'query': {
             'postal_code': '80204',
             'radius_miles': '30',
+            'q': 'Audi',
+            'make_only': 'true',
             'vehicle_id': 'vehicle',
             'specialty': 'pdr',
             'mobile_only': 'true',
