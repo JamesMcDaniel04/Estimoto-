@@ -15,7 +15,7 @@ from fastapi import APIRouter, Depends, Header, HTTPException, Request
 from fastapi.responses import HTMLResponse
 from starlette.concurrency import run_in_threadpool
 from pydantic import BaseModel, ConfigDict, Field, field_validator
-from sqlalchemy import or_, select, update
+from sqlalchemy import delete, or_, select, update
 from sqlalchemy.orm import Session
 
 from .auth import bridge_authorized, current_customer, db_session
@@ -243,6 +243,38 @@ def get_outreach(outreach_id: str, c: Customer = Depends(current_customer), db: 
     return _outreach_view(_owned_outreach(db, outreach_id, c.id))
 
 
+DISCARDABLE = {"draft", "call_required", "delivery_failed"}
+WITHDRAWABLE = {"queued", "delivery_unknown", "waiting_for_reply"}
+
+
+@router.delete("/shop-outreach/{outreach_id}", status_code=204)
+def discard_outreach(outreach_id: str, c: Customer = Depends(current_customer), db: Session = Depends(db_session)):
+    _lock_outreach(db, outreach_id)
+    outreach = _owned_outreach(db, outreach_id, c.id)
+    if outreach.status not in DISCARDABLE:
+        raise HTTPException(409, "This request was already sent and can only be withdrawn.")
+    db.execute(delete(ShopOutbox).where(ShopOutbox.outreach_id == outreach.id))
+    db.delete(outreach)
+    db.commit()
+
+
+@router.post("/shop-outreach/{outreach_id}/withdraw")
+def withdraw_outreach(outreach_id: str, c: Customer = Depends(current_customer), db: Session = Depends(db_session)):
+    _lock_outreach(db, outreach_id)
+    outreach = _owned_outreach(db, outreach_id, c.id)
+    if outreach.status not in WITHDRAWABLE:
+        raise HTTPException(409, "This request can no longer be withdrawn.")
+    current = now()
+    outreach.status = "withdrawn"
+    outreach.updated_at = current
+    # An undelivered outbox row is finished so the worker never sends it;
+    # a delivered request keeps its status history and its link goes dead.
+    db.execute(update(ShopOutbox).where(ShopOutbox.outreach_id == outreach.id, ShopOutbox.finished_at.is_(None))
+               .values(finished_at=current))
+    db.commit()
+    return _outreach_view(outreach)
+
+
 @router.post("/shop-outreach", status_code=201)
 def create_outreach(body: OutreachDraftWrite, request: Request, idempotency_key: str | None = Header(default=None),
                     c: Customer = Depends(current_customer), db: Session = Depends(db_session)):
@@ -365,6 +397,8 @@ def _action_record(db, token):
         raise HTTPException(404, "Action link not found.")
     record = db.scalar(select(ShopOutreach).where(
         ShopOutreach.action_token_hash == hashlib.sha256(token.encode()).hexdigest()))
+    if record and record.status == "withdrawn":
+        raise HTTPException(410, "This request was withdrawn by the customer.")
     if not record or not record.action_expires_at or _utc(record.action_expires_at) <= now():
         raise HTTPException(404, "Action link expired or unavailable.")
     return record

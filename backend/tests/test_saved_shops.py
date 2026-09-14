@@ -294,3 +294,48 @@ def test_delayed_worker_never_first_sends_stale_slots(shops, monkeypatch):
     assert sent == []
     state = client.get(f"/v1/shop-outreach/{reviewed['id']}", headers=auth()).json()
     assert state["status"] == "delivery_failed"
+
+
+def test_outreach_draft_can_be_discarded(shops):
+    client, app, sent = shops
+    shop = create_shop(client)
+    reviewed = draft(client, shop["id"]).json()
+    assert client.delete(f"/v1/shop-outreach/{reviewed['id']}", headers=auth("bob")).status_code == 404
+    assert client.delete(f"/v1/shop-outreach/{reviewed['id']}", headers=auth()).status_code == 204
+    assert client.get(f"/v1/shop-outreach/{reviewed['id']}", headers=auth()).status_code == 404
+    assert client.get("/v1/shop-outreach", headers=auth()).json() == []
+    assert client.delete(f"/v1/shop-outreach/{reviewed['id']}", headers=auth()).status_code == 404
+
+
+def test_queued_request_withdrawn_before_delivery_never_sends(shops):
+    client, app, sent = shops
+    shop = create_shop(client)
+    reviewed = draft(client, shop["id"]).json()
+    assert authorize(client, reviewed).status_code == 200
+    assert client.delete(f"/v1/shop-outreach/{reviewed['id']}", headers=auth()).status_code == 409
+    withdrawn = client.post(f"/v1/shop-outreach/{reviewed['id']}/withdraw", headers=auth())
+    assert withdrawn.status_code == 200 and withdrawn.json()["status"] == "withdrawn"
+    from estimoto_plus.saved_shops import deliver_shop_batch
+    assert deliver_shop_batch(app.state.session_factory, app.state.shop_mail_transport)["delivered"] == 0
+    assert sent == []
+    assert client.post(f"/v1/shop-outreach/{reviewed['id']}/withdraw", headers=auth()).status_code == 409
+    assert client.post(f"/v1/shop-outreach/{reviewed['id']}/withdraw", headers=auth("bob")).status_code == 404
+
+
+def test_sent_request_withdrawn_kills_shop_link(shops):
+    client, app, sent = shops
+    shop = create_shop(client)
+    offered = slot()
+    reviewed = draft(client, shop["id"], [offered]).json()
+    assert authorize(client, reviewed).status_code == 200
+    from estimoto_plus.saved_shops import deliver_shop_batch
+    assert deliver_shop_batch(app.state.session_factory, app.state.shop_mail_transport)["delivered"] == 1
+    action_path = re.search(r"https://plus\.example\.test(/v1/shop-actions/[A-Za-z0-9_-]+)", sent[0].read().decode()).group(1)
+    assert client.get(action_path).status_code == 200
+    assert client.post(f"/v1/shop-outreach/{reviewed['id']}/withdraw", headers=auth()).json()["status"] == "withdrawn"
+    landing = client.get(action_path)
+    assert landing.status_code == 410 and "withdrawn by the customer" in landing.text
+    assert client.post(action_path, data={"slot": offered}).status_code == 410
+    assert client.get(f"/v1/shop-outreach/{reviewed['id']}", headers=auth()).json()["status"] == "withdrawn"
+    # A withdrawn request is terminal: no further withdraw, no discard.
+    assert client.delete(f"/v1/shop-outreach/{reviewed['id']}", headers=auth()).status_code == 409
