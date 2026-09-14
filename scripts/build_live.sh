@@ -29,9 +29,9 @@ PY
 PLUS_SHA=$(git rev-parse HEAD)
 cd app
 flutter pub get --enforce-lockfile
-if [ "$PLUS_TARGET" = web ] || [ "$PLUS_TARGET" = all ]; then
 PLUS_VERSION_NAME=$(sed -n 's/^version: \([0-9.]*\)+.*/\1/p' pubspec.yaml)
 PLUS_BUILD_NUMBER=$(sed -n 's/^version: [0-9.]*+\([0-9]*\).*/\1/p' pubspec.yaml)
+if [ "$PLUS_TARGET" = web ] || [ "$PLUS_TARGET" = all ]; then
   flutter build web --release --no-pub --dart-define-from-file=config/local.json --dart-define=SOURCE_SHA="$PLUS_SHA" --dart-define=PLUS_VERSION_NAME="$PLUS_VERSION_NAME" --dart-define=PLUS_BUILD_NUMBER="$PLUS_BUILD_NUMBER"
   sh "$PLUS_ROOT/scripts/build_capture.sh"
   mkdir -p "$PLUS_ROOT/app/build/web/capture"
