@@ -1,4 +1,12 @@
-# Current release — build 12, September 14, 2026
+# Current release — build 14, September 14, 2026
+
+Web/API and native build 14 use `2390c5ed418a6c2d5db6e98b1424354848ce9176`; schema `d9e4b82013c7`. [Verification](qa/2026-09-14-build14-verification.md) · [Artifacts and provider state](releases/2026-09-14-build14.json).
+
+The Repairs page shows receipt tasks and parts alongside recorded totals, with source links and no double counting. Main Refresh updates details and totals changed on the server. All 254 Flutter tests passed; analysis clean; 27 focused backend receipt tests passed. Signed Android and live web hashes are verified, including native addition/deletion refresh checks and complete synthetic QA cleanup.
+
+Android build 14 is published; iOS 14 is VALID and available internally, with external review blocked by an earlier build. Google Places activation still requires Google Cloud verification, and public-provider New York coverage remains unreliable. Original Estimoto is separately released as build 233.
+
+## Historical release — build 12, September 14, 2026
 
 Web/API and signed native build 12 use `c66ecb4c8b2a47da572bd9659825dd14b6c2a79f`. `/ready` reports schema `d9e4b82013c7`; served JavaScript and public APK hashes match the release artifacts. [Verification](qa/2026-09-14-build12-verification.md) · [Artifacts and provider state](releases/2026-09-14-build12.json).
 

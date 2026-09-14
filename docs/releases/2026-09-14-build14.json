@@ -1,0 +1,104 @@
+{
+  "date": "2026-09-14",
+  "product": "Estimoto +",
+  "version": "0.1.0+14",
+  "source_sha": "2390c5ed418a6c2d5db6e98b1424354848ce9176",
+  "schema_revision": "d9e4b82013c7",
+  "web_sha256": "1fe4a0cd782f13899b42cd455aea20bf4dc851f06a0ee21bb3600e922dfdc84b",
+  "artifacts": [
+    {
+      "kind": "APK",
+      "bytes": 62927303,
+      "sha256": "37ac5e4a0df55e6651b49e506d9d889292eea6752220144b3d315a53c5779a6b"
+    },
+    {
+      "kind": "AAB",
+      "bytes": 60621476,
+      "sha256": "b2fef832903fb3133c64dbfcb6d19b6e2a34c26ea92d60c873e06de0505c763f"
+    },
+    {
+      "kind": "IPA",
+      "bytes": 25973190,
+      "sha256": "44c2c52415c9c167d514a66a80fa1b0aec224693fc1f860138bb779a8db69890"
+    }
+  ],
+  "android": {
+    "publication": "direct APK",
+    "url": "https://estimoto-plus-api.fly.dev/android/download",
+    "signer_sha256": "e6d106fccc6c0e77e04a46c64f8edffdafb11b502d4857e51606c725086581dd",
+    "actual_public_download_hash_verified": true,
+    "upgrade_from_build": 13,
+    "emulator_installed_version": 14
+  },
+  "ios": {
+    "app_id": "6811678079",
+    "build_id": "6e1f66f3-8049-4b37-bf2d-f7613331430f",
+    "processing": "VALID",
+    "groups": [
+      "Customer Preview",
+      "Internal Testers"
+    ],
+    "internal": "IN_BETA_TESTING",
+    "external": "READY_FOR_BETA_SUBMISSION",
+    "notes_characters": 798,
+    "review_attempt": "422 ENTITY_UNPROCESSABLE.ANOTHER_BUILD_IN_REVIEW"
+  },
+  "checks": {
+    "app_passed": 254,
+    "analysis": "passed",
+    "backend_focused_passed": 27,
+    "live_pdf_photo_item_extraction": [
+      {
+        "mime": "application/pdf",
+        "amount_cents": 12990,
+        "status": "applied",
+        "idempotent_replay": true,
+        "private_bytes_match": true,
+        "anonymous_denied": true,
+        "work_items": 2,
+        "tasks": [
+          "Brake service",
+          "Oil service"
+        ]
+      },
+      {
+        "mime": "image/png",
+        "amount_cents": 12990,
+        "status": "applied",
+        "idempotent_replay": true,
+        "private_bytes_match": true,
+        "anonymous_denied": true,
+        "work_items": 2,
+        "tasks": [
+          "Oil and filter change",
+          "Brake inspection"
+        ]
+      }
+    ],
+    "supplied_invoice_local_service_sections": 6,
+    "existing_receipt_backfill": {
+      "processed": 1,
+      "with_items": 1,
+      "unavailable": 0,
+      "remaining_on_repeat": 0
+    },
+    "native13_tasks_parts_cost_and_source_link": "passed",
+    "native14_refresh_loads_new_server_receipt": "passed",
+    "native14_refresh_clears_deleted_receipt_same_vehicle": "passed",
+    "native14_refreshed_total_cents": 12990,
+    "synthetic_account_files_rows_cleaned": true,
+    "removed_token_read_and_write_401": true
+  },
+  "discovery": {
+    "google_places_implemented": true,
+    "google_places_activated": false,
+    "activation_blocker": "Google Cloud account verification pending",
+    "new_york_10001": "public provider unavailable; explicit partial-results state"
+  },
+  "not_proven": [
+    "Google Places live nationwide coverage",
+    "External iOS build14 distribution",
+    "Physical-device biometrics or calls",
+    "Google Play distribution"
+  ]
+}

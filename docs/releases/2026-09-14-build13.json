@@ -1,0 +1,18 @@
+{
+  "source_sha": "ccab3ab04229d8cb783b5849c8048ed31865bf03",
+  "version": "0.1.0+13",
+  "ipa_sha256": "23cdd21696485ff95d19b708d3b97a9464d0a6ee675f0113ffaddbe15d76c670",
+  "android_apk_sha256": "66a56ae0142c0a34ed3a27e51218f17da2dfbc5bb0a9ba2050636a89092bc1ac",
+  "android_aab_sha256": "62095960d1702c26335638e383a3e25a2943ddedafb55b6b634ba4ea827829e4",
+  "web_sha256": "6e9424f7ae96f9577ae239141d5de0b7fa233c370b6b6bc77d47b0be4678ed0a",
+  "ios_build_id": "64454429-cda7-4f0d-99df-7a295eabf862",
+  "ios_processing": "VALID",
+  "ios_internal": "IN_BETA_TESTING",
+  "ios_external": "READY_FOR_BETA_SUBMISSION",
+  "notes_characters": 712,
+  "review_blocker": "ANOTHER_BUILD_IN_REVIEW",
+  "native_receipt_tasks_parts_source_link": "passed",
+  "native_recorded_total_cents": 25980,
+  "known_issue": "Main Refresh did not invalidate receipt history for the same vehicle; fixed in build14.",
+  "superseded_by": 14
+}

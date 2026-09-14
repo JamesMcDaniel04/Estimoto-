@@ -1,4 +1,13 @@
-# Mobile customer preview — build 12
+# Mobile customer preview — build 14
+
+Package `io.estimoto.plus`, source `2390c5ed418a6c2d5db6e98b1424354848ce9176`.
+[Download latest Android](https://estimoto-plus-api.fly.dev/android/download) · [Build-14 evidence](releases/2026-09-14-build14.json) · [Verification](qa/2026-09-14-build14-verification.md) · [Notes](testflight-build14.txt)
+
+Receipt tasks and parts now appear beneath Recorded costs with links to their private receipts. Main Refresh reloads newly parsed work and cost changes. All 254 app tests passed, analysis is clean, and the signed native build passed live receipt-addition and deletion refresh checks. Public APK and served web hashes match the built artifacts.
+
+iOS 14 is VALID with exact notes and both groups; internal testing is available. External review is blocked by another build in review. Google Cloud verification and Places activation remain pending. Physical-device and Google Play proof remain separate.
+
+## Historical build 12
 
 Package `io.estimoto.plus`, source `c66ecb4c8b2a47da572bd9659825dd14b6c2a79f`.
 [Download latest Android](https://estimoto-plus-api.fly.dev/android/download) · [Build-12 evidence](releases/2026-09-14-build12.json) · [Verification](qa/2026-09-14-build12-verification.md) · [Notes](releases/0.1.0-12-beta-notes.md)
