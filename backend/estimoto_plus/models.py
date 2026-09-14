@@ -89,7 +89,19 @@ class Provider(Base):
     description: Mapped[str] = mapped_column(Text, default="")
 
 
-class ServiceRequest(Base):
+class CalendarSourceMixin:
+    calendar_last_scan_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True, index=True)
+    calendar_check: Mapped[bool] = mapped_column(Boolean, default=False)
+    duration_minutes: Mapped[int] = mapped_column(Integer, default=60)
+    calendar_generation: Mapped[int | None] = mapped_column(Integer, nullable=True)
+    calendar_selected_ids: Mapped[list] = mapped_column(JSON, default=list)
+    calendar_time_zone: Mapped[str | None] = mapped_column(String(100), nullable=True)
+    calendar_sync_enabled: Mapped[bool] = mapped_column(Boolean, default=False)
+    calendar_sync_status: Mapped[str] = mapped_column(String(30), default="not_enabled")
+    calendar_sync_message: Mapped[str | None] = mapped_column(String(300), nullable=True)
+
+
+class ServiceRequest(CalendarSourceMixin, Base):
     __tablename__ = "service_requests"
     __table_args__ = (UniqueConstraint("customer_id", "idempotency_key"),)
     id: Mapped[str] = mapped_column(String(36), primary_key=True, default=uid)
@@ -99,6 +111,7 @@ class ServiceRequest(Base):
     specialty: Mapped[str] = mapped_column(String(30))
     description: Mapped[str] = mapped_column(Text)
     preferred_time: Mapped[str] = mapped_column(String(200), default="")
+    proposed_slots: Mapped[list] = mapped_column(JSON, default=list)
     status: Mapped[str] = mapped_column(String(20), default="requested")
     delivery_status: Mapped[str] = mapped_column(String(20), default="queued")
     idempotency_key: Mapped[str] = mapped_column(String(200))

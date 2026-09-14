@@ -1,4 +1,5 @@
 from __future__ import annotations
+from .calendar_scheduling import CalendarChecked
 
 from datetime import date as Date, datetime
 from typing import Literal
@@ -83,12 +84,29 @@ class ReminderCreate(Strict):
         return self
 
 
-class RequestCreate(Strict):
+class RequestCreate(Strict, CalendarChecked):
     vehicle_id: str = Field(max_length=36)
     provider_id: str = Field(max_length=36)
     specialty: Literal["pdr", "collision", "maintenance", "mechanical"]
     description: str = Field(min_length=1, max_length=5000)
     preferred_time: str = Field(default="", max_length=200)
+    proposed_slots: list[datetime] = Field(default_factory=list, max_length=3)
+
+    @field_validator('proposed_slots', mode='before')
+    @classmethod
+    def slot_strings(cls, values):
+        if not isinstance(values, list) or any(not isinstance(v, str) for v in values):
+            raise ValueError('Slots require ISO timestamps.')
+        return values
+
+    @field_validator('proposed_slots')
+    @classmethod
+    def aware_slots(cls, values):
+        from datetime import timezone
+        if any(v.tzinfo is None or v.utcoffset() is None for v in values) or len(set(values)) != len(values):
+            raise ValueError('Choose distinct offset-aware times.')
+        return [v.astimezone(timezone.utc) for v in values]
+
     share_contact: Literal[True]
 
 

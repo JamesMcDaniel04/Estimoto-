@@ -24,6 +24,8 @@ from .postal import canonical_zip
 from .schemas import AssistantInput, EstimateCreate, EstimateSubmit, ProfileWrite, ReminderCreate, RequestCreate, VehicleCreate, VehicleUpdate
 from .workflow import bridge_details, creation_payload, payload_hash, queue_cancellation
 
+from .calendar_scheduling import check_slots, legacy_payload, sync_view, preferred_times
+
 router = APIRouter(prefix="/v1")
 ESTIMATE_PHOTO_KEYS = ("odometer", "engine_bay", "interior", "tire_tread", "front", "driver", "rear", "passenger")
 PDR_PANEL_TYPES = ("hood", "fender_left", "front_door_left", "rear_door_left", "quarter_left", "trunk",
@@ -69,7 +71,7 @@ def request_view(db, r):
     return {"id": r.id, "vehicle_id": r.vehicle_id, "provider_id": r.provider_id, "specialty": r.specialty,
             "description": r.description, "preferred_time": r.preferred_time, "status": r.status,
             "delivery_status": r.delivery_status, "created_at": iso(r.created_at), "updated_at": iso(r.updated_at),
-            "scheduled_at": iso(r.scheduled_at), "events": [{"status": e.status, "message": e.message, "created_at": iso(e.created_at)} for e in events]}
+            "scheduled_at": iso(r.scheduled_at), "proposed_slots": r.proposed_slots, **sync_view(r), "events": [{"status": e.status, "message": e.message, "created_at": iso(e.created_at)} for e in events]}
 
 
 def estimate_view(db, e):
@@ -180,7 +182,7 @@ def create_request(body: RequestCreate, request: Request, idempotency_key: str |
                    c: Customer = Depends(current_customer), db: Session = Depends(db_session)):
     if not idempotency_key or len(idempotency_key) > 200:
         raise HTTPException(422, "Idempotency-Key is required.")
-    payload = body.model_dump()
+    payload = legacy_payload(body, directory=True)
     digest = hashlib.sha256(json.dumps(payload, sort_keys=True, separators=(",", ":")).encode()).hexdigest()
     # Serialize request outcomes across API workers before reading either outcome
     # table. A no-op UPDATE takes a PostgreSQL row lock and a SQLite write lock;
@@ -225,11 +227,26 @@ def create_request(body: RequestCreate, request: Request, idempotency_key: str |
         except ValueError as exc:
             return reject(422, str(exc))
         consume_rate(db, c.id, "service_request", MAX_SERVICE_REQUESTS_PER_HOUR)
+    calendar_data = {}
+    if body.calendar_check:
+        try:
+            calendar_data = check_slots(db, request.app.state.settings, request.app.state.calendar_transport,
+                                        c.id, body.proposed_slots, body.duration_minutes, body.calendar_generation)
+        except HTTPException as exc:
+            if exc.status_code == 422:
+                return reject(422, exc.detail)
+            raise
+    elif body.calendar_generation is not None or body.proposed_slots:
+        return reject(422, "Choose and check Calendar times before including structured slots.")
     status = "local_preview" if c.demo else "queued"
     r = ServiceRequest(id=uid(), customer_id=c.id, vehicle_id=body.vehicle_id, provider_id=body.provider_id,
                        specialty=body.specialty, description=body.description.strip(), preferred_time=body.preferred_time.strip(),
                        idempotency_key=idempotency_key, payload_hash=digest, service_postal_code=service_zip,
-                       delivery_status=status, created_at=now(), updated_at=now())
+                       delivery_status=status, created_at=now(), updated_at=now(),
+                       proposed_slots=[v.isoformat() for v in body.proposed_slots], duration_minutes=body.duration_minutes,
+                       calendar_sync_status="pending" if calendar_data.get("calendar_sync_enabled") else "not_enabled", **calendar_data)
+    if body.calendar_check:
+        r.preferred_time = preferred_times(body.proposed_slots, body.duration_minutes, r.calendar_time_zone)
     db.add(r)
     try:
         db.flush()
@@ -249,6 +266,8 @@ def create_request(body: RequestCreate, request: Request, idempotency_key: str |
 
 @router.post("/requests/{request_id}/cancel")
 def cancel_request(request_id: str, c: Customer = Depends(current_customer), db: Session = Depends(db_session)):
+    db.execute(update(Customer).where(Customer.id == c.id).values(id=Customer.id))
+    db.expire_all()
     owned(db, ServiceRequest, request_id, c)
     stamp = now()
     changed = db.execute(update(ServiceRequest).where(

@@ -21,6 +21,7 @@ from .auth import bridge_authorized, current_customer, db_session
 from .models import Customer, RateBucket, Vehicle, now
 from .shop_models import MyShop, ShopOutbox, ShopOutreach
 from .workflow import payload_hash
+from .calendar_scheduling import CalendarChecked, check_slots, legacy_payload, sync_view
 
 router = APIRouter(prefix="/v1")
 MAIL_ENDPOINT = "https://api.resend.com/emails"
@@ -56,7 +57,7 @@ class ShopWrite(Strict):
         return value
 
 
-class OutreachDraftWrite(Strict):
+class OutreachDraftWrite(Strict, CalendarChecked):
     shop_id: str = Field(min_length=1, max_length=36)
     vehicle_id: str | None = Field(default=None, max_length=36)
     service_summary: str = Field(min_length=1, max_length=500)
@@ -153,7 +154,7 @@ def _outreach_view(outreach):
             "message": outreach.message, "shared_contact": outreach.shared_contact,
             "vehicle_summary": outreach.vehicle_summary, "proposed_slots": outreach.proposed_slots,
             "review_hash": outreach.review_hash, "status": outreach.status,
-            "delivery_status": outreach.delivery_status,
+            "delivery_status": outreach.delivery_status, **sync_view(outreach),
             "call_link": _call_link(outreach.recipient_phone) if outreach.status == "call_required" else None,
             "confirmed_slot": outreach.confirmed_slot,
             "created_at": outreach.created_at.isoformat(), "updated_at": outreach.updated_at.isoformat()}
@@ -239,11 +240,11 @@ def get_outreach(outreach_id: str, c: Customer = Depends(current_customer), db: 
 
 
 @router.post("/shop-outreach", status_code=201)
-def create_outreach(body: OutreachDraftWrite, idempotency_key: str | None = Header(default=None),
+def create_outreach(body: OutreachDraftWrite, request: Request, idempotency_key: str | None = Header(default=None),
                     c: Customer = Depends(current_customer), db: Session = Depends(db_session)):
     if not idempotency_key or len(idempotency_key) > 200:
         raise HTTPException(422, "Idempotency-Key is required.")
-    creation_hash = payload_hash(body.model_dump(mode="json"))
+    creation_hash = payload_hash(legacy_payload(body))
     _lock_customer(db, c.id)
     existing = db.scalar(select(ShopOutreach).where(ShopOutreach.customer_id == c.id,
                                                     ShopOutreach.creation_key == idempotency_key))
@@ -261,6 +262,12 @@ def create_outreach(body: OutreachDraftWrite, idempotency_key: str | None = Head
     vehicle = _owned_vehicle(db, vehicle_id, c.id)
     if not c.name.strip() or not EMAIL_RE.fullmatch(c.email) or c.phone and not PHONE_RE.fullmatch(c.phone):
         raise HTTPException(422, "Save a valid contact name, email, and optional phone before outreach.")
+    calendar_data = {}
+    if body.calendar_check:
+        calendar_data = check_slots(db, request.app.state.settings, request.app.state.calendar_transport,
+                                    c.id, body.proposed_slots, body.duration_minutes, body.calendar_generation)
+    elif body.calendar_generation is not None:
+        raise HTTPException(422, "Check Calendar availability before setting a generation.")
     vehicle_summary = f"{vehicle.year} {vehicle.make} {vehicle.model}" if vehicle else ""
     slots = [value.isoformat() for value in body.proposed_slots]
     message = (f"Service request: {body.service_summary.strip()}\n"
@@ -273,9 +280,13 @@ def create_outreach(body: OutreachDraftWrite, idempotency_key: str | None = Head
               "subject": "Service availability request from Estimoto +", "message": message,
               "shared_contact": {"name": c.name, "email": c.email, "phone": c.phone},
               "vehicle_summary": vehicle_summary, "proposed_slots": slots}
+    if body.calendar_check:
+        review["message"] += f"\nReserved duration: {body.duration_minutes} minutes."
+    review_digest = payload_hash({**review, **({**calendar_data, "duration_minutes": body.duration_minutes} if body.calendar_check else {})})
     outreach = ShopOutreach(customer_id=c.id, shop_id=shop.id, vehicle_id=vehicle_id,
                             creation_key=idempotency_key, creation_hash=creation_hash,
-                            review_hash=payload_hash(review), **review)
+                            review_hash=review_digest, duration_minutes=body.duration_minutes,
+                            calendar_sync_status="pending" if calendar_data.get("calendar_sync_enabled") else "not_enabled", **calendar_data, **review)
     db.add(outreach)
     db.commit()
     return _outreach_view(outreach)
@@ -312,6 +323,10 @@ def authorize_outreach(outreach_id: str, body: AuthorizeWrite, request: Request,
         raise HTTPException(409, "Outreach was already authorized with another operation.")
     if any(datetime.fromisoformat(value) <= now() + timedelta(hours=1) for value in outreach.proposed_slots):
         raise HTTPException(422, "An offered time is too soon or has passed. Create a new draft.")
+    if outreach.calendar_check:
+        check_slots(db, request.app.state.settings, request.app.state.calendar_transport, c.id,
+                    [datetime.fromisoformat(v) for v in outreach.proposed_slots], outreach.duration_minutes,
+                    outreach.calendar_generation, frozen=outreach)
     _consume_rate(db, c.id, "shop_authorize", 10)
     if outreach.recipient_email:
         mail = _mail_config()
@@ -384,6 +399,7 @@ async def confirm_shop_slot(token: str, request: Request, db: Session = Depends(
         raise HTTPException(422, "Choose an offered time.")
     slot = fields["slot"][0]
     record = _action_record(db, token)
+    _lock_customer(db, record.customer_id)
     _lock_outreach(db, record.id)
     record = _action_record(db, token)
     if slot not in record.proposed_slots:
@@ -396,6 +412,9 @@ async def confirm_shop_slot(token: str, request: Request, db: Session = Depends(
     else:
         if datetime.fromisoformat(slot) <= now():
             raise HTTPException(422, "That offered time has passed.")
+        if record.calendar_check:
+            check_slots(db, request.app.state.settings, request.app.state.calendar_transport, record.customer_id,
+                        [datetime.fromisoformat(slot)], record.duration_minutes, record.calendar_generation, frozen=record)
         record.status = "confirmed"
         record.confirmed_slot = slot
         record.updated_at = now()
@@ -404,11 +423,14 @@ async def confirm_shop_slot(token: str, request: Request, db: Session = Depends(
                         headers={"Cache-Control": "no-store", "Referrer-Policy": "no-referrer"})
 
 
-def _claim_mail(db, outbox_id):
+def _claim_mail(db, outbox_id, calendar_settings=None, calendar_transport=None):
     outreach_id = db.scalar(select(ShopOutbox.outreach_id).where(ShopOutbox.id == outbox_id))
     db.rollback()
     if not outreach_id:
         return None
+    outreach = db.get(ShopOutreach, outreach_id)
+    if outreach:
+        _lock_customer(db, outreach.customer_id)
     _lock_outreach(db, outreach_id)
     outreach = db.get(ShopOutreach, outreach_id)
     item = db.get(ShopOutbox, outbox_id)
@@ -445,6 +467,25 @@ def _claim_mail(db, outbox_id):
         item.finished_at = current
         db.commit()
         return "unknown"
+    if outreach.calendar_check:
+        try:
+            if calendar_settings is None:
+                raise HTTPException(503, "Calendar availability is unavailable.")
+            check_slots(db, calendar_settings, calendar_transport, outreach.customer_id,
+                        [datetime.fromisoformat(v) for v in outreach.proposed_slots], outreach.duration_minutes,
+                        outreach.calendar_generation, frozen=outreach)
+        except HTTPException as exc:
+            if exc.status_code in (422, 409):
+                outreach.status = "delivery_unknown" if item.first_attempt_at else "delivery_failed"
+                outreach.delivery_status = outreach.status
+                outreach.calendar_sync_status = "attention_needed"
+                outreach.calendar_sync_message = "Offered times could not be rechecked. Review and create a new request."
+                item.finished_at = current
+                db.commit()
+                return "unknown" if item.first_attempt_at else "failed"
+            item.next_attempt_at = current + timedelta(minutes=5)
+            db.commit()
+            return None
     token = str(uuid4())
     first_attempt_at = _utc(item.first_attempt_at) or current
     claimed = db.execute(update(ShopOutbox).where(
@@ -524,7 +565,7 @@ def _finish_mail(db, outbox_id, token, outreach_id, outcome, receipt):
     return outcome
 
 
-def deliver_shop_batch(session_factory, transport=None, *, api_url=MAIL_ENDPOINT):
+def deliver_shop_batch(session_factory, transport=None, *, api_url=MAIL_ENDPOINT, calendar_settings=None, calendar_transport=None):
     with session_factory() as db:
         ids = db.scalars(select(ShopOutbox.id).where(
             ShopOutbox.finished_at.is_(None), ShopOutbox.next_attempt_at <= now(),
@@ -533,7 +574,7 @@ def deliver_shop_batch(session_factory, transport=None, *, api_url=MAIL_ENDPOINT
     delivered = failed = unknown = 0
     for outbox_id in ids:
         with session_factory() as db:
-            claim = _claim_mail(db, outbox_id)
+            claim = _claim_mail(db, outbox_id, calendar_settings, calendar_transport)
         if claim is None:
             continue
         if claim == "failed":
@@ -559,4 +600,5 @@ def deliver_shop_batch(session_factory, transport=None, *, api_url=MAIL_ENDPOINT
 def deliver_shop_outreach(request: Request):
     url = (os.getenv("RESEND_API_URL", MAIL_ENDPOINT) if request.app.state.settings.environment != "production" else MAIL_ENDPOINT)
     return deliver_shop_batch(request.app.state.session_factory,
-                              getattr(request.app.state, "shop_mail_transport", None), api_url=url)
+                              getattr(request.app.state, "shop_mail_transport", None), api_url=url,
+                              calendar_settings=request.app.state.settings, calendar_transport=request.app.state.calendar_transport)

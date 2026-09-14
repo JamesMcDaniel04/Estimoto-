@@ -5,6 +5,11 @@ from pathlib import Path
 
 @dataclass
 class Settings:
+    calendar_enabled: bool = field(default_factory=lambda: os.getenv("GOOGLE_CALENDAR_ENABLED", "false").lower() == "true")
+    nango_api_key: str = field(default_factory=lambda: os.getenv("NANGO_API_KEY", ""), repr=False)
+    nango_environment: str = field(default_factory=lambda: os.getenv("NANGO_ENVIRONMENT", "production"))
+    nango_allowed_key_fingerprints: str = field(default_factory=lambda: os.getenv("NANGO_ALLOWED_KEY_FINGERPRINTS", ""))
+    nango_calendar_integration_id: str = field(default_factory=lambda: os.getenv("NANGO_CALENDAR_INTEGRATION_ID", "estimoto-plus-google-calendar"))
     carsxe_api_key: str = field(default_factory=lambda: os.getenv("CARSXE_API_KEY", ""), repr=False)
     database_url: str = field(default_factory=lambda: os.getenv("DATABASE_URL", ""))
     environment: str = field(default_factory=lambda: os.getenv("ENVIRONMENT", "production"))

@@ -26,6 +26,8 @@ from .graph import router as graph_router
 from .upload_limit import PhotoBodyLimit
 from .vehicle_images import router as vehicle_images_router
 from .android_download import router as android_download_router
+from .calendar_routes import router as calendar_router
+from .calendar_sync import sync_calendar_batch
 
 
 def create_app(settings: Settings | None = None, *, auth_verifier=None, auth_client=None, bridge_transport=None):
@@ -70,7 +72,9 @@ def create_app(settings: Settings | None = None, *, auth_verifier=None, auth_cli
                     if settings.estimate_bridge_url:
                         await asyncio.to_thread(deliver_estimate_batch, settings, app.state.bridge_transport, app.state.session_factory)
                     await asyncio.to_thread(deliver_shop_batch, app.state.session_factory,
-                                            getattr(app.state, "shop_mail_transport", None))
+                                            getattr(app.state, "shop_mail_transport", None),
+                                            calendar_settings=settings, calendar_transport=app.state.calendar_transport)
+                    await asyncio.to_thread(sync_calendar_batch, settings, app.state.session_factory, app.state.calendar_transport)
                 except Exception as exc:
                     logging.getLogger(__name__).error("Plus background worker cycle failed: %s", type(exc).__name__)
         enabled = settings.worker_enabled if settings.worker_enabled is not None else settings.environment == "production"
@@ -121,12 +125,14 @@ def create_app(settings: Settings | None = None, *, auth_verifier=None, auth_cli
     app.state.auth_verifier = auth_verifier
     app.state.auth_client = auth_client
     app.state.bridge_transport = bridge_transport
+    app.state.calendar_transport = None
     app.include_router(customer_router)
     app.include_router(bridge_router)
     app.include_router(saved_shops_router)
     app.include_router(graph_router)
     app.include_router(vehicle_images_router)
     app.include_router(android_download_router)
+    app.include_router(calendar_router)
 
     @app.get("/health/live")
     def health_live():
@@ -143,7 +149,7 @@ def create_app(settings: Settings | None = None, *, auth_verifier=None, auth_cli
                 revision = connection.scalar(sql_text("SELECT version_num FROM alembic_version"))
                 connection.execute(sql_text("SELECT 1"))
             photo_path = Path(settings.photo_dir)
-            if revision != "e21870f6a94b" or not photo_path.is_dir() or not os.access(photo_path, os.W_OK):
+            if revision != "6db7a239f1c8" or not photo_path.is_dir() or not os.access(photo_path, os.W_OK):
                 raise RuntimeError("not ready")
             if settings.environment == "production" and not (os.path.ismount(photo_path) or os.path.ismount(photo_path.parent)):
                 raise RuntimeError("not ready")

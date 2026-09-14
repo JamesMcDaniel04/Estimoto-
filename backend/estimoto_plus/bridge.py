@@ -35,7 +35,7 @@ def upsert_provider(body: ProviderPublish, db: Session = Depends(db_session)):
 TRANSITIONS = {
     "requested": {"accepted", "declined", "cancelled"},
     "accepted": {"scheduled", "declined", "cancelled"},
-    "scheduled": {"completed", "cancelled"},
+    "scheduled": {"scheduled", "completed", "cancelled"},
     "declined": set(), "cancelled": set(), "completed": set(),
 }
 
@@ -65,7 +65,11 @@ def inbound_event(request_id: str, body: RequestInboundEvent, db: Session = Depe
         raise HTTPException(422, "Scheduled time is only valid for scheduling.")
     predecessors = tuple(status for status, targets in TRANSITIONS.items() if body.status in targets)
     stamp = now()
+    customer_id = r.customer_id
     db.rollback()  # End preliminary read transaction; the conditional write is authoritative.
+    # Serialize appointment changes with checked admission and Calendar writes.
+    from .calendar_scheduling import lock_customer
+    lock_customer(db, customer_id)
     changed = db.execute(update(ServiceRequest).where(
         ServiceRequest.id == request_id,
         ServiceRequest.provider_id == body.provider_id,

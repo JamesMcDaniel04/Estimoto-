@@ -4,7 +4,7 @@ from datetime import datetime
 from sqlalchemy import Boolean, DateTime, ForeignKey, Index, Integer, JSON, String, Text, UniqueConstraint
 from sqlalchemy.orm import Mapped, mapped_column
 
-from .models import Base, now, uid
+from .models import Base, CalendarSourceMixin, now, uid
 
 
 class MyShop(Base):
@@ -22,7 +22,7 @@ class MyShop(Base):
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=now)
 
 
-class ShopOutreach(Base):
+class ShopOutreach(CalendarSourceMixin, Base):
     __tablename__ = "shop_outreach"
     __table_args__ = (UniqueConstraint("customer_id", "creation_key"),)
     id: Mapped[str] = mapped_column(String(36), primary_key=True, default=uid)
