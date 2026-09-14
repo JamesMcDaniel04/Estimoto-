@@ -21,6 +21,24 @@ is VALID and available internally; external review remains pending.
 | Hosted CI | [Run 34815970821](https://github.com/JamesMcDaniel04/Estimoto-plus/actions/runs/34815970821) has no executed steps; check `103886600083` confirms the existing billing block. Local verification is recorded separately. |
 | Original Estimoto mobile | Separate build 232, source `a0a2af9cfb8c88cb3b7eb9860a42554dcf57714f`, shipped with 38 exact-tab tests and external approval. Its approval does not approve Plus. |
 
+## Customer editing in build 11
+
+Reminders, estimate drafts and their photos, scheduling requests, service
+history entries and valuation lookups can now be edited, withdrawn or deleted
+from the app; shared estimates and confirmed appointments stay locked.
+Reminders: tap to edit or delete, and Undo after marking one complete.
+Estimates: edit details, delete the draft and remove saved photos while the
+draft is unshared; afterwards the options menu explains the lock. Scheduling
+requests: discard unsent drafts (including an interrupted device draft) and
+withdraw sent ones, which turns the shop's confirmation link into a 410 with no
+message to the shop. Service history: edit any field with receipts kept and the
+private graph re-projected. Vehicle value: past lookups are kept per vehicle
+(50 most recent), shown newest first and deletable. Estibot: conversations can
+be cleared and an unanswered question offers the technician search. Demo:
+drafts accept photos through the simple picker, the sample calendar can be
+disconnected, and the guided camera reports a typed unavailable code.
+Backend migration `b7f2c9d4e1a0` adds `vehicle_valuation_history`.
+
 ## Build 10 validation
 
 All 217 app tests and analysis passed after integrating Settings; 19 capture-web

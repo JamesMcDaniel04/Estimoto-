@@ -32,13 +32,13 @@ Open `http://127.0.0.1:4318`. Production customer sessions use the dedicated aut
 
 | Area | Implemented |
 | --- | --- |
-| Garage | Saved contact details, multiple vehicles, mileage and optional insurance; date/mileage reminders; representative CarsXE photos or private camera/gallery uploads |
-| Estimates | PDR/Collision tabs, guided required-photo capture, private readback, durable handoff to a selected Estimoto shop and reviewed estimate status |
+| Garage | Saved contact details, multiple vehicles, mileage and optional insurance; date/mileage reminders you can edit, delete or un-complete; representative CarsXE photos or private camera/gallery uploads |
+| Estimates | PDR/Collision tabs, guided required-photo capture, private readback, editable and deletable unshared drafts and photos, durable handoff to a selected Estimoto shop and reviewed estimate status |
 | Repairs | Shop-supplied timelines and update dates, request delivery/response status, cancellation |
 | Find Help | Participating shops/techs and reviewed local businesses within 30 miles; up to 30 results, real shop artwork, contact details, mini profiles and vehicle-specific dedicated shops |
 | Estibot | Guided estimate and routine-care topics, technician matching, saved-shop scheduling, private graph retrieval over service history, and labeled YouTube search links |
-| My shops | Private shop contacts, reviewed customer-authorized scheduling requests and explicit shop acceptance |
-| Service history | Customer-reported service, shop and parts-source records; optional aggregated contributions |
+| My shops | Private shop contacts, reviewed customer-authorized scheduling requests that can be discarded or withdrawn, and explicit shop acceptance |
+| Service history | Customer-reported service, shop and parts-source records you can edit in place; receipts; per-vehicle valuation history; optional aggregated contributions |
 | Foundation | Separate `io.estimoto.plus` iOS/Android app, Supabase Auth client, customer ownership checks, migrations, durable request outbox and bridge contract |
 
 Submitting a service request is not an appointment. A provider must confirm acceptance and schedule. Estibot presents a review screen before sharing contact and vehicle details.

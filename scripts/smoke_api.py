@@ -144,6 +144,16 @@ def run(flutter_client):
             photo_url = f'/v1/estimates/{draft["id"]}/photos/{photo["id"]}'
             image = client.get(photo_url)
             check(image.status_code == 200 and image.headers['content-type'].startswith('image/'), 'Private photo could not be read back.')
+            reminder = client.post('/v1/reminders', json={'vehicle_id': car['id'], 'title': 'Socket reminder', 'due_mileage': 9000}).json()
+            check(client.put(f'/v1/reminders/{reminder["id"]}', json={'title': 'Socket reminder edited'}).json()['title'] == 'Socket reminder edited', 'Reminder edit failed.')
+            check(client.post(f'/v1/reminders/{reminder["id"]}/complete').json()['completed'] and not client.post(f'/v1/reminders/{reminder["id"]}/reopen').json()['completed'], 'Reminder reopen failed.')
+            check(client.delete(f'/v1/reminders/{reminder["id"]}').status_code == 204, 'Reminder delete failed.')
+            scratch = client.post('/v1/estimates', json={'vehicle_id': car['id'], 'discipline': 'pdr', 'description': 'Scratch draft', 'date_of_loss': None}).json()
+            check(client.put(f'/v1/estimates/{scratch["id"]}', json={'description': 'Scratch draft edited'}).json()['description'] == 'Scratch draft edited', 'Estimate edit failed.')
+            scratch_photo = client.post(f'/v1/estimates/{scratch["id"]}/photos', data={'label': 'Scratch'}, files={'file': ('scratch.jpg', data.getvalue(), 'image/jpeg')}).json()
+            check(client.delete(f'/v1/estimates/{scratch["id"]}/photos/{scratch_photo["id"]}').status_code == 204, 'Estimate photo delete failed.')
+            check(client.delete(f'/v1/estimates/{scratch["id"]}').status_code == 204, 'Estimate delete failed.')
+            check(all(e['id'] != scratch['id'] for e in client.get('/v1/bootstrap').json()['estimates']), 'Deleted estimate still listed.')
             other = {'Authorization': 'Bearer ' + tokens[1]}
             check(client.get(photo_url, headers=other).status_code == 404, 'Cross-customer photo access allowed.')
             check(client.put(f'/v1/vehicles/{car["id"]}', headers=other, json={'mileage': 1}).status_code == 404, 'Cross-customer garage edit allowed.')
@@ -155,7 +165,7 @@ def run(flutter_client):
             check(any(v['id'] == car['id'] for v in state['vehicles']), 'Restart lost garage records.')
             check(state['requests'][0]['status'] == 'cancelled', 'Restart lost request cancellation.')
             check(client.get(photo_url).status_code == 200, 'Restart lost private photo.')
-        print('API socket smoke: migrations, two customer identities, private photos, durable request/replay/cancel, fictional bridge receipts and restart persistence passed.')
+        print('API socket smoke: migrations, two customer identities, private photos, reminder and draft edit/delete, durable request/replay/cancel, fictional bridge receipts and restart persistence passed.')
 
 
 if __name__ == '__main__':
