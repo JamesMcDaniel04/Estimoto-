@@ -1,3 +1,4 @@
+import 'dart:io';
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:estimoto_plus/app.dart';
@@ -136,16 +137,15 @@ void main() {
     expect(exits, 1);
   });
 
-  testWidgets('settings shows the app version', (tester) async {
+  testWidgets('settings shows the app version from pubspec', (tester) async {
     final controller = await _controller(_Repository());
     await _mountScreen(tester, controller);
-    expect(
-      find.text(
-        'Version ${PlusBuildInfo.versionName} (${PlusBuildInfo.buildNumber})',
-      ),
-      findsOneWidget,
-    );
-    expect(PlusBuildInfo.versionName, '0.1.0');
-    expect(PlusBuildInfo.buildNumber, '7');
+    expect(find.text(PlusBuildInfo.label), findsOneWidget);
+    final version = RegExp(
+      r'^version:\s*([0-9.]+)\+([0-9]+)',
+      multiLine: true,
+    ).firstMatch(File('pubspec.yaml').readAsStringSync())!;
+    expect(PlusBuildInfo.versionName, version.group(1));
+    expect(PlusBuildInfo.buildNumber, version.group(2));
   });
 }
