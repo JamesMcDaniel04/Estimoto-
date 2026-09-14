@@ -2,9 +2,9 @@
   "files": [
     {
       "source": "dashboard/src/pages/intake/GuidedCamera.tsx",
-      "source_sha256": "03102647b75b5c610c1bb9211bf64753c514a3454c1b2e5db918924bbfc76f30",
+      "source_sha256": "eb71447d8410bc8a3e66a7c8d10f9448e1c6a4ee129f300403181569bd8cdfe3",
       "target": "src/shared/GuidedCamera.tsx",
-      "target_sha256": "03102647b75b5c610c1bb9211bf64753c514a3454c1b2e5db918924bbfc76f30"
+      "target_sha256": "eb71447d8410bc8a3e66a7c8d10f9448e1c6a4ee129f300403181569bd8cdfe3"
     },
     {
       "source": "dashboard/src/pages/intake/VehicleGuide.tsx",
@@ -31,6 +31,6 @@
       "target_sha256": "9f9091e9f390d16b46d04cf22bee749fd2cdd837ad1a03b2979a3a3573cf8e91"
     }
   ],
-  "source_commit": "0729c7f4a4d153df150ccb84f606942f63a3d60d",
+  "source_commit": "15f0342bca8bb6fa52a197f6b70badacee93637d",
   "source_repository": "Estimoto"
 }

@@ -234,15 +234,29 @@ export default function GuidedCamera({ steps, uploaded, body, onBodyChange, chec
   }, [loaded, paused, complete, step, style, checkFrame, saveFrame]);
 
   const uploadManually = async (file: File | null) => {
-    if (!file || inflight.current || complete || !step) return;
+    if (!file || inflight.current || complete || !step || (pending.current && pending.current !== file)) return;
     if (!(["image/jpeg", "image/png", "image/webp"].includes(file.type)) || file.size > 8 * 1024 * 1024) {
       setInstruction("Choose a JPEG, PNG or WebP photo smaller than 8 MB.");
       return;
     }
     inflight.current = true;
     setBusy(true);
-    try { await saveFrame(file, generation.current); }
+    try {
+      await saveFrame(file, generation.current);
+      if (pending.current === file) {
+        setAutomatic(false);
+        setRetry(true);
+        setInstruction("This photo has not been confirmed saved. Retry saving it before moving on.");
+      }
+    }
     catch (error) {
+      if (error instanceof Error && error.name === "PhotoRejected") {
+        pending.current = null;
+        setRetry(false);
+      } else {
+        setAutomatic(false);
+        setRetry(true);
+      }
       setInstruction(error instanceof Error ? error.message : "The photo could not be saved. Try again.");
     } finally {
       inflight.current = false;
@@ -306,7 +320,8 @@ export default function GuidedCamera({ steps, uploaded, body, onBodyChange, chec
         {!complete && !cameraError && <>
           <button type="button" disabled={!loaded || busy || paused} onClick={() => void capture(false)} className="capture-shutter"><Camera className="h-5 w-5" />{busy ? "Checking / saving…" : retry ? "Retry saving photo" : "Take photo now"}</button>
         </>}
-        {!complete && <><input ref={manualInput} className="sr-only" type="file" accept="image/jpeg,image/png,image/webp" aria-label="Upload photo for current view" onChange={(event) => { const file = event.currentTarget.files?.[0] ?? null; event.currentTarget.value = ""; void uploadManually(file); }} /><button type="button" disabled={busy} className="mt-2 rounded-full border border-slate-300 p-3 text-sm font-semibold text-brand disabled:opacity-50" onClick={() => manualInput.current?.click()}>Upload a photo instead</button></>}
+        {!complete && <><input ref={manualInput} className="sr-only" type="file" accept="image/jpeg,image/png,image/webp" aria-label="Upload photo for current view" disabled={busy || retry} onChange={(event) => { const file = event.currentTarget.files?.[0] ?? null; event.currentTarget.value = ""; void uploadManually(file); }} /><button type="button" disabled={busy || retry} className="mt-2 rounded-full border border-slate-300 p-3 text-sm font-semibold text-brand disabled:opacity-50" onClick={() => manualInput.current?.click()}>Upload a photo instead</button></>}
+        {!complete && retry && (cameraError || !loaded) && <button type="button" disabled={busy || paused} className="mt-2 rounded-full bg-brand p-3 text-sm font-semibold text-white disabled:opacity-50" onClick={() => void uploadManually(pending.current)}>Retry saving photo</button>}
         {!complete && step?.optional && <button type="button" disabled={busy || retry} onClick={skipOptional} className="mt-2 rounded-full border border-slate-300 p-3 text-sm font-semibold text-brand disabled:opacity-50">Skip optional photo</button>}
         {complete && !needsDamagePanel && <button type="button" disabled={completing} onClick={onComplete ?? close} className="flex w-full items-center justify-center gap-2 rounded-full bg-brand p-4 text-base font-semibold text-white"><Check />{completing ? "Preparing your estimate…" : onComplete ? "Continue to estimate" : "Done"}</button>}
         <p className="capture-footnote">{complete ? "Photo capture is complete. Review before submitting." : "Driver side is the side with the steering wheel."}</p>
