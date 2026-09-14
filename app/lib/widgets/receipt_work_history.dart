@@ -32,7 +32,7 @@ class ReceiptWorkHistory extends StatelessWidget {
         ),
         const SizedBox(height: 6),
         const Text(
-          'Item amounts are included in the recorded entry total. They are not added again.',
+          'Item amounts are for reference. Recorded costs use the saved entry total.',
         ),
         for (final record in withReceipts) ...[
           const SizedBox(height: 18),

@@ -18,7 +18,7 @@ class ReceiptWorkItems extends StatelessWidget {
       children: [
         if (extraction['items_status'] == 'needs_review')
           const Text(
-            'Some receipt text was unclear. Check these details against the original.',
+            'Some details need review. Check this list against the original.',
           ),
         if (items.isEmpty)
           const Text(
