@@ -37,6 +37,7 @@ MAX_CUSTOMER_PHOTO_BYTES = 250 * 1024 * 1024
 MAX_PHOTO_UPLOADS_PER_HOUR = 100
 MAX_ESTIMATE_SUBMITS_PER_HOUR = 20
 MAX_SERVICE_REQUESTS_PER_HOUR = 20
+UNMATCHED_REPLY = "I can't answer that one yet. I can explain an estimate, plan routine maintenance, or find a technician near you."
 
 
 def consume_rate(db, customer_id, action, limit):
@@ -638,7 +639,7 @@ def assistant(body: AssistantInput, request: Request, c: Customer = Depends(curr
     elif "filter" in message:
         reply = "Your owner's manual identifies the correct filter and replacement interval. Cabin and engine air filters serve different purposes; check the procedure for your vehicle before replacing either. A technician can help if access requires removing other components."
     else:
-        reply = "I can help you understand an estimate, plan routine maintenance, or find a technician. Try 'Find mobile dent repair' or 'How do I check tire pressure?'"
+        reply = UNMATCHED_REPLY
     if urgent:
         # Safety guidance precedes matching, even when the user requests a shop.
         reply = "Avoid driving if the vehicle may be unsafe. Stop somewhere safe and arrange professional help; contact emergency services when appropriate. " + (reply if wants_provider else "I can help you find a qualified repair provider.")
@@ -679,7 +680,13 @@ def assistant(body: AssistantInput, request: Request, c: Customer = Depends(curr
             if exc.status_code == 429:
                 return result
             raise
-    return enhance_advice(result, message=body.message,
-                          vehicle={k: getattr(car, k) for k in ("year", "make", "model", "mileage")} if car else None,
-                          settings=request.app.state.settings, evidence=evidence,
-                          transport=getattr(request.app.state, "assistant_transport", None))
+    result = enhance_advice(result, message=body.message,
+                            vehicle={k: getattr(car, k) for k in ("year", "make", "model", "mileage")} if car else None,
+                            settings=request.app.state.settings, evidence=evidence,
+                            transport=getattr(request.app.state, "assistant_transport", None))
+    if result.get("reply") == UNMATCHED_REPLY:
+        # Nothing deterministic or model-backed answered: say so and hand the
+        # customer the technician search for their saved area.
+        result["intent"] = "unmatched"
+        result.setdefault("discovery", {"postal_code": postal or None, "specialty": specialty})
+    return result

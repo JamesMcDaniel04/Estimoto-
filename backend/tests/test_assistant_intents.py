@@ -66,3 +66,13 @@ def test_provider_rejection_is_distinct_from_an_idempotency_conflict(customer):
     conflict = client.post('/v1/requests', headers={'Idempotency-Key': 'b'}, json=body)
     assert conflict.status_code == 409
     assert conflict.json().get('code') != 'request_not_created'
+
+
+def test_unmatched_question_names_limits_and_offers_search(customer):
+    client, vehicle = customer
+    client.put('/v1/profile', json={'name': 'A', 'postal_code': '80202'})
+    result = client.post('/v1/assistant', json={'message': 'my check engine light is on and the car shakes', 'vehicle_id': vehicle}).json()
+    assert result['intent'] == 'unmatched'
+    assert result['reply'] == "I can't answer that one yet. I can explain an estimate, plan routine maintenance, or find a technician near you."
+    assert result['discovery'] == {'postal_code': '80202', 'specialty': 'mechanical'}
+    assert result['providers'] == []
