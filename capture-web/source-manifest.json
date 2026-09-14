@@ -1,0 +1,36 @@
+{
+  "files": [
+    {
+      "source": "dashboard/src/pages/intake/GuidedCamera.tsx",
+      "source_sha256": "03102647b75b5c610c1bb9211bf64753c514a3454c1b2e5db918924bbfc76f30",
+      "target": "src/shared/GuidedCamera.tsx",
+      "target_sha256": "03102647b75b5c610c1bb9211bf64753c514a3454c1b2e5db918924bbfc76f30"
+    },
+    {
+      "source": "dashboard/src/pages/intake/VehicleGuide.tsx",
+      "source_sha256": "41f37e5d736de815db66aa5d57fecd99eda8bafdb8009703274b82edf56e859b",
+      "target": "src/shared/VehicleGuide.tsx",
+      "target_sha256": "41f37e5d736de815db66aa5d57fecd99eda8bafdb8009703274b82edf56e859b"
+    },
+    {
+      "source": "dashboard/src/pages/intake/vehicleScene.ts",
+      "source_sha256": "1db9323cc9c421236e45548d47901951c8fce173c8421441f0f0bbfc66837205",
+      "target": "src/shared/vehicleScene.ts",
+      "target_sha256": "1db9323cc9c421236e45548d47901951c8fce173c8421441f0f0bbfc66837205"
+    },
+    {
+      "source": "dashboard/src/pages/intake/template.ts",
+      "source_sha256": "8bdb8af4234757a4377117f11c6be688ad2c06974f26c735d0e7c4227b9243cc",
+      "target": "src/shared/template.ts",
+      "target_sha256": "8bdb8af4234757a4377117f11c6be688ad2c06974f26c735d0e7c4227b9243cc"
+    },
+    {
+      "source": "dashboard/src/index.css",
+      "source_sha256": "545c8a333555fa98916475085f3c97c621c63f9239595d984e428b1b1a5b88b6",
+      "target": "src/shared/camera.css",
+      "target_sha256": "9f9091e9f390d16b46d04cf22bee749fd2cdd837ad1a03b2979a3a3573cf8e91"
+    }
+  ],
+  "source_commit": "0729c7f4a4d153df150ccb84f606942f63a3d60d",
+  "source_repository": "Estimoto"
+}
