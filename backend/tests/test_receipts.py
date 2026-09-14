@@ -45,7 +45,7 @@ def test_receipt_roundtrip_private_exact_replay_and_tombstone(clients):
     first = upload(client, rid, key)
     assert first.status_code == 201, first.text
     receipt = first.json()
-    assert set(receipt) == {"id", "filename", "content_type", "byte_size", "created_at"}
+    assert set(receipt) == {"id", "filename", "content_type", "byte_size", "created_at", "total_extraction", "record_cost_cents"}
     assert upload(client, rid, key).json() == receipt
     assert upload(client, rid, key, filename="different.png").status_code == 409
     assert upload(client, rid, who="bob").status_code == 404

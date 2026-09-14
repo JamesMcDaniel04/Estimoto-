@@ -17,8 +17,9 @@ from uuid import UUID
 
 from fastapi import APIRouter, Depends, Header, HTTPException, Request
 from fastapi.responses import Response
+from pydantic import BaseModel, ConfigDict, Field
 from sqlalchemy import func, or_, select
-from sqlalchemy.orm import Session
+from sqlalchemy.orm import Session, object_session
 from starlette.concurrency import run_in_threadpool
 from starlette.datastructures import UploadFile
 
@@ -34,8 +35,12 @@ _pdf_slots = BoundedSemaphore(2)
 
 
 def receipt_view(row):
+    db = object_session(row)
+    record = db.get(KnowledgeRecord, row.record_id) if db and row.record_id else None
     return {"id": row.id, "filename": row.filename, "content_type": row.content_type,
-            "byte_size": row.byte_size, "created_at": row.created_at.isoformat()}
+            "byte_size": row.byte_size, "created_at": row.created_at.isoformat(),
+            "total_extraction": row.total_extraction or {},
+            "record_cost_cents": record.cost_cents if record else None}
 
 
 def record_owned(db, customer_id, record_id):
@@ -63,6 +68,7 @@ def erase_receipt(row):
     row.status, row.record_id = "deleted", None
     row.cleanup_retry_at = None
     row.filename, row.content_type, row.sha256, row.byte_size = "", "", "", 0
+    row.total_extraction = {}
 
 
 def recover_deletions(db, customer_id, settings):
@@ -203,6 +209,9 @@ def _save(record_id, customer_id, key, data, mime, filename, request):
         os.replace(pending, target)
         _sync_directory(target.parent)
         existing.status = "saved"
+        from .receipt_totals import extract_total, apply_extraction
+        record = record_owned(db, customer_id, record_id)
+        apply_extraction(existing, record, extract_total(data, mime))
         # Never unlink on a commit error: it may have committed remotely.
         db.commit()
         return receipt_view(existing)
@@ -231,6 +240,56 @@ async def upload_receipt(record_id: str, request: Request, idempotency_key: str 
         filename = "".join(ch for ch in filename if ch.isprintable())[:180] or "receipt"
     await run_in_threadpool(validate_receipt, data, mime)
     return await run_in_threadpool(_save, record_id, customer_id, key, data, mime, filename, request)
+
+
+def saved_receipt(db, customer_id, record_id, receipt_id):
+    record = record_owned(db, customer_id, record_id)
+    receipt = db.get(KnowledgeReceipt, receipt_id)
+    if receipt is None or receipt.customer_id != customer_id or receipt.record_id != record_id or receipt.status != 'saved':
+        raise HTTPException(404, 'Receipt not found.')
+    return record, receipt
+
+
+@router.post('/{receipt_id}/parse-total')
+def parse_receipt_total(record_id: str, receipt_id: str, request: Request,
+                        c: Customer = Depends(current_customer), db: Session = Depends(db_session)):
+    from .customer_routes import consume_rate
+    from .receipt_totals import extract_total, apply_extraction
+    lock_customer(db, c.id)
+    record, receipt = saved_receipt(db, c.id, record_id, receipt_id)
+    consume_rate(db, c.id, 'receipt_total_parse', 30)
+    try:
+        with _path(request.app.state.settings, receipt.storage_name).open('rb') as stream:
+            data = stream.read(MAX_BYTES + 1)
+        if len(data) != receipt.byte_size or hashlib.sha256(data).hexdigest() != receipt.sha256:
+            raise OSError('integrity')
+    except (OSError, ValueError):
+        raise HTTPException(503, 'This receipt is temporarily unavailable. Please retry.') from None
+    apply_extraction(receipt, record, extract_total(data, receipt.content_type))
+    db.commit()
+    return receipt_view(receipt)
+
+
+class ApplyTotal(BaseModel):
+    model_config = ConfigDict(extra='forbid')
+    expected_cost_cents: int | None = Field(ge=0, le=100_000_000, strict=True)
+
+
+@router.post('/{receipt_id}/apply-total')
+def apply_receipt_total(record_id: str, receipt_id: str, body: ApplyTotal,
+                        c: Customer = Depends(current_customer), db: Session = Depends(db_session)):
+    lock_customer(db, c.id)
+    record, receipt = saved_receipt(db, c.id, record_id, receipt_id)
+    result = receipt.total_extraction or {}
+    amount = result.get('amount_cents')
+    if type(amount) is not int or not 0 <= amount <= 100_000_000 or result.get('currency') != 'USD':
+        raise HTTPException(422, 'No supported total was detected. Enter the recorded cost manually.')
+    if record.cost_cents != amount and record.cost_cents != body.expected_cost_cents:
+        raise HTTPException(409, 'The recorded cost changed. Refresh and review the amount again.')
+    record.cost_cents = amount
+    receipt.total_extraction = {**result, 'status': 'applied'}
+    db.commit()
+    return receipt_view(receipt)
 
 
 @router.get("/{receipt_id}")

@@ -7,7 +7,7 @@ from fastapi import APIRouter, Depends, HTTPException, Query, Request
 from pydantic import BaseModel, ConfigDict, Field
 from sqlalchemy import select
 from sqlalchemy.orm import Session
-from . import official_shops
+from . import official_shops, google_places
 from .auth import current_customer, db_session
 from .calendar_scheduling import consume_rate as _consume_rate, lock_customer, utc
 from .discovery_cache import public_directory, zip_location
@@ -95,11 +95,36 @@ def search(db, request, customer, postal, vehicle=None, specialty=None, mobile_o
         return empty
     factory, transport = request.app.state.session_factory, request.app.state.discovery_transport
     center, geo_state, geo_checked = zip_location(factory, transport, postal)
+    settings = request.app.state.settings
+    google = None
+    if center is None and settings.places_enabled:
+        try:
+            center = google_places.places_zip(factory, transport, settings, postal)
+            geo_state, geo_checked = 'ready', now()
+            empty['source_attributions'] = [*ATTRIBUTIONS, google_places.ATTRIBUTION]
+        except DirectoryUnavailable:
+            pass
     if center is None:
         return empty
-    public, public_state, checked = public_directory(factory, transport, postal, center['point'], request.app.state.settings)
+    if settings.places_enabled:
+        try:
+            google = google_places.search_places(factory, transport, settings, postal, center['point'],
+                make=vehicle.make if vehicle else '', specialty=specialty, query=query)
+            empty['source_attributions'] = [*ATTRIBUTIONS, google_places.ATTRIBUTION]
+        except DirectoryUnavailable:
+            pass
+    public, public_state, checked = public_directory(factory, transport, postal, center['point'], settings,
+                                                    allow_fetch=google is None)
     candidates = []
     status = 'ready' if geo_state == public_state == 'ready' else 'stale' if public is not None else 'unavailable'
+    if google is not None:
+        status, checked = ('ready' if geo_state == 'ready' else 'stale'), now()
+        empty['directory_provider'] = 'google_places'
+        for row in google['listings']:
+            row['distance_miles'] = round(distance_miles(center['point'], row['point']), 1)
+            candidates.append(row)
+    else:
+        empty['directory_provider'] = 'public_sources'
     favorites = db.scalars(select(DedicatedShop).where(DedicatedShop.customer_id == customer.id,
                           DedicatedShop.vehicle_id == vehicle.id)).all() if vehicle else []
     favorite_refs = {(f.source, f.source_id) for f in favorites if not specialty or f.specialty == specialty}
@@ -162,15 +187,18 @@ def search(db, request, customer, postal, vehicle=None, specialty=None, mobile_o
         row.pop('point', None)
     terms = query.casefold().split()
     def matches_query(row):
+        if row['source'] == 'google_places':
+            return True  # Text Search already matched the complete service query.
         searchable = ' '.join([row['name'], row.get('description', ''),
             *row.get('service_details', []), *row.get('specialties', []), *row.get('listed_makes', []),
             row.get('vehicle_match', {}).get('make') or '']).casefold()
         return all(term in searchable for term in terms)
     candidates = [row for row in candidates if matches_query(row) and
-                  (not make_only or row['vehicle_match']['status'] == 'listed_make')]
+                  (not make_only or row['vehicle_match']['status'] in ('listed_make', 'search_relevance'))]
     def rank(row):
-        matching = not specialty or specialty in row['specialties']
-        return (not row['favorite'], not matching, row['vehicle_match']['status'] != 'listed_make',
+        matching = not specialty or specialty in row['specialties'] or row['source'] == 'google_places'
+        make_rank = {'listed_make': 0, 'search_relevance': 1}.get(row['vehicle_match']['status'], 2)
+        return (not row['favorite'], not matching, make_rank,
                 row['source'] != 'estimoto' if matching else True, row['distance_miles'], row['name'].casefold(), row['id'])
     candidates.sort(key=rank)
     seen, unique = {}, []
@@ -183,7 +211,9 @@ def search(db, request, customer, postal, vehicle=None, specialty=None, mobile_o
                             re.search(r'(?<!\d)\d{5}(?:-\d{4})?\s*$', address) is not None)
         location = re.sub(r'\W+', '', address.casefold()) if complete_address else ''
         phone = re.sub(r'\D', '', row['phone'])
-        key = (name, phone, location) if location else (row['source'], row['source_id'])
+        # Keep live Google content separate so provider attribution and retention
+        # rules cannot be lost when the same shop appears in another directory.
+        key = (name, phone, location) if location and row['source'] != 'google_places' else (row['source'], row['source_id'])
         if key in seen:
             position = seen[key]
             previous = unique[position]
@@ -214,7 +244,7 @@ def search(db, request, customer, postal, vehicle=None, specialty=None, mobile_o
         alternatives = [r for r in unique if r['kind'] == 'shop' and r not in primary]
     else:
         primary, alternatives = unique, []
-    truncated = partner_limit or len(primary) + len(alternatives) > RESULT_LIMIT
+    truncated = partner_limit or len(primary) + len(alternatives) > RESULT_LIMIT or bool(google and google['more_available'])
     primary = primary[:RESULT_LIMIT]
     alternatives = alternatives[:RESULT_LIMIT - len(primary)]
     message = 'Public map listings, officially checked business profiles and participating Estimoto providers. Approximate distance from your ZIP center. Confirm services and availability with the shop.'
@@ -255,7 +285,7 @@ def discovery(request: Request, postal_code: str | None = Query(default=None, ma
 class FavoriteWrite(BaseModel):
     model_config = ConfigDict(extra='forbid')
     vehicle_id: str = Field(min_length=1, max_length=36)
-    source: Literal['estimoto', 'openstreetmap', 'official_website', 'my_shop']
+    source: Literal['estimoto', 'openstreetmap', 'official_website', 'google_places', 'my_shop']
     source_id: str = Field(min_length=1, max_length=100)
 
 
@@ -271,13 +301,19 @@ def favorites(vehicle_id: str, c: Customer = Depends(current_customer), db: Sess
 
 
 @router.put('/favorites/{specialty}')
-def set_favorite(specialty: Specialty, body: FavoriteWrite, c: Customer = Depends(current_customer), db: Session = Depends(db_session)):
+def set_favorite(specialty: Specialty, body: FavoriteWrite, request: Request, c: Customer = Depends(current_customer), db: Session = Depends(db_session)):
     lock_customer(db, c.id)
     owned_vehicle(db, body.vehicle_id, c.id)
     if body.source == 'estimoto':
         source = db.scalar(select(Provider).where(Provider.source_id == body.source_id, Provider.public_visible.is_(True), Provider.demo_only.is_(c.demo)))
     elif body.source == 'official_website':
         source = official_shops.catalog().get(body.source_id)
+    elif body.source == 'google_places':
+        try:
+            source = google_places.validate_place(request.app.state.session_factory,
+                request.app.state.discovery_transport, request.app.state.settings, body.source_id)
+        except DirectoryUnavailable:
+            raise HTTPException(503, 'The shop could not be verified. Please try again later.') from None
     elif body.source == 'my_shop':
         source = db.scalar(select(MyShop).where(MyShop.id == body.source_id, MyShop.customer_id == c.id, MyShop.deleted.is_(False)))
     else:

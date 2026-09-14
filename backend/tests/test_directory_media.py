@@ -191,7 +191,7 @@ def test_same_location_public_photo_survives_partner_dedupe(clients, monkeypatch
     row['media'] = {'url': 'https://commons.wikimedia.org/wiki/Special:Redirect/file/Shop.jpg?width=320',
                     'kind': 'photo', 'attribution': 'Jane Doe · CC BY 4.0',
                     'source_url': 'https://commons.wikimedia.org/wiki/File:Shop.jpg'}
-    monkeypatch.setattr(discovery, 'public_directory', lambda *_: ({'listings': [row]}, 'ready', now()))
+    monkeypatch.setattr(discovery, 'public_directory', lambda *_, **kw: ({'listings': [row]}, 'ready', now()))
     matched = [r for r in client.get('/v1/discovery', headers=h('alice')).json()['providers'] if r['id'] == provider_id]
     assert len(matched) == 1
     assert matched[0]['request_modes'] == ['shop_visit']
@@ -208,7 +208,7 @@ def test_preupgrade_cached_public_listing_has_explicit_null_media(clients, monke
     stub.elements = [stub.shop(1, 'Cached old listing')]
     row = normalize_listing(stub.elements[0])
     row.pop('media')
-    monkeypatch.setattr(discovery, 'public_directory', lambda *_: ({'listings': [row]}, 'stale', now()))
+    monkeypatch.setattr(discovery, 'public_directory', lambda *_, **kw: ({'listings': [row]}, 'stale', now()))
     response = client.get('/v1/discovery', headers=h('alice'))
     assert response.status_code == 200
     assert response.json()['providers'][0]['media'] is None

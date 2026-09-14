@@ -186,7 +186,9 @@ class _FindHelpScreenState extends WorkspaceState<FindHelpScreen> {
         ),
         if (controller.selectedVehicle != null)
           FilterChip(
-            label: Text('Lists ${controller.selectedVehicle!.make} services'),
+            label: Text('Matches ${controller.selectedVehicle!.make}'),
+            tooltip:
+                'Shop-listed makes and vehicle search suggestions. Confirm services with the shop.',
             selected: makeOnly,
             onSelected: (value) {
               makeOnly = value;

@@ -4,12 +4,15 @@ import '../domain/models.dart';
 import '../theme.dart';
 import 'common.dart';
 import 'shop_media.dart';
+import 'google_places_attribution.dart';
 
-Uri shopMapsUri(ProviderProfile provider) => Uri.https(
-  'www.google.com',
-  '/maps/search/',
-  {'api': '1', 'query': '${provider.name} ${provider.displayAddress}'},
-);
+Uri shopMapsUri(ProviderProfile provider) =>
+    Uri.https('www.google.com', '/maps/search/', {
+      'api': '1',
+      'query': '${provider.name} ${provider.displayAddress}',
+      if (provider.source == 'google_places')
+        'query_place_id': provider.sourceId,
+    });
 
 enum ShopProfileAction { request, save, saveContact }
 
@@ -85,6 +88,7 @@ class ShopProfile extends StatelessWidget {
             provider.name,
             style: Theme.of(context).textTheme.headlineMedium,
           ),
+          GooglePlacesAttribution(provider),
           const SizedBox(height: 8),
           Text(
             provider.independent
@@ -173,7 +177,7 @@ class ShopProfile extends StatelessWidget {
           ),
           if (!canSave && favorites.isEmpty)
             const Text('Choose a saved vehicle to save a dedicated shop.'),
-          if (canSaveContact)
+          if (canSaveContact && provider.source != 'google_places')
             TextButton.icon(
               onPressed: () =>
                   Navigator.pop(context, ShopProfileAction.saveContact),

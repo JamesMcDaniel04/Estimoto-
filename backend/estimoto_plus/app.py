@@ -39,13 +39,15 @@ from .shop_media_catalog import router as shop_media_router
 
 # Readiness fails closed until the database carries exactly this migration.
 # tests/test_readiness.py keeps it equal to the Alembic head.
-EXPECTED_SCHEMA_REVISION = "b7f2c9d4e1a0"
+EXPECTED_SCHEMA_REVISION = "d9e4b82013c7"
 
 
 def create_app(settings: Settings | None = None, *, auth_verifier=None, auth_client=None, bridge_transport=None):
     settings = settings or Settings()
     if not settings.database_url:
         raise ValueError("DATABASE_URL is required")
+    if settings.places_enabled and not settings.google_places_api_key:
+        raise ValueError('PLACES_ENABLED requires GOOGLE_PLACES_API_KEY on the backend')
     if settings.environment == "production":
         required = (settings.supabase_url, settings.supabase_publishable_key, settings.bridge_url,
                     settings.estimate_bridge_url, settings.bridge_key, settings.source_sha)

@@ -38,7 +38,24 @@ void main() {
       await api.upload(fixture());
       await api.read('receipt-1');
       await api.delete('receipt-1');
-      expect(calls.map((r) => r.method), ['POST', 'GET', 'DELETE']);
+      await api.parseTotal('receipt-1');
+      await api.applyTotal('receipt-1', 12500);
+      expect(calls.map((r) => r.method), [
+        'POST',
+        'GET',
+        'DELETE',
+        'POST',
+        'POST',
+      ]);
+      expect(
+        calls[3].url.path,
+        '/v1/knowledge/records/record-1/receipts/receipt-1/parse-total',
+      );
+      expect(
+        calls[4].url.path,
+        '/v1/knowledge/records/record-1/receipts/receipt-1/apply-total',
+      );
+      expect(calls[4].body, '{"expected_cost_cents":12500}');
       expect(calls.first.url.path, '/v1/knowledge/records/record-1/receipts');
       expect(calls.first.headers['Idempotency-Key'], fixture().operationId);
       expect(calls.first.body, contains('filename="work.pdf"'));
@@ -54,7 +71,7 @@ void main() {
   test(
     'sign-out while auth resolves blocks upload, read and delete before I/O',
     () async {
-      for (final method in ['upload', 'read', 'delete']) {
+      for (final method in ['upload', 'read', 'delete', 'parse', 'apply']) {
         var active = true, calls = 0;
         final auth = Completer<String?>();
         final repo = ApiPlusRepository(
@@ -69,6 +86,8 @@ void main() {
         final Future<dynamic> result = switch (method) {
           'upload' => api.upload(fixture()),
           'read' => api.read('receipt-1'),
+          'parse' => api.parseTotal('receipt-1'),
+          'apply' => api.applyTotal('receipt-1', null),
           _ => api.delete('receipt-1'),
         };
         active = false;

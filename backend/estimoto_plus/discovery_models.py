@@ -36,3 +36,10 @@ class DirectoryBudget(Base):
     day: Mapped[str] = mapped_column(String(10), primary_key=True)
     attempts: Mapped[int] = mapped_column(Integer, default=0)
     body_bytes: Mapped[int] = mapped_column(Integer, default=0)
+
+
+class PlacesBudget(Base):
+    """Counters only. Google content is never stored in the ODbL directory."""
+    __tablename__ = 'places_request_budgets'
+    day: Mapped[str] = mapped_column(String(10), primary_key=True)
+    requests: Mapped[int] = mapped_column(Integer, default=0)

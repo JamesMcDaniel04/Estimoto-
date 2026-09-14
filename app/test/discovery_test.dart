@@ -241,7 +241,7 @@ void main() {
       find.textContaining('Your vehicle or service ZIP changed'),
       findsNothing,
     );
-    await tapDiscovery(tester, find.text('Lists Audi services'));
+    await tapDiscovery(tester, find.text('Matches Audi'));
     expect(repo.calls.last['make_only'], true);
     expect(repo.calls.last['postal_code'], '80229');
     final beforeEdit = repo.calls.length;
@@ -249,11 +249,11 @@ void main() {
     c.selectVehicle(c.selectedVehicle!.id);
     await tester.pumpAndSettle();
     expect(repo.calls.length, beforeEdit + 1);
-    expect(find.text('Lists BMW services'), findsOneWidget);
+    expect(find.text('Matches BMW'), findsOneWidget);
     c.selectVehicle(c.snapshot!.vehicles.last.id);
     await tester.pumpAndSettle();
-    expect(find.text('Lists Toyota services'), findsOneWidget);
-    expect(find.text('Lists Audi services'), findsNothing);
+    expect(find.text('Matches Toyota'), findsOneWidget);
+    expect(find.text('Matches Audi'), findsNothing);
     expect(repo.calls.last['vehicle_id'], c.snapshot!.vehicles.last.id);
     expect(repo.calls.last['make_only'], true);
     expect(tester.takeException(), isNull);

@@ -6,6 +6,8 @@ ENV PYTHONDONTWRITEBYTECODE=1 PYTHONUNBUFFERED=1 SOURCE_SHA=${SOURCE_SHA}
 # home, which must not remain the inaccessible root-account directory.
 ENV HOME=/home/plus
 WORKDIR /app/backend
+RUN apt-get update && apt-get install -y --no-install-recommends tesseract-ocr tesseract-ocr-eng poppler-utils \
+    && rm -rf /var/lib/apt/lists/*
 COPY backend/requirements.lock ./requirements.lock
 RUN pip install --no-cache-dir -r requirements.lock \
     && useradd --uid 10001 --create-home plus

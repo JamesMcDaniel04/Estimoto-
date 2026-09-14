@@ -8,6 +8,7 @@ import 'common.dart';
 import 'workspace_widgets.dart';
 import 'shop_media.dart';
 import 'shop_profile.dart';
+import 'google_places_attribution.dart';
 
 String serviceModeLabel(String mode) => mode == 'mobile'
     ? 'Mobile service · provider comes to you'
@@ -82,6 +83,25 @@ class DiscoveryDetails extends StatelessWidget {
           onPressed: () => openExternal(context, textOf(attribution, 'url')),
           child: Text(textOf(attribution, 'name')),
         ),
+      if (data['directory_provider'] == 'google_places') ...[
+        const Text(
+          'Results may be suggested for your vehicle by Google Maps. Confirm the exact repair and vehicle expertise with the shop.',
+        ),
+        TextButton(
+          onPressed: () => openExternal(
+            context,
+            'https://estimoto-plus-api.fly.dev/discovery-terms.html',
+          ),
+          child: const Text('Shop search terms'),
+        ),
+        TextButton(
+          onPressed: () => openExternal(
+            context,
+            'https://estimoto-plus-api.fly.dev/discovery-privacy.html',
+          ),
+          child: const Text('Shop search privacy'),
+        ),
+      ],
     ],
   );
 }
@@ -169,7 +189,7 @@ class _DiscoveryResultsState extends WorkspaceState<DiscoveryResults> {
   }
 
   Future<void> saveContact(ProviderProfile provider) async {
-    if (!sameSearch) return;
+    if (!sameSearch || provider.source == 'google_places') return;
     await Navigator.of(context).push<void>(
       MaterialPageRoute(
         builder: (_) => ShopEditor(
@@ -227,7 +247,8 @@ class _DiscoveryResultsState extends WorkspaceState<DiscoveryResults> {
             .map((f) => specialtyLabel(textOf(f, 'specialty')))
             .toList(),
         onSave: widget.vehicleId == null || busy ? null : () => save(provider),
-        onSaveContact: provider.independent
+        onSaveContact:
+            provider.independent && provider.source != 'google_places'
             ? () => saveContact(provider)
             : null,
         onRequest:
@@ -330,6 +351,11 @@ class DiscoveryProviderCard extends StatelessWidget {
         ].contains(match['basis']) &&
         vehicleMake != null &&
         '${match['make']}'.toLowerCase() == vehicleMake!.toLowerCase();
+    final suggestedMake =
+        provider.source == 'google_places' &&
+        match['status'] == 'search_relevance' &&
+        vehicleMake != null &&
+        '${match['make']}'.toLowerCase() == vehicleMake!.toLowerCase();
     final identity = Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
@@ -350,6 +376,8 @@ class DiscoveryProviderCard extends StatelessWidget {
                           provider.json['verification']['status'] ==
                               'contact_confirmed'
                       ? 'Business contact details checked'
+                      : provider.source == 'google_places'
+                      ? 'Independent repair listing'
                       : 'Independent listing · OpenStreetMap'
                 : 'Participating Estimoto provider',
             style: Theme.of(context).textTheme.bodySmall,
@@ -423,11 +451,19 @@ class DiscoveryProviderCard extends StatelessWidget {
                       'Listed support for ${match['make']} · confirm with the shop',
                     ),
                   ),
+                if (suggestedMake)
+                  Padding(
+                    padding: const EdgeInsets.only(top: 10),
+                    child: Text(
+                      'Suggested for your ${match['make']} · confirm services with the shop',
+                    ),
+                  ),
                 if (provider.description.isNotEmpty)
                   Padding(
                     padding: const EdgeInsets.only(top: 10),
                     child: Text(provider.description),
                   ),
+                GooglePlacesAttribution(provider),
                 if (provider.requestModes.contains('mobile'))
                   const Padding(
                     padding: EdgeInsets.only(top: 10),

@@ -19,6 +19,7 @@ jobs:
           cache: pip
           cache-dependency-path: backend/requirements.lock
       - run: python -m pip install -r backend/requirements.lock
+      - run: sudo apt-get update && sudo apt-get install -y tesseract-ocr tesseract-ocr-eng poppler-utils
       - run: python -m pytest -q
         working-directory: backend
       - run: python scripts/smoke_api.py
@@ -58,6 +59,7 @@ jobs:
               connection.execute('CREATE ROLE anon NOLOGIN NOSUPERUSER NOBYPASSRLS')
               connection.execute('CREATE ROLE authenticated NOLOGIN NOSUPERUSER NOBYPASSRLS')
           PY
+      - run: sudo apt-get update && sudo apt-get install -y tesseract-ocr tesseract-ocr-eng poppler-utils
       - run: python -m pytest -q
         working-directory: backend
   capture-web:

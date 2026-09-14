@@ -7,6 +7,8 @@
 !backend/alembic/
 !backend/alembic/**
 !backend/alembic.ini
+!backend/scripts/
+!backend/scripts/check_places.py
 !app/
 !app/build/
 !app/build/web/

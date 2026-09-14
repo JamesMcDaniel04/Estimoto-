@@ -49,6 +49,7 @@ class KnowledgeReceipt(Base):
     storage_name: Mapped[str | None] = mapped_column(String(36), nullable=True)
     status: Mapped[str] = mapped_column(String(20), default="staging")
     cleanup_retry_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+    total_extraction: Mapped[dict] = mapped_column(JSON, default=dict)
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=now)
 
 

@@ -119,18 +119,18 @@ def zip_location(factory, transport, postal, *, allow_fetch=True):
     return cached(factory, 'zip:' + postal, lambda: fetch_zip(postal, transport), allow_fetch=allow_fetch)
 
 
-def public_directory(factory, transport, postal, point, settings):
+def public_directory(factory, transport, postal, point, settings, *, allow_fetch=True):
     secondary_key = 'osm:secondary:' + postal
     secondary_fetch = lambda limit, meter: fetch_listings(point, transport, limit=limit, meter=meter, endpoint=SECONDARY_ENDPOINT)
     saved_secondary = cached(factory, secondary_key, secondary_fetch, budget=settings, allow_fetch=False)
     if saved_secondary[1] == 'ready':
         return saved_secondary
     result = cached(factory, 'osm:' + postal,
-                    lambda limit, meter: fetch_listings(point, transport, limit=limit, meter=meter), budget=settings)
+                    lambda limit, meter: fetch_listings(point, transport, limit=limit, meter=meter), budget=settings, allow_fetch=allow_fetch)
     if result[0] is not None:
         return result
     # Both endpoints acquire gate:osm and charge the same daily budget.
-    secondary = cached(factory, secondary_key, secondary_fetch, budget=settings)
+    secondary = cached(factory, secondary_key, secondary_fetch, budget=settings, allow_fetch=allow_fetch)
     if secondary[0] is not None:
         return secondary
     # A failed new-ZIP lookup does not invalidate nearby recently indexed shops.

@@ -18,6 +18,7 @@ import 'package:estimoto_plus/theme.dart';
 import 'package:estimoto_plus/widgets/history_cost_summary.dart';
 
 class _Repo extends DemoPlusRepository {
+  Json? totalResult;
   bool failFirst = false, failKnowledge = false;
   bool commitBeforeUploadFailure = false;
   bool uncertainHistory = false;
@@ -70,7 +71,8 @@ class _Api extends ReceiptApi {
         408,
       );
     }
-    return delegate.upload(value);
+    final result = await delegate.upload(value);
+    return {...result, ...?repo.totalResult};
   }
 
   @override
@@ -148,6 +150,45 @@ Future<void> tap(WidgetTester t, String text) async {
 
 void main() {
   setUpAll(loadReceiptProofFonts);
+  testWidgets(
+    'uploaded total immediately updates recorded cost and explains the saved amount',
+    (t) async {
+      final repo = _Repo()
+        ..totalResult = {
+          'total_extraction': {
+            'status': 'applied',
+            'amount_cents': 170348,
+            'currency': 'USD',
+            'source': 'pdf_text',
+          },
+          'record_cost_cents': 170348,
+        };
+      final (c, entry) = await _setup(repo);
+      await repo.updateKnowledgeRecord(entry['id'], {'cost_cents': null});
+      await mount(
+        t,
+        HistoryReceiptsScreen(
+          controller: c,
+          recordId: entry['id'],
+          store: MemoryReceiptPendingStore(),
+          pdfPicker: () async => XFile.fromData(
+            Uint8List.fromList('%PDF-1.4 receipt'.codeUnits),
+            name: 'total.pdf',
+          ),
+        ),
+      );
+      await tap(t, 'Choose PDF');
+      expect(
+        find.text(r'Receipt saved. $1,703.48 added to Recorded costs.'),
+        findsOneWidget,
+      );
+      expect(find.text(r'Receipt total: $1,703.48'), findsOneWidget);
+      expect(find.text('Included in Recorded costs.'), findsOneWidget);
+      expect(find.text(r'$1,703.48'), findsOneWidget);
+      expect(t.takeException(), isNull);
+      c.dispose();
+    },
+  );
   testWidgets(
     'inline receipt choices validate before saving and keep cancellation honest',
     (t) async {

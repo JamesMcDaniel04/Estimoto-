@@ -354,7 +354,8 @@ def test_migration_chain_and_private_table_boundary(dialect, tmp_path, monkeypat
         command.upgrade(config, 'head')
         command.check(config)
         with engine.connect() as db:
-            assert db.scalar(text('SELECT version_num FROM alembic_version')) == 'b7f2c9d4e1a0'
+            from estimoto_plus.app import EXPECTED_SCHEMA_REVISION
+            assert db.scalar(text('SELECT version_num FROM alembic_version')) == EXPECTED_SCHEMA_REVISION
             if dialect == 'postgresql':
                 rows = db.execute(text("SELECT relname,relrowsecurity FROM pg_class JOIN pg_namespace n ON n.oid=relnamespace WHERE n.nspname=:schema AND relname IN ('vehicle_valuation_cache','valuation_provider_state','vehicle_valuation_history')"), {'schema': 'public'}).all()
                 assert len(rows) == 3 and all(enabled for _, enabled in rows)

@@ -1,5 +1,6 @@
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
+import 'history_screen.dart';
 import 'package:image_picker/image_picker.dart';
 import 'package:pdfx/pdfx.dart';
 import '../data/repository.dart';
@@ -296,13 +297,29 @@ class _HistoryReceiptsScreenState extends State<HistoryReceiptsScreen>
     setState(() => pending = saved);
     final result = await upload.retry();
     if (!current) return;
-    widget.controller.historyChanged();
     setState(() {
       pending = null;
-      notice = 'Receipt saved privately.';
+    });
+    acceptReceipt(result);
+  }
+
+  void acceptReceipt(Json result) {
+    if (!current) return;
+    final extraction = result['total_extraction'] as Map? ?? {};
+    final amount = extraction['amount_cents'];
+    final applied =
+        extraction['status'] == 'applied' &&
+        amount is int &&
+        result['record_cost_cents'] == amount;
+    setState(() {
+      notice = applied
+          ? 'Receipt saved. ${receiptCost(amount)} added to Recorded costs.'
+          : 'Receipt saved privately.';
       if (record != null) {
         record = {
           ...record!,
+          if (result.containsKey('record_cost_cents'))
+            'cost_cents': result['record_cost_cents'],
           'receipts': [
             ...rowsOf(
               record!,
@@ -313,6 +330,87 @@ class _HistoryReceiptsScreenState extends State<HistoryReceiptsScreen>
         };
       }
     });
+    widget.controller.historyChanged();
+  }
+
+  Future<void> parseTotal(Json receipt) => action(() async {
+    acceptReceipt(await api.parseTotal(textOf(receipt, 'id')));
+  });
+
+  Future<void> useTotal(Json receipt) => action(() async {
+    final extraction = receipt['total_extraction'] as Map? ?? {};
+    final amount = extraction['amount_cents'];
+    if (amount is! int || record == null) return;
+    final previous = record!['cost_cents'] as int?;
+    if (!await confirm(
+      'Use receipt total?',
+      previous == null
+          ? 'Record ${receiptCost(amount)} as the cost for this history entry?'
+          : 'Replace the recorded cost of ${receiptCost(previous)} with ${receiptCost(amount)}? This replaces the amount; it does not add a second charge.',
+      'Use total',
+    )) {
+      return;
+    }
+    acceptReceipt(await api.applyTotal(textOf(receipt, 'id'), previous));
+  });
+
+  Future<void> editCost() => action(() async {
+    if (record == null) return;
+    await Navigator.of(context).push<void>(
+      MaterialPageRoute(
+        builder: (_) =>
+            HistoryEditor(controller: widget.controller, record: record),
+      ),
+    );
+    if (current) await load();
+  });
+
+  Widget totalDetails(Json receipt) {
+    final extraction = receipt['total_extraction'] as Map? ?? {};
+    final amount = extraction['amount_cents'];
+    final status = extraction['status'];
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        if (amount is int) ...[
+          Text('Receipt total: ${receiptCost(amount)}'),
+          if (record?['cost_cents'] == amount)
+            const Text('Included in Recorded costs.')
+          else if (!widget.controller.isDemo)
+            TextButton(
+              onPressed: busy ? null : () => useTotal(receipt),
+              child: const Text('Use detected total'),
+            ),
+        ] else
+          Text(
+            status == 'unsupported_currency'
+                ? 'This receipt uses another currency. Enter its USD cost manually.'
+                : status == 'needs_review'
+                ? 'Several possible totals need review. Enter the correct cost below.'
+                : widget.controller.isDemo
+                ? 'Automatic receipt totals are available when signed in.'
+                : status == 'not_found'
+                ? 'No clear receipt total was found. You can enter it manually.'
+                : 'The receipt total has not been read yet.',
+          ),
+        if (status == 'needs_review' && amount is int)
+          const Text('Check this amount against the receipt before using it.'),
+        Wrap(
+          spacing: 8,
+          children: [
+            if (!widget.controller.isDemo && (amount is! int))
+              TextButton(
+                onPressed: busy ? null : () => parseTotal(receipt),
+                child: const Text('Read receipt total'),
+              ),
+            TextButton(
+              onPressed: busy ? null : editCost,
+              child: const Text('Edit recorded cost'),
+            ),
+          ],
+        ),
+      ],
+    );
   }
 
   Future<void> photo(ImageSource source) => action(() async {
@@ -680,6 +778,7 @@ class _HistoryReceiptsScreenState extends State<HistoryReceiptsScreen>
                     Text(
                       '${(intOf(receipt, 'byte_size') / 1024).ceil()} KB · Saved privately',
                     ),
+                    totalDetails(receipt),
                     Wrap(
                       spacing: 10,
                       children: [

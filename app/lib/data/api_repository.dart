@@ -865,12 +865,14 @@ class _ApiReceiptRecord extends ReceiptApi {
     String method, {
     String? receiptId,
     ReceiptPending? upload,
+    String action = '',
+    Json? body,
   }) async {
     check();
     final headers = await repository._headers();
     check();
     final path =
-        '/v1/knowledge/records/${Uri.encodeComponent(recordId)}/receipts${receiptId == null ? '' : '/${Uri.encodeComponent(receiptId)}'}';
+        '/v1/knowledge/records/${Uri.encodeComponent(recordId)}/receipts${receiptId == null ? '' : '/${Uri.encodeComponent(receiptId)}'}$action';
     final uri = repository.baseUri.resolve(path);
     final http.BaseRequest outgoing;
     if (upload != null) {
@@ -891,7 +893,12 @@ class _ApiReceiptRecord extends ReceiptApi {
         );
       headers['Idempotency-Key'] = upload.operationId;
     } else {
-      outgoing = http.Request(method, uri);
+      final jsonRequest = http.Request(method, uri);
+      if (body != null) {
+        headers['Content-Type'] = 'application/json';
+        jsonRequest.body = jsonEncode(body);
+      }
+      outgoing = jsonRequest;
     }
     outgoing.headers.addAll(headers);
     outgoing.followRedirects = false;
@@ -925,13 +932,17 @@ class _ApiReceiptRecord extends ReceiptApi {
           401 => 'Your session ended. Sign in again to open your receipts.',
           403 || 404 => 'This history entry or receipt is no longer available.',
           409 =>
-            'This saved upload conflicts with an earlier file. Refresh your receipts before discarding it.',
+            action.isNotEmpty
+                ? 'The recorded cost changed. Refresh and review the amount again.'
+                : 'This saved upload conflicts with an earlier file. Refresh your receipts before discarding it.',
           410 =>
             'This receipt was deleted. Discard the saved upload to choose another file.',
           413 => 'Choose a receipt no larger than 10 MB.',
           415 => 'Choose a readable JPEG, PNG, WebP or PDF receipt.',
           422 =>
-            'This entry already has 10 receipts. Delete one before adding another.',
+            action.isNotEmpty
+                ? 'No supported receipt total is available. Enter the cost manually.'
+                : 'This entry already has 10 receipts. Delete one before adding another.',
           429 => 'Please wait a moment, then retry the same saved receipt.',
           _ =>
             'The receipt could not be saved or opened. Retry when your connection is available.',
@@ -961,4 +972,19 @@ class _ApiReceiptRecord extends ReceiptApi {
   Future<void> delete(String receiptId) async {
     await request('DELETE', receiptId: receiptId);
   }
+
+  @override
+  Future<Json> parseTotal(String receiptId) async => repository._decode(
+    await request('POST', receiptId: receiptId, action: '/parse-total'),
+  );
+  @override
+  Future<Json> applyTotal(String receiptId, int? expectedCostCents) async =>
+      repository._decode(
+        await request(
+          'POST',
+          receiptId: receiptId,
+          action: '/apply-total',
+          body: {'expected_cost_cents': expectedCostCents},
+        ),
+      );
 }
