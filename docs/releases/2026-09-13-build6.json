@@ -1,0 +1,37 @@
+{
+  "version": "0.1.0",
+  "build": 6,
+  "source_sha": "08c156de08b626da9de1ba10975f214a2a89d41b",
+  "android": {
+    "stable_url": "https://estimoto-plus-api.fly.dev/android/download",
+    "release_tag": "v0.1.0-beta.6",
+    "apk_sha256": "13bf8d789ea9a099d4708e7c8d3e1b8278885e949caa165d157a10ba380851f6",
+    "apk_bytes": 60762087,
+    "aab_sha256": "2d2ddf88ede240df4f16d97314f27e58c2d3191938ad5570e8913c79f37990c5",
+    "aab_bytes": 58557800,
+    "signer_sha256": "e6d106fccc6c0e77e04a46c64f8edffdafb11b502d4857e51606c725086581dd",
+    "public_bytes_verified": true,
+    "requested_email_delivered": true,
+    "emulator_upgrade_session_preserved": true
+  },
+  "ios": {
+    "app_id": "6811678079",
+    "build_id": "151a340f-7220-4b08-8c74-cabaa53c8ee2",
+    "ipa_sha256": "ff8d1a9dce044c7e6c0f08e42021b1d28510d2866c593a038c9c8385dfccc0a7",
+    "ipa_bytes": 24497355,
+    "processing": "VALID",
+    "internal_state": "IN_BETA_TESTING",
+    "external_state": "READY_FOR_BETA_SUBMISSION",
+    "internal_and_external_groups_attached": true,
+    "what_to_test_set": true,
+    "external_blocker": "Build 2 remains WAITING_FOR_BETA_REVIEW; Apple refused another simultaneous review submission."
+  },
+  "validation": {
+    "guided_capture_live_checks": 72,
+    "guided_capture_live_requests": 44,
+    "android_interrupted_photo_explicit_recovery": true,
+    "android_live_estibot_photo_help": true,
+    "ios_native_and_guided_photo_library_picker_opened": true,
+    "physical_camera_quality_verification": false
+  }
+}
