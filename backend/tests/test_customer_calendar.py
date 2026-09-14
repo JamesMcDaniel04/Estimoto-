@@ -260,7 +260,9 @@ def test_calendar_migration_and_rls_on_disposable_postgres(tmp_path):
     from pathlib import Path
     from sqlalchemy.orm import Session
     from estimoto_plus.calendar_models import CalendarAttempt, CalendarConnection, CalendarOperation, CalendarProvision
-    from estimoto_plus.models import Customer, now
+    from estimoto_plus.models import Customer, Estimate, Photo, Vehicle, now
+    from estimoto_plus.discovery_models import DirectoryBudget, DirectoryCache, PublicListing, DedicatedShop
+    from estimoto_plus.capture_models import CaptureReceipt, CaptureVinSuggestion
     supplied = os.getenv('PLUS_TEST_POSTGRES_URL') or os.getenv('CALENDAR_TEST_POSTGRES_URL')
     if not supplied:
         pytest.skip('Local disposable PostgreSQL URL is required for migration/RLS proof.')
@@ -284,6 +286,19 @@ def test_calendar_migration_and_rls_on_disposable_postgres(tmp_path):
         with Session(engine) as db:
             db.add(Customer(id='synthetic-calendar', email='test@example.test'))
             db.flush()
+            db.add(Vehicle(id='synthetic-vehicle', customer_id='synthetic-calendar', year=2021, make='Toyota', model='Tacoma'))
+            db.flush()
+            db.add(Estimate(id='synthetic-estimate', customer_id='synthetic-calendar', vehicle_id='synthetic-vehicle', discipline='pdr', description='Synthetic'))
+            db.flush()
+            db.add(Photo(id='synthetic-photo', estimate_id='synthetic-estimate', label='vin', mime_type='image/jpeg', storage_name='synthetic-private', sha256='0' * 64))
+            db.flush()
+            db.add(CaptureReceipt(id=str(uuid4()), customer_id='synthetic-calendar', estimate_id='synthetic-estimate', capture_key='vin', payload_hash='0' * 64,
+                                  claim_token=str(uuid4()), lease_until=now() + timedelta(minutes=1), result={}))
+            db.add(CaptureVinSuggestion(photo_id='synthetic-photo', customer_id='synthetic-calendar', estimate_id='synthetic-estimate', photo_sha256='0' * 64, result={}))
+            db.add(DirectoryBudget(day=now().date().isoformat()))
+            db.add(DirectoryCache(key='zip:80204', value={}))
+            db.add(PublicListing(source_id='node:1', value={}))
+            db.add(DedicatedShop(customer_id='synthetic-calendar', vehicle_id='synthetic-vehicle', specialty='mechanical', source='openstreetmap', source_id='node:1'))
             db.add(CalendarConnection(customer_id='synthetic-calendar', integration_id='estimoto-plus-google-calendar', environment='production'))
             db.add(CalendarAttempt(customer_id='synthetic-calendar', generation=1, integration_id='estimoto-plus-google-calendar',
                                    environment='production', expires_at=now() + timedelta(minutes=30)))
@@ -291,9 +306,12 @@ def test_calendar_migration_and_rls_on_disposable_postgres(tmp_path):
             db.add(CalendarOperation(customer_id='synthetic-calendar', source_kind='request', source_id='synthetic', generation=1,
                                      nango_connection_id='synthetic', event_id='abcde', payload={}, payload_hash='0' * 64))
             db.commit()
-        tables = [m.__tablename__ for m in (CalendarConnection, CalendarAttempt, CalendarProvision, CalendarOperation)]
+        tables = [m.__tablename__ for m in (CalendarConnection, CalendarAttempt, CalendarProvision, CalendarOperation,
+                                           DirectoryCache, PublicListing, DedicatedShop, DirectoryBudget, CaptureReceipt, CaptureVinSuggestion)]
         with engine.begin() as db:
-            assert db.scalar(text('SELECT version_num FROM alembic_version')) == '6db7a239f1c8'
+            from alembic.script import ScriptDirectory
+            expected_head = ScriptDirectory(str(Path(__file__).parents[1] / 'alembic')).get_current_head()
+            assert db.scalar(text('SELECT version_num FROM alembic_version')) == expected_head
             for table in tables:
                 assert db.scalar(text('SELECT relrowsecurity FROM pg_class WHERE oid=to_regclass(:table)'), {'table': table}) is True
                 assert db.scalar(text(f'SELECT count(*) FROM "{table}"')) == 1

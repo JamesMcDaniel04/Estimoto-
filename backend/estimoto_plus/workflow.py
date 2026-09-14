@@ -42,6 +42,7 @@ def creation_payload(request, customer, vehicle, provider) -> dict:
         "contact": contact,
         "vehicle": car,
         "created_at": request.created_at.isoformat(),
+        **({'service_mode': request.service_mode} if request.service_mode is not None else {}),
     }
 
 

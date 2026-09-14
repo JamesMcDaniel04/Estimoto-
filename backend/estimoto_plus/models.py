@@ -101,7 +101,12 @@ class CalendarSourceMixin:
     calendar_sync_message: Mapped[str | None] = mapped_column(String(300), nullable=True)
 
 
-class ServiceRequest(CalendarSourceMixin, Base):
+class DiscoverySourceMixin:
+    service_mode: Mapped[str | None] = mapped_column(String(20), nullable=True)
+    discovery_admission: Mapped[dict] = mapped_column(JSON, default=dict)
+
+
+class ServiceRequest(CalendarSourceMixin, DiscoverySourceMixin, Base):
     __tablename__ = "service_requests"
     __table_args__ = (UniqueConstraint("customer_id", "idempotency_key"),)
     id: Mapped[str] = mapped_column(String(36), primary_key=True, default=uid)
@@ -160,7 +165,7 @@ class Outbox(Base):
     suppressed: Mapped[bool] = mapped_column(Boolean, default=False)
 
 
-class Estimate(Base):
+class Estimate(DiscoverySourceMixin, Base):
     __tablename__ = "estimates"
     id: Mapped[str] = mapped_column(String(36), primary_key=True, default=uid)
     customer_id: Mapped[str] = mapped_column(ForeignKey("customers.id"), index=True)

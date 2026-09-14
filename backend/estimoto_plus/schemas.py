@@ -67,6 +67,7 @@ class EstimateCreate(Strict):
 
 
 class EstimateSubmit(Strict):
+    service_mode: Literal['shop_visit', 'mobile'] | None = None
     provider_id: str = Field(min_length=1, max_length=36)
     share_contact: Literal[True]
 
@@ -85,6 +86,7 @@ class ReminderCreate(Strict):
 
 
 class RequestCreate(Strict, CalendarChecked):
+    service_mode: Literal['shop_visit', 'mobile'] | None = None
     vehicle_id: str = Field(max_length=36)
     provider_id: str = Field(max_length=36)
     specialty: Literal["pdr", "collision", "maintenance", "mechanical"]

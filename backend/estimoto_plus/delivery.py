@@ -34,6 +34,7 @@ def due_ids(session_factory):
 
 
 def claim(session_factory, outbox_id):
+    from .discovery import valid_admission
     with session_factory() as db:
         request_id = db.scalar(select(Outbox.request_id).where(Outbox.id == outbox_id))
         db.rollback()
@@ -58,8 +59,10 @@ def claim(session_factory, outbox_id):
             eligible = (provider is not None and provider.public_visible and provider.accepting_requests
                         and not provider.demo_only and request.specialty in provider.specialties
                         and canonical_zip(request.service_postal_code) is not None
-                        and request.service_postal_code in provider.postal_codes
+                        and valid_admission(
+                            provider, request.service_postal_code, request.service_mode, request.discovery_admission)
                         and isinstance(payload, dict)
+                        and payload.get('service_mode') == request.service_mode
                         and payload.get("service_postal_code") == request.service_postal_code
                         and payload.get("provider_source_id") == provider.source_id)
             if request.status == "cancelled" or not valid_payload or not eligible:

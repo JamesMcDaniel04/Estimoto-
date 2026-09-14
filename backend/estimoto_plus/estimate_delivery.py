@@ -27,6 +27,7 @@ def due_estimate_ids(session_factory):
 
 
 def claim_estimate(session_factory, outbox_id):
+    from .discovery import valid_admission
     with session_factory() as db:
         estimate_id = db.scalar(select(EstimateOutbox.estimate_id).where(EstimateOutbox.id == outbox_id))
         db.rollback()
@@ -58,7 +59,9 @@ def claim_estimate(session_factory, outbox_id):
             provider = db.scalar(select(Provider).where(Provider.id == estimate.provider_id).with_for_update())
             if (not provider or not provider.public_visible or not provider.accepting_requests or provider.demo_only or
                     provider.kind != "shop" or estimate.discipline not in provider.specialties or
-                    payload.get("service_postal_code") not in provider.postal_codes or
+                    payload.get('service_mode') != estimate.service_mode or
+                    not valid_admission(
+                        provider, payload.get('service_postal_code'), estimate.service_mode, estimate.discovery_admission) or
                     payload.get("provider_source_id") != provider.source_id):
                 estimate.delivery_status = "failed"
                 estimate.processing_state = "failed"

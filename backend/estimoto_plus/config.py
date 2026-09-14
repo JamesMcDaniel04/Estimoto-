@@ -5,6 +5,9 @@ from pathlib import Path
 
 @dataclass
 class Settings:
+    discovery_enabled: bool = field(default_factory=lambda: os.getenv('DISCOVERY_ENABLED', 'false').lower() == 'true')
+    discovery_daily_requests: int = field(default_factory=lambda: int(os.getenv('DISCOVERY_DAILY_REQUESTS', '30')))
+    discovery_daily_bytes: int = field(default_factory=lambda: int(os.getenv('DISCOVERY_DAILY_BYTES', str(8 * 1024 * 1024))))
     calendar_enabled: bool = field(default_factory=lambda: os.getenv("GOOGLE_CALENDAR_ENABLED", "false").lower() == "true")
     nango_api_key: str = field(default_factory=lambda: os.getenv("NANGO_API_KEY", ""), repr=False)
     nango_environment: str = field(default_factory=lambda: os.getenv("NANGO_ENVIRONMENT", "production"))
