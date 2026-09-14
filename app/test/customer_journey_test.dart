@@ -116,6 +116,12 @@ void main() {
       final controller = await launch(tester);
       await tester.tap(find.byKey(const Key('nav-find-help')));
       await tester.pumpAndSettle();
+      final shopCard = find.byKey(
+        ValueKey('shop-card-${controller.snapshot!.providers.first.id}'),
+      );
+      await tester.ensureVisible(shopCard);
+      await tester.tap(shopCard);
+      await tester.pumpAndSettle();
       final requestAction = find.text('Request help').first;
       await tester.ensureVisible(requestAction);
       await tester.tap(requestAction);

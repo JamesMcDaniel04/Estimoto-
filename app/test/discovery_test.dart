@@ -191,6 +191,11 @@ Future<void> tapDiscovery(WidgetTester tester, Finder finder) async {
   await tester.pumpAndSettle();
 }
 
+Future<void> openDiscoveryProfile(
+  WidgetTester tester, {
+  String id = 'partner-plus-id',
+}) => tapDiscovery(tester, find.byKey(ValueKey('shop-card-$id')));
+
 Future<void> discoveryProof(WidgetTester tester, String name) async {
   const directory = String.fromEnvironment('DISCOVERY_CAPTURE_DIR');
   if (directory.isEmpty) return;
@@ -242,6 +247,7 @@ void main() {
       final c = await discoveryController(repo);
       await mountDiscovery(tester, c);
       await tester.pumpAndSettle();
+      await openDiscoveryProfile(tester, id: 'osm:node:123');
       await tapDiscovery(
         tester,
         find.text('Save contact for reviewed scheduling'),
@@ -300,6 +306,7 @@ void main() {
       final c = await discoveryController(repo);
       await mountDiscovery(tester, c);
       await tester.pumpAndSettle();
+      await openDiscoveryProfile(tester);
       await tapDiscovery(tester, find.text('Request help'));
       c.selectVehicle(c.snapshot!.vehicles.last.id);
       await tester.pumpAndSettle();
@@ -331,13 +338,15 @@ void main() {
       );
       await mountDiscovery(tester, c);
       await tester.pumpAndSettle();
-      expect(find.text('Request help'), findsOneWidget);
       expect(find.text('Your dedicated shop: PDR'), findsOneWidget);
+      await openDiscoveryProfile(tester);
+      expect(find.text('Request help'), findsOneWidget);
       await tapDiscovery(tester, find.text('Change or remove saved choice'));
       await tapDiscovery(tester, find.text('Remove: PDR'));
       expect(repo.favorites, isEmpty);
       expect(repo.savedFavorite, isNull);
       expect(find.text('Your dedicated shop: PDR'), findsNothing);
+      await openDiscoveryProfile(tester);
       expect(find.text('Save as my dedicated shop'), findsOneWidget);
     },
   );
@@ -349,6 +358,7 @@ void main() {
       final c = await discoveryController(repo);
       await mountDiscovery(tester, c);
       await tester.pumpAndSettle();
+      await openDiscoveryProfile(tester, id: 'osm:node:123');
       expect(find.text('Request help'), findsNothing);
       await tapDiscovery(tester, find.text('Save as my dedicated shop'));
       await tapDiscovery(tester, find.text('Save for: PDR'));
@@ -360,6 +370,7 @@ void main() {
       });
       expect(repo.createdRequest, isNull);
       expect(find.text('Your dedicated shop: PDR'), findsOneWidget);
+      await openDiscoveryProfile(tester, id: 'osm:node:123');
       await tapDiscovery(tester, find.text('Change or remove saved choice'));
       await tapDiscovery(tester, find.text('Remove: PDR'));
       expect(repo.favorites, isEmpty);
@@ -373,6 +384,7 @@ void main() {
       final c = await discoveryController(repo);
       await mountDiscovery(tester, c);
       await tester.pumpAndSettle();
+      await openDiscoveryProfile(tester, id: 'osm:node:123');
       await tapDiscovery(tester, find.text('Save as my dedicated shop'));
       c.selectVehicle(c.snapshot!.vehicles.last.id);
       await tester.pumpAndSettle();
@@ -403,6 +415,7 @@ void main() {
       );
       await tester.pumpAndSettle();
       await discoveryProof(tester, 'directory-card-320-large');
+      await openDiscoveryProfile(tester);
       await tapDiscovery(tester, find.text('Request help'));
       expect(find.text(serviceModeLabel('shop_visit')), findsOneWidget);
       await tester.enterText(
@@ -441,6 +454,7 @@ void main() {
     );
     await mountDiscovery(tester, c);
     await tester.pumpAndSettle();
+    await openDiscoveryProfile(tester);
     await tapDiscovery(tester, find.text('Request help'));
     expect(find.text('As previously submitted'), findsOneWidget);
     await tapDiscovery(tester, find.byKey(const Key('share-contact')));
@@ -641,13 +655,15 @@ void main() {
       expect(find.text('Independent Audi Repair'), findsOneWidget);
       expect(find.textContaining('Listed support for Audi'), findsNothing);
       expect(repo.calls.single['vehicle_id'], owner.selectedVehicle!.id);
-      expect(find.text('Request help'), findsOneWidget);
       await Scrollable.ensureVisible(
         tester.element(find.byType(DiscoveryProviderCard).first),
         alignment: 0,
       );
       await tester.pumpAndSettle();
       await discoveryProof(tester, 'directory-card-390');
+      await openDiscoveryProfile(tester);
+      expect(find.text('Request help'), findsOneWidget);
+      await tapDiscovery(tester, find.byTooltip('Close shop profile'));
       expect(tester.takeException(), isNull);
     },
   );

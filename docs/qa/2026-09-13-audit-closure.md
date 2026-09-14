@@ -1,26 +1,51 @@
-# Launch audit follow-up
+# Launch audit follow-up — build 8
 
-The September 13 audit examined Plus build 7 (`ebb7f47275b018f276744322bbb2c191438e4f7a`). This record tracks its 17 findings against the build-8 candidate. Source fixes, local tests, deployed behavior and provider approval are separate evidence. Final delivery is recorded in [release status](../release-status.md) and [mobile release](../mobile-release.md).
+The September 13 audit examined Plus build 7 (`ebb7f47275b018f276744322bbb2c191438e4f7a`).
+Build 8 was published from `e5d0e4ad40ba93866e1905f55c6046d6b4824588`; the full
+integration gate ran on its parent `47f8eedfb749509d8540e8468b1cf0eada639308`.
+The intervening publisher-only redirect fix passed 16 focused tests. The gate
+passed 410 backend tests with zero skips, 208 Flutter tests with clean analysis,
+19 capture-web tests/build and all three socket smokes. Source, local validation,
+live behavior, device use and external approval remain distinct evidence.
+See [build-8 evidence](../releases/2026-09-14-build8.json),
+[release status](../release-status.md) and [mobile delivery](../mobile-release.md).
 
-| Finding | Resolution in the candidate | Evidence / remaining check |
+| Finding | Resolution | Evidence / remaining check |
 | --- | --- | --- |
-| H1: main behind production | Bring `main` forward to this tested candidate; README uses the permanent Android URL. | Record remote branch and live source after publishing; do not force-push. |
-| H2: hosted CI billing lock | Added missing capture and PostgreSQL jobs plus discovery/calendar socket checks; added a local release gate. | **External block:** GitHub annotations say the account is locked for billing. Local runs do not establish hosted CI success. Account owner must resolve billing and rerun Actions. |
-| H3: pure-Dart socket no longer compiles | Repository APIs import platform-free pending-operation types; UI still uses its native storage adapters. | `scripts/smoke_api.py --flutter-client` passes the real HTTP Dart client and restart checks. |
-| H4: capture tests omitted | `build_capture.sh` runs tests before bundling; CI has a capture-web job. | All 19 Vitest tests and TypeScript/Vite build pass locally. Every live web build uses this script. |
-| H5: contradictory docs | Reconciled backend README, API contract and launch record with live submission, capture, images, valuation, scheduling and discovery. | Historical build evidence stays dated; candidate claims do not imply deployment. |
-| M1: public production docs | Production disables `/docs`, `/redoc`, `/openapi.json`; development keeps them. | `test_production_surface.py`; verify live 404 after deployment. |
-| M2: missing-record dead ends | Unavailable screens retain an app bar/back action; deleted records have accurate copy; guided photos handle a missing estimate. | `audit_navigation_test.dart` exercises navigation and deleted-record cases. |
-| M3: demo phone scheduling has no call | Authorized phone-only draft becomes `call_required` with a validated call URI. | Regression checks consent and exact mocked `tel:` launch. No real shop is called by tests. |
-| M4: default calendar UTC | New connections start without a zone; first setup suggests a validated device IANA zone. Existing saved zones, including UTC, stay intact. Demo uses Denver. | Flutter/backend calendar regressions cover first setup, reconnect and saved choices. Native channel compilation and device rendering remain release checks. |
-| M5: every read rechecks Auth | Per-app pooled HTTP client and bounded positive read cache, with duplicate concurrent checks coalesced. Writes always verify upstream and invalidate reads. | Auth cache regressions cover expiry, revocation, errors, capacity, concurrency and app isolation. See tradeoff below. |
-| M6: missing web frame/security headers | Production sets HSTS and frame protection; guided capture keeps same-origin embedding policy. | Production surface tests; verify actual response headers after deployment. |
-| M7: overly broad Estibot promise | Prompt names supported estimate/routine-care/matching/scheduling topics and explains diagnostic limits. | Flutter UI tests; no claim of general diagnostic AI. |
-| L1: malformed email called empty | Separate empty-address and invalid-address messages. | Welcome-screen validation regressions. |
-| L2: demo valuation disabled | Synthetic VIN and fixed fictional result let the demo show the valuation layout. | Labeled as a local sample, not a CarsXE result; no provider call and no claim it values that car. |
-| L3: inaccurate WebView resume doc | Integration docs describe pause, reload and fresh handshake on resume. | Checked against the native host; reserved resume RPC is distinguished. |
-| L4: stale web shell | Entry HTML, bootstrap, service worker, main bundle and version/manifest responses require revalidation. | Production surface tests; live headers checked after deployment. |
-| L5: 34 skipped integration cases | New isolated PostgreSQL 17.6 plus actual original bridge source exercised every skipped case. | Initial source snapshot: 369 passed, zero skipped; final clean candidate uses the integrated release gate below. |
+| H1: main behind production | `main` and `origin/main` were fast-forwarded from the old `1a69205` history to include artifact source `e5d0e4a`; README uses the permanent Android URL. | Local and remote-tracking refs matched the delivered source. No force-push; forthcoming build-9 evidence will be recorded separately. |
+| H2: hosted CI billing lock | Four configured jobs now cover Flutter, backend/PostgreSQL and capture; a complete local release gate passed. | **External block remains:** main run `34811930282`, annotation check `103874843739`, all four jobs failed to start because of account billing. No hosted CI pass is claimed. |
+| H3: pure-Dart socket no longer compiles | Repository imports platform-free pending-operation types; native adapters remain in the UI. | Integrated API/pure-Dart real HTTP smoke and restart checks passed. |
+| H4: capture tests omitted | Capture build runs tests before bundling; CI has a capture-web job. | 19 Vitest tests, TypeScript/Vite build and integrated capture gate passed locally; hosted execution is blocked under H2. |
+| H5: contradictory docs | Backend/API/launch, discovery, Calendar and artwork docs describe current implemented behavior; release docs identify build 8. | Build-4/5 evidence remains historical. Submission, capture v2, images/valuation, 30-result reviewed directory and saved-zone behavior were reconciled with source. |
+| M1: public production docs | Production disables `/docs`, `/redoc`, `/openapi.json`; development retains them. | All three returned 404 in the live build-8 surface checks. |
+| M2: missing-record dead ends | Unavailable screens keep back navigation, deleted-vehicle copy is accurate and missing guided estimates do not crash. | Navigation/deletion/account-change regressions passed within the 208-test Flutter gate. |
+| M3: demo phone scheduling has no call | Authorized phone-only drafts become `call_required` with a validated call URI. | Regression verified explicit consent and the exact mocked dialer launch. It did not call a real shop. |
+| M4: default Calendar UTC | New setup suggests a validated device IANA zone only for an unconfigured preference; explicit saved UTC survives reconnect; demo uses Denver. | Flutter/backend first-save, reconnect and late-night regressions passed. Signed Android/iOS artifacts built; physical-device timezone behavior remains unverified. |
+| M5: every read rechecks Auth | Per-app pooled client and bounded successful GET/HEAD cache coalesce duplicate verification. Writes verify fresh and invalidate reads. | Expiry, revocation, error, capacity, concurrency and app-isolation tests passed; see the explicit read-revocation tradeoff below. |
+| M6: missing web frame/security headers | Main pages set HSTS and frame protection; guided capture retains same-origin embedding. | Live headers, restrictive capture policy and exact served bytes passed the surface gate. |
+| M7: overly broad Estibot promise | Prompt names supported estimate/routine-care/matching/scheduling topics and explains diagnostic limits. | Source review and full Flutter gate passed; no general diagnostic-AI claim. |
+| L1: malformed email called empty | Empty and malformed addresses have separate messages. | Welcome validation regressions passed without sending email. |
+| L2: demo valuation disabled | A synthetic VIN and fixed fictional result demonstrate the layout. | Widget regression verifies sample attribution and no CarsXE result claim; demo performs no provider call. |
+| L3: inaccurate WebView resume doc | Integration docs describe pause, reload and a fresh handshake on resume. | Checked against the native host; reserved resume RPC is distinguished. |
+| L4: stale web shell | Entry HTML, bootstrap, service worker, main bundle and version/manifest require revalidation. | Live header and conditional-304 checks passed. A returning browser retained an old brand image; the content-hashed asset fix is included in forthcoming build 9. Publication and final warm-cache verification remain outstanding. |
+| L5: 34 skipped integration cases | Isolated PostgreSQL and actual original bridge source exercised all 34 cases. | Clean integrated gate: **410 passed, zero skipped**; source unchanged, cluster stopped/removed and port closed afterward. |
+
+Twenty live surface checks passed; the directory/media check returned 27 listings
+with complete website/phone fields and 27 decoded images (26 logos and one shop
+photo). All 26 independent content-addressed image hashes matched. Browser QA
+rendered all 27 images and a mini profile after synthetic sign-in. The exact
+public Android-8 APK upgraded build 7 on an emulator, showed the new artwork and
+completed synthetic native sign-in. The native directory loaded, displayed
+Bronco's Muffler's real logo and opened its mini profile. Final web cache checks
+will follow build-9 publication. No repair shop was contacted and no request was created;
+synthetic checks do not prove real mailbox use.
+
+Build-8 synthetic QA data cleanup is complete: global sign-out preceded removal
+of the exact new Auth account, profile and rate rows, and other customer-owned
+tables were confirmed empty before cleanup. The old token was rejected with 401
+on a write and a subsequent GET. The real customer account was untouched and no
+private files were uploaded. The native app displayed the ended-session screen;
+signing out returned to welcome, completing that UI check.
 
 ## Authentication capacity tradeoff
 
@@ -42,9 +67,25 @@ python3 scripts/check_release.py --integration --output /tmp/plus-release-checks
 
 The gate records its source SHA, log hashes, return codes and backend skip count, then rejects source changes during the run. It runs backend pytest, Flutter analysis/tests, capture-web tests/build, API plus pure-Dart socket checks, discovery socket checks and calendar socket checks. `--integration` rejects any skipped backend test. Keep raw logs private until reviewed; copy sanitized results into release evidence. Stop and remove only the temporary PostgreSQL cluster created for that run.
 
-## Checks that source tests cannot establish
+## Checks that remain separate
 
-- Real mailbox delivery plus code entry for `hello@estimoto.io` on web and Android still needs actual inbox/device evidence. Admin-generated synthetic sign-in codes do not prove email delivery.
-- GitHub's billing lock is an account-level issue. The latest inspected failed build-7 run was `34806833579`; its Flutter check annotation reported that no job started because of billing.
-- Apple's existing Plus external beta review and Google Calendar provider enablement remain separate gates; neither is established by group attachment or local tests.
-- Physical-device camera quality, real shop acceptance, and customer scheduling delivery remain distinct from emulators and isolated bridge fixtures.
+- A normal real-customer sign-in code was requested through the UI; inbox/code
+  entry is still pending. Synthetic browser/emulator sign-in cannot prove mail
+  delivery or code entry by the customer.
+- The freshly requested Android invite was sent once, accepted at 06:16:05 UTC
+  and confirmed delivered by Resend readback at 06:16:26 UTC on September 14.
+  This proves invite delivery only, not opening, installation or authentication.
+- Hosted GitHub Actions remains blocked by account billing. Resolve the account
+  issue and rerun the four jobs; local success is not a substitute for a hosted run.
+- Read-only Apple verification at 06:22:53 UTC confirmed build 8 VALID, exact
+  notes and both groups, internal testing and no build-8 review submission.
+  External access remains blocked by build 2 `WAITING_FOR_REVIEW`. Original
+  Estimoto build 232's separate approval does not approve Plus.
+- Physical iOS/Android camera, receipts, interrupted-picker recovery and a first
+  real shop handoff/acceptance remain unverified. Google Calendar provider setup
+  remains disabled; no real customer Calendar connection/event is proved.
+- Forthcoming build 9 combines profile-opening shop cards with the browser brand
+  cache fix. Its publication and final browser refresh remain outstanding; see
+  the [release notes](../releases/0.1.0-9-beta-notes.md). Build-8 synthetic cleanup
+  and native ended-session/sign-out UI checks are complete. Credentials,
+  cohort identifiers, private files and raw cleanup journals stay outside Git.

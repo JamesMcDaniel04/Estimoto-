@@ -159,6 +159,13 @@ class ImageResponse extends Stream<List<int>> implements HttpClientResponse {
 
 void main() {
   late ImageClient client;
+  Future<void> openProfile(WidgetTester tester) async {
+    final card = find.byKey(const ValueKey('shop-card-synthetic-provider'));
+    await tester.ensureVisible(card);
+    await tester.tap(card);
+    await tester.pumpAndSettle();
+  }
+
   setUp(() {
     client = ImageClient();
   });
@@ -364,10 +371,14 @@ void main() {
       expect(find.byKey(const Key('shop-media-fallback')), findsNothing);
       expect(client.headers, isNot(contains('authorization')));
       expect(client.headers, isNot(contains('referer')));
+      await openProfile(tester);
       await tester.ensureVisible(find.text('Request help'));
       await tester.tap(find.text('Request help'));
+      await tester.pumpAndSettle();
+      await openProfile(tester);
       await tester.ensureVisible(find.text('Save as my dedicated shop'));
       await tester.tap(find.text('Save as my dedicated shop'));
+      await tester.pumpAndSettle();
       expect(requested && saved, isTrue);
       expect(tester.takeException(), isNull);
     },
@@ -407,9 +418,7 @@ void main() {
     expect(client.calls, [Uri.parse(logoUrl)]);
     expect(client.headers, isNot(contains('authorization')));
     expect(client.headers, isNot(contains('referer')));
-    await tester.ensureVisible(find.text('View shop profile'));
-    await tester.tap(find.text('View shop profile'));
-    await tester.pumpAndSettle();
+    await openProfile(tester);
     await tester.ensureVisible(find.text('Logo credit'));
     await tester.tap(find.text('Logo credit'));
     await tester.pumpAndSettle();
@@ -420,10 +429,14 @@ void main() {
     await tester.ensureVisible(find.byTooltip('Close shop profile'));
     await tester.tap(find.byTooltip('Close shop profile'));
     await tester.pumpAndSettle();
+    await openProfile(tester);
     await tester.ensureVisible(find.text('Request help'));
     await tester.tap(find.text('Request help'));
+    await tester.pumpAndSettle();
+    await openProfile(tester);
     await tester.ensureVisible(find.text('Save as my dedicated shop'));
     await tester.tap(find.text('Save as my dedicated shop'));
+    await tester.pumpAndSettle();
     expect(requested && saved, isTrue);
     expect(tester.takeException(), isNull);
   });
@@ -504,8 +517,9 @@ void main() {
       scale: 1.8,
     );
     await tester.pumpAndSettle();
-    await tester.ensureVisible(find.text('Change or remove saved choice'));
     expect(find.text('Your dedicated shop: PDR'), findsOneWidget);
+    await openProfile(tester);
+    await tester.ensureVisible(find.text('Change or remove saved choice'));
     expect(tester.takeException(), isNull);
   });
 }

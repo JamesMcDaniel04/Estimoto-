@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:estimoto_plus/domain/models.dart';
 import 'package:estimoto_plus/theme.dart';
@@ -60,6 +61,64 @@ void main() {
     },
   );
 
+  testWidgets(
+    'tapping card padding opens its profile without contacting the shop',
+    (tester) async {
+      final launches = <String>[];
+      const channel = MethodChannel('plugins.flutter.io/url_launcher');
+      tester.binding.defaultBinaryMessenger.setMockMethodCallHandler(channel, (
+        call,
+      ) async {
+          if (call.method == 'launch') {
+            launches.add(call.arguments['url'] as String);
+          }
+        return true;
+      });
+      addTearDown(
+        () => tester.binding.defaultBinaryMessenger.setMockMethodCallHandler(
+          channel,
+          null,
+        ),
+      );
+      var saved = false;
+      await tester.pumpWidget(
+        MaterialApp(
+          home: Scaffold(
+            body: SingleChildScrollView(
+              child: DiscoveryProviderCard(
+                provider: profile(),
+                onSave: () => saved = true,
+              ),
+            ),
+          ),
+        ),
+      );
+      final card = find.byKey(ValueKey('shop-card-${profile().id}'));
+      await tester.tapAt(tester.getTopLeft(card) + const Offset(8, 8));
+      await tester.pumpAndSettle();
+      expect(find.byType(ShopProfile), findsOneWidget);
+      expect(launches, isEmpty);
+      expect(saved, isFalse);
+      await tester.ensureVisible(find.text('Call shop'));
+      await tester.tap(find.text('Call shop'));
+      await tester.pumpAndSettle();
+      await tester.ensureVisible(find.text('Website'));
+      await tester.tap(find.text('Website'));
+      await tester.pumpAndSettle();
+      expect(launches, [
+        'tel:+13035550142',
+        'https://shop.example/branch?location=42',
+      ]);
+      expect(find.byType(ShopProfile), findsOneWidget);
+      await tester.ensureVisible(find.text('Save as my dedicated shop'));
+      await tester.tap(find.text('Save as my dedicated shop'));
+      await tester.pumpAndSettle();
+      expect(saved, isTrue);
+      expect(find.byType(ShopProfile), findsNothing);
+      expect(tester.takeException(), isNull);
+    },
+  );
+
   for (final scale in [1.0, 2.0]) {
     testWidgets(
       'profile opens from directory and fits 320px at text scale $scale',
@@ -84,8 +143,11 @@ void main() {
             ),
           ),
         );
-        await tester.ensureVisible(find.text('View shop profile'));
-        await tester.tap(find.text('View shop profile'));
+        expect(find.text('Call'), findsNothing);
+        expect(find.text('Website'), findsNothing);
+        expect(find.text('View shop profile'), findsNothing);
+        await tester.ensureVisible(find.text(profile().name));
+        await tester.tap(find.text(profile().name));
         await tester.pumpAndSettle();
         expect(find.byType(ShopProfile), findsOneWidget);
         await tester.ensureVisible(find.text('Google Maps & reviews'));

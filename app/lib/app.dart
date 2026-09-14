@@ -1,5 +1,6 @@
 import 'dart:async';
 import 'package:flutter/material.dart';
+import 'brand_assets.dart';
 import 'screens/garage_screen.dart';
 import 'screens/estimates_screen.dart';
 import 'screens/estibot_screen.dart';
@@ -82,7 +83,7 @@ class _HomeShellState extends State<_HomeShell> with WidgetsBindingObserver {
               ClipRRect(
                 borderRadius: BorderRadius.circular(8),
                 child: Image.asset(
-                  'assets/brand/estimoto-plus-icon.png',
+                  plusIconAsset,
                   width: 32,
                   height: 32,
                   excludeFromSemantics: true,

@@ -2,6 +2,7 @@ import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
+import '../brand_assets.dart';
 import '../theme.dart';
 import '../widgets/common.dart';
 import '../widgets/vehicle_illustration.dart';
@@ -102,7 +103,7 @@ class _WelcomeScreenState extends State<WelcomeScreen> {
             child: ClipRRect(
               borderRadius: BorderRadius.circular(16),
               child: Image.asset(
-                'assets/brand/estimoto-plus-icon.png',
+                plusIconAsset,
                 width: 72,
                 height: 72,
                 excludeFromSemantics: true,

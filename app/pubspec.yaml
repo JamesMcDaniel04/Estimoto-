@@ -1,7 +1,7 @@
 name: estimoto_plus
 description: "Estimoto + customer garage, estimates, repairs and technician connections."
 publish_to: 'none'
-version: 0.1.0+8
+version: 0.1.0+9
 
 environment:
   sdk: ^3.12.1
@@ -36,5 +36,6 @@ flutter:
   uses-material-design: true
   assets:
     - assets/brand/estimoto-plus-icon.png
+    - assets/brand/estimoto-plus-icon-fc3222881ab13091.png
     - assets/vehicles/2021-toyota-tacoma.webp
     - assets/vehicles/2022-audi-q5.webp

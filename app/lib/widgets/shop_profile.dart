@@ -11,21 +11,44 @@ Uri shopMapsUri(ProviderProfile provider) => Uri.https(
   {'api': '1', 'query': '${provider.name} ${provider.displayAddress}'},
 );
 
-Future<void> showShopProfile(BuildContext context, ProviderProfile provider) =>
-    showModalBottomSheet<void>(
-      context: context,
-      isScrollControlled: true,
-      showDragHandle: true,
-      useSafeArea: true,
-      builder: (_) => FractionallySizedBox(
-        heightFactor: .9,
-        child: ShopProfile(provider: provider),
-      ),
-    );
+enum ShopProfileAction { request, save, saveContact }
+
+Future<ShopProfileAction?> showShopProfile(
+  BuildContext context,
+  ProviderProfile provider, {
+  bool canRequest = false,
+  bool canSave = false,
+  bool canSaveContact = false,
+  List<String> favorites = const [],
+}) => showModalBottomSheet<ShopProfileAction>(
+  context: context,
+  isScrollControlled: true,
+  showDragHandle: true,
+  useSafeArea: true,
+  builder: (_) => FractionallySizedBox(
+    heightFactor: .9,
+    child: ShopProfile(
+      provider: provider,
+      canRequest: canRequest,
+      canSave: canSave,
+      canSaveContact: canSaveContact,
+      favorites: favorites,
+    ),
+  ),
+);
 
 class ShopProfile extends StatelessWidget {
-  const ShopProfile({super.key, required this.provider});
+  const ShopProfile({
+    super.key,
+    required this.provider,
+    this.canRequest = false,
+    this.canSave = false,
+    this.canSaveContact = false,
+    this.favorites = const [],
+  });
   final ProviderProfile provider;
+  final bool canRequest, canSave, canSaveContact;
+  final List<String> favorites;
 
   Future<void> open(BuildContext context, Uri uri) async {
     try {
@@ -90,6 +113,21 @@ class ShopProfile extends StatelessWidget {
               const Text('National customer service'),
           ],
           const SizedBox(height: 16),
+          if (!provider.independent &&
+              canRequest &&
+              provider.requestModes.isNotEmpty)
+            Padding(
+              padding: const EdgeInsets.only(bottom: 12),
+              child: SizedBox(
+                width: double.infinity,
+                child: FilledButton.icon(
+                  onPressed: () =>
+                      Navigator.pop(context, ShopProfileAction.request),
+                  icon: const Icon(Icons.handshake_outlined),
+                  label: const Text('Request help'),
+                ),
+              ),
+            ),
           Wrap(
             spacing: 10,
             runSpacing: 8,
@@ -117,6 +155,31 @@ class ShopProfile extends StatelessWidget {
               ),
             ],
           ),
+          if (favorites.isNotEmpty) ...[
+            const SizedBox(height: 12),
+            Text('Your dedicated shop: ${favorites.join(', ')}'),
+          ],
+          const SizedBox(height: 12),
+          OutlinedButton.icon(
+            onPressed: canSave
+                ? () => Navigator.pop(context, ShopProfileAction.save)
+                : null,
+            icon: const Icon(Icons.star_border),
+            label: Text(
+              favorites.isEmpty
+                  ? 'Save as my dedicated shop'
+                  : 'Change or remove saved choice',
+            ),
+          ),
+          if (!canSave && favorites.isEmpty)
+            const Text('Choose a saved vehicle to save a dedicated shop.'),
+          if (canSaveContact)
+            TextButton.icon(
+              onPressed: () =>
+                  Navigator.pop(context, ShopProfileAction.saveContact),
+              icon: const Icon(Icons.contact_page_outlined),
+              label: const Text('Save contact for reviewed scheduling'),
+            ),
           const SectionHeading('Services'),
           Wrap(
             spacing: 8,
@@ -144,7 +207,7 @@ class ShopProfile extends StatelessWidget {
           Text(
             provider.independent
                 ? 'Call the shop to confirm services, pricing and appointment availability.'
-                : 'Request help from the shop card. The provider will confirm your appointment.',
+                : 'The provider will confirm availability and your appointment after you request help.',
           ),
           if (confirmed) ...[
             const SectionHeading('Business information'),
