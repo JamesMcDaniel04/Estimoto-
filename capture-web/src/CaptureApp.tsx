@@ -6,7 +6,7 @@ import { CaptureRPC, encodedPhoto, RPCError } from "./rpc";
 type Photo = { id: string; label: string; sha256: string; quality: "framing_checked" | "not_checked" };
 type Suggestion = { photo_id: string; suggested_vin: string | null; confidence: number | null };
 type CaptureState = { estimate_id: string; discipline: "pdr" | "collision"; vehicle: { year: number; make: string; model: string; vin: string }; photos: Photo[]; vin_suggestion: Suggestion | null };
-type SaveResult = { id: string; label: string; quality: Photo["quality"]; warning?: string | null };
+type SaveResult = { id: string; label: string; sha256: string; quality: Photo["quality"]; warning?: string | null };
 type Guidance = { ready: boolean; available: boolean; instruction: string };
 type CaptureHostAPI = Pick<CaptureRPC, "request" | "ready" | "close">;
 const operationIds = new WeakMap<File, string>();
@@ -105,9 +105,17 @@ export function CaptureApp({ rpc }: { rpc: CaptureHostAPI }) {
       }
       throw cause;
     }
-    if (!result?.id || result.label !== key) throw new Error("Photo status is uncertain. Retry saving the same photo.");
+    if (!result?.id || result.label !== key || !/^[a-f0-9]{64}$/.test(result.sha256)) {
+      throw new Error("Photo status is uncertain. Retry saving the same photo.");
+    }
     if (result.warning) setWarning(result.warning);
-    await refresh();
+    const current = await refresh();
+    const active = current.photos.find((row) => row.label === key);
+    if (!active || active.id !== result.id || active.sha256 !== result.sha256) {
+      const conflict = new RPCError("A newer photo is saved for this step. Review it before taking another photo.", 409);
+      conflict.name = "PhotoRejected";
+      throw conflict;
+    }
     return true;
   }, [bodyStyle, refresh]);
 

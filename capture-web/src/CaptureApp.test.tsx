@@ -1,16 +1,18 @@
-import { fireEvent, render, screen, waitFor } from "@testing-library/react";
+import { fireEvent, render, screen, waitFor, within } from "@testing-library/react";
 import "@testing-library/jest-dom/vitest";
 import { expect, it, vi } from "vitest";
 import { CaptureApp } from "./CaptureApp";
 import type { CaptureRPC } from "./rpc";
 import type { PhotoStep } from "./shared/template";
 
+const camera = vi.hoisted(() => ({ save: null as null | ((key: string, panel: string, file: File) => Promise<boolean>) }));
 vi.mock("./shared/GuidedCamera", () => ({ default: (props: {
   steps: PhotoStep[]; needsDamagePanel?: boolean; onDamagePanel?: (panel: string) => void;
-}) => <div data-testid="guided-camera">
+  onCapture: (key: string, panel: string, file: File) => Promise<boolean>;
+}) => { camera.save = props.onCapture; return <div data-testid="guided-camera">
   <span>{props.steps.map((step) => step.key).join(",")}</span>
   {props.needsDamagePanel && <button onClick={() => props.onDamagePanel?.("hood")}>Choose hood</button>}
-</div> }));
+</div>; } }));
 
 function host(state: object) {
   const request = vi.fn(async (method: string) => {
@@ -57,4 +59,19 @@ it("shows the owner-bound entry instruction when opened without a host", async (
   render(<CaptureApp rpc={fake.api} />);
   expect(await screen.findByRole("alert")).toHaveTextContent("Open capture from your Estimoto + garage.");
   expect(fake.request).not.toHaveBeenCalled();
+});
+
+it("rejects a saved operation receipt superseded by a newer photo of the same step", async () => {
+  const current = { estimate_id: "draft", discipline: "collision", vehicle, photos: [
+    { id: "same-photo-row", label: "vin", sha256: "b".repeat(64), quality: "framing_checked" }], vin_suggestion: null };
+  const request = vi.fn(async (method: string) => method === "captureState" ? current :
+    method === "saveCapture" ? { id: "same-photo-row", label: "vin", sha256: "a".repeat(64), quality: "framing_checked" } : null);
+  const view = render(<CaptureApp rpc={{ request, ready: vi.fn(), close: vi.fn() } as unknown as Pick<CaptureRPC, "request" | "ready" | "close">} />);
+  await within(view.container).findByText("1 of 9 required photos saved. This only saves evidence; submitting to a shop happens after review.");
+  fireEvent.click(within(view.container).getByRole("button", { name: "Open guided camera" }));
+  const file = new File(["sample"], "vin.jpg", { type: "image/jpeg" });
+  await expect(camera.save!("vin", "vin", file)).rejects.toMatchObject({
+    name: "PhotoRejected", message: expect.stringContaining("newer photo"),
+  });
+  expect(request).toHaveBeenCalledWith("captureState", {}, 12_000);
 });
