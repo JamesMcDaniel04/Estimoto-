@@ -7,9 +7,9 @@ import '../domain/models.dart';
 import 'repository.dart';
 import '../services/calendar_errors.dart';
 import '../services/receipt_api.dart';
-import '../services/receipt_pending.dart';
+import '../services/receipt_pending_types.dart';
 import '../services/guided_capture_api.dart';
-import '../services/guided_capture_pending.dart';
+import '../services/guided_capture_pending_types.dart';
 
 class ApiPlusRepository extends PlusRepository {
   ApiPlusRepository({

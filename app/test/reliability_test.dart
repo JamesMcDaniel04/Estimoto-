@@ -195,6 +195,12 @@ void main() {
     await tester.tap(find.byKey(const Key('nav-find-help')));
     await tester.pumpAndSettle();
     Future<void> open() async {
+      final shopCard = find.byKey(
+        ValueKey('shop-card-${controller.snapshot!.providers.first.id}'),
+      );
+      await tester.ensureVisible(shopCard);
+      await tester.tap(shopCard);
+      await tester.pumpAndSettle();
       final action = find.text('Request help').first;
       await tester.ensureVisible(action);
       await tester.tap(action);

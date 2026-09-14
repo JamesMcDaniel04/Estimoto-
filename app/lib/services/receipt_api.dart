@@ -1,6 +1,6 @@
 import 'dart:typed_data';
 import '../domain/models.dart';
-import 'receipt_pending.dart';
+import 'receipt_pending_types.dart';
 
 abstract class ReceiptApi {
   Future<Json> upload(ReceiptPending value);

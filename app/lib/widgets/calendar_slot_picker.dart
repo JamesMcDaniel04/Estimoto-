@@ -160,9 +160,17 @@ class _CalendarSlotPickerState extends WorkspaceState<CalendarSlotPicker>
       dayStart: dayStart,
       dayEnd: dayEnd,
     );
-    final start = calendarInstant(body['time_min'] as String),
-        end = calendarInstant(body['time_max'] as String);
+    var start = calendarInstant(body['time_min'] as String);
+    final end = calendarInstant(body['time_max'] as String);
     final now = widget.now().toUtc();
+    // Near midnight, tomorrow still has valid appointment times even when
+    // its midnight is inside the server's one-hour lead time. Keep the chosen
+    // dates and trim only that unavailable prefix, with room for transit time.
+    final earliest = now.add(const Duration(hours: 1, minutes: 1));
+    if (start.isAfter(now) && start.isBefore(earliest)) {
+      start = earliest;
+      body['time_min'] = start.toIso8601String();
+    }
     if (!start.isAfter(now.add(const Duration(hours: 1))) ||
         end.isAfter(now.add(const Duration(days: 90))) ||
         end.difference(start) > const Duration(days: 14)) {

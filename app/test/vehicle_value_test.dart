@@ -114,6 +114,33 @@ Future<void> lookup(WidgetTester t, {bool settle = true}) async {
 }
 
 void main() {
+  testWidgets(
+    'untouched demo vehicle can show a clearly labeled sample valuation',
+    (t) async {
+      final repo = DemoPlusRepository();
+      final controller = PlusController(repo);
+      await controller.refresh();
+      expect(
+        RegExp(
+          r'^[A-HJ-NPR-Z0-9]{17}$',
+        ).hasMatch(controller.selectedVehicle!.vin),
+        isTrue,
+      );
+      await mount(t, controller);
+      final button = find.widgetWithText(FilledButton, 'Look up vehicle value');
+      expect(t.widget<FilledButton>(button).onPressed, isNotNull);
+      await lookup(t);
+      expect(find.text('Sample valuation • fictional amounts'), findsOneWidget);
+      expect(find.text('Demo sample · average condition'), findsWidgets);
+      expect(find.textContaining('CarsXE ·'), findsNothing);
+      expect(
+        find.textContaining('No valuation provider was contacted'),
+        findsOneWidget,
+      );
+      expect(t.takeException(), isNull);
+    },
+  );
+
   setUpAll(loadReceiptProofFonts);
   testWidgets(
     'value lookup is explicit and keeps provider value separate from documented costs at 320px',

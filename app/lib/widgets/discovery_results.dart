@@ -1,5 +1,4 @@
 import 'package:flutter/material.dart';
-import 'package:url_launcher/url_launcher.dart';
 import '../domain/models.dart';
 import '../state/plus_controller.dart';
 import '../screens/request_sheet.dart';
@@ -8,6 +7,7 @@ import 'dedicated_shop_choice.dart';
 import 'common.dart';
 import 'workspace_widgets.dart';
 import 'shop_media.dart';
+import 'shop_profile.dart';
 
 String serviceModeLabel(String mode) => mode == 'mobile'
     ? 'Mobile service · provider comes to you'
@@ -16,7 +16,7 @@ String serviceModeLabel(String mode) => mode == 'mobile'
 List<ProviderProfile> discoveryProviders(
   Json data,
   String key, {
-  int limit = 100,
+  int limit = 30,
 }) => rowsOf(data, key)
     .where((p) => p['public_visible'] != false)
     .take(limit)
@@ -38,7 +38,7 @@ class DiscoveryNotice extends StatelessWidget {
         ),
         if (data['truncated'] == true)
           const Text(
-            'Showing 100 listings total, including alternatives. Refine your service to narrow results.',
+            'Showing up to 30 shops, including alternatives. Refine your service to narrow results.',
           ),
         if (data['status'] == 'stale')
           const Padding(
@@ -70,7 +70,7 @@ class DiscoveryDetails extends StatelessWidget {
     expandedCrossAxisAlignment: CrossAxisAlignment.start,
     children: [
       const Text(
-        'Distances are approximate straight-line distances from your ZIP center, not driving distance or mobile coverage. Listings may not include every nearby business. Confirm services and availability directly.',
+        'A curated selection of shops with checked business contact details and participating Estimoto providers. Distances are approximate straight-line distances from your ZIP center, not driving distance or mobile coverage. Confirm services and availability directly.',
       ),
       if (textOf(data, 'checked_at').isNotEmpty)
         Padding(
@@ -176,7 +176,7 @@ class _DiscoveryResultsState extends WorkspaceState<DiscoveryResults> {
             'name': provider.name,
             'email': textOf(provider.json, 'email'),
             'phone': provider.phone,
-            'address': provider.address,
+            'address': provider.displayAddress,
             'website': textOf(provider.json, 'website'),
             'vehicle_id': widget.vehicleId,
             'notes': textOf(provider.json, 'source_url').isEmpty
@@ -202,7 +202,7 @@ class _DiscoveryResultsState extends WorkspaceState<DiscoveryResults> {
     final alternatives = discoveryProviders(
       widget.data,
       'shop_visit_alternatives',
-      limit: 100 - providers.length,
+      limit: 30 - providers.length,
     );
     Widget card(ProviderProfile provider, bool alternative) => Padding(
       padding: const EdgeInsets.symmetric(vertical: 8),
@@ -293,12 +293,25 @@ class DiscoveryProviderCard extends StatelessWidget {
   final VoidCallback? onRequest, onSave, onSaveContact;
   final String? vehicleMake;
   final List<String> favorites;
-  Future<void> contact(BuildContext context, Uri uri) async {
-    try {
-      if (await launchUrl(uri, mode: LaunchMode.externalApplication)) return;
-    } catch (_) {}
-    if (context.mounted) {
-      showMessage(context, 'Could not open this contact option.');
+  Future<void> openProfile(BuildContext context) async {
+    final action = await showShopProfile(
+      context,
+      provider,
+      canRequest: onRequest != null,
+      canSave: onSave != null,
+      canSaveContact: onSaveContact != null,
+      favorites: favorites,
+    );
+    if (!context.mounted) return;
+    switch (action) {
+      case ShopProfileAction.request:
+        onRequest?.call();
+      case ShopProfileAction.save:
+        onSave?.call();
+      case ShopProfileAction.saveContact:
+        onSaveContact?.call();
+      case null:
+        break;
     }
   }
 
@@ -307,17 +320,12 @@ class DiscoveryProviderCard extends StatelessWidget {
     final match = provider.json['vehicle_match'] as Map? ?? {};
     final listedMake =
         match['status'] == 'listed_make' &&
-        match['basis'] == 'service:vehicle:brand' &&
+        const [
+          'service:vehicle:brand',
+          'official_website',
+        ].contains(match['basis']) &&
         vehicleMake != null &&
         '${match['make']}'.toLowerCase() == vehicleMake!.toLowerCase();
-    final phone = provider.phone.replaceAll(RegExp(r'[^+\d]'), '');
-    final website = Uri.tryParse(textOf(provider.json, 'website'));
-    final validWebsite =
-        website != null &&
-        const ['https', 'http'].contains(website.scheme) &&
-        website.host.isNotEmpty &&
-        website.userInfo.isEmpty;
-    final media = provider.media;
     final identity = Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
@@ -334,7 +342,11 @@ class DiscoveryProviderCard extends StatelessWidget {
           padding: const EdgeInsets.only(top: 4),
           child: Text(
             provider.independent
-                ? 'Independent listing · OpenStreetMap'
+                ? provider.json['verification'] is Map &&
+                          provider.json['verification']['status'] ==
+                              'contact_confirmed'
+                      ? 'Business contact details checked'
+                      : 'Independent listing · OpenStreetMap'
                 : 'Participating Estimoto provider',
             style: Theme.of(context).textTheme.bodySmall,
           ),
@@ -342,142 +354,91 @@ class DiscoveryProviderCard extends StatelessWidget {
       ],
     );
     return Card(
-      child: Padding(
-        padding: const EdgeInsets.all(16),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            LayoutBuilder(
-              builder: (context, constraints) {
-                final largeText =
-                    MediaQuery.textScalerOf(context).scale(17) > 23;
-                if (largeText && constraints.maxWidth < 340) {
-                  return Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      ShopMediaThumbnail(provider: provider, size: 64),
-                      const SizedBox(height: 10),
-                      identity,
-                    ],
-                  );
-                }
-                return Row(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    ShopMediaThumbnail(provider: provider),
-                    const SizedBox(width: 12),
-                    Expanded(child: identity),
-                  ],
-                );
-              },
-            ),
-            if (provider.address.isNotEmpty)
-              Padding(
-                padding: const EdgeInsets.only(top: 10),
-                child: Text(
-                  provider.address,
-                  style: Theme.of(context).textTheme.bodySmall,
-                ),
-              ),
-            if (provider.specialties.isNotEmpty)
-              Padding(
-                padding: const EdgeInsets.only(top: 10),
-                child: Wrap(
-                  spacing: 6,
-                  runSpacing: 6,
-                  children: [
-                    for (final service in provider.specialties)
-                      StatusPill(specialtyLabel(service)),
-                  ],
-                ),
-              ),
-            if (listedMake)
-              Padding(
-                padding: const EdgeInsets.only(top: 10),
-                child: Text(
-                  'Listed support for ${match['make']} · confirm with the shop',
-                ),
-              ),
-            if (provider.description.isNotEmpty)
-              Padding(
-                padding: const EdgeInsets.only(top: 10),
-                child: Text(provider.description),
-              ),
-            if (provider.requestModes.contains('mobile'))
-              const Padding(
-                padding: EdgeInsets.only(top: 10),
-                child: Text(
-                  'Lists mobile service for this ZIP · availability requires confirmation',
-                ),
-              ),
-            if (provider.independent)
-              const Padding(
-                padding: EdgeInsets.only(top: 10),
-                child: Text(
-                  'Contact this business directly. Estimoto does not send provider requests to this listing.',
-                ),
-              ),
-            if (favorites.isNotEmpty)
-              Padding(
-                padding: const EdgeInsets.only(top: 12),
-                child: Text('Your dedicated shop: ${favorites.join(', ')}'),
-              ),
-            const SizedBox(height: 12),
-            if (!provider.independent &&
-                provider.requestModes.isNotEmpty &&
-                onRequest != null)
-              SizedBox(
-                width: double.infinity,
-                child: FilledButton(
-                  onPressed: onRequest,
-                  child: const Text('Request help'),
-                ),
-              ),
-            Wrap(
-              spacing: 10,
+      clipBehavior: Clip.antiAlias,
+      child: Semantics(
+        button: true,
+        hint: 'Open shop profile',
+        child: InkWell(
+          key: ValueKey('shop-card-${provider.id}'),
+          onTap: () => openProfile(context),
+          child: Padding(
+            padding: const EdgeInsets.all(16),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                if (RegExp(r'^\+?\d{7,15}$').hasMatch(phone))
-                  TextButton.icon(
-                    onPressed: () =>
-                        contact(context, Uri(scheme: 'tel', path: phone)),
-                    icon: const Icon(Icons.phone_outlined),
-                    label: const Text('Call'),
-                  ),
-                if (validWebsite)
-                  TextButton.icon(
-                    onPressed: () => contact(context, website),
-                    icon: const Icon(Icons.open_in_new),
-                    label: const Text('Website'),
-                  ),
-                if (textOf(provider.json, 'source_url').isNotEmpty)
-                  TextButton(
-                    onPressed: () => openExternal(
-                      context,
-                      textOf(provider.json, 'source_url'),
+                LayoutBuilder(
+                  builder: (context, constraints) {
+                    final largeText =
+                        MediaQuery.textScalerOf(context).scale(17) > 23;
+                    if (largeText && constraints.maxWidth < 340) {
+                      return Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          ShopMediaThumbnail(provider: provider, size: 64),
+                          const SizedBox(height: 10),
+                          identity,
+                        ],
+                      );
+                    }
+                    return Row(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        ShopMediaThumbnail(provider: provider),
+                        const SizedBox(width: 12),
+                        Expanded(child: identity),
+                        const SizedBox(width: 8),
+                        const Icon(Icons.chevron_right, semanticLabel: null),
+                      ],
+                    );
+                  },
+                ),
+                if (provider.displayAddress.isNotEmpty)
+                  Padding(
+                    padding: const EdgeInsets.only(top: 10),
+                    child: Text(
+                      provider.displayAddress,
+                      style: Theme.of(context).textTheme.bodySmall,
                     ),
-                    child: const Text('Listing source'),
                   ),
-                if (media != null) ShopMediaCredit(media: media),
+                if (provider.specialties.isNotEmpty)
+                  Padding(
+                    padding: const EdgeInsets.only(top: 10),
+                    child: Wrap(
+                      spacing: 6,
+                      runSpacing: 6,
+                      children: [
+                        for (final service in provider.specialties)
+                          StatusPill(specialtyLabel(service)),
+                      ],
+                    ),
+                  ),
+                if (listedMake)
+                  Padding(
+                    padding: const EdgeInsets.only(top: 10),
+                    child: Text(
+                      'Listed support for ${match['make']} · confirm with the shop',
+                    ),
+                  ),
+                if (provider.description.isNotEmpty)
+                  Padding(
+                    padding: const EdgeInsets.only(top: 10),
+                    child: Text(provider.description),
+                  ),
+                if (provider.requestModes.contains('mobile'))
+                  const Padding(
+                    padding: EdgeInsets.only(top: 10),
+                    child: Text(
+                      'Lists mobile service for this ZIP · availability requires confirmation',
+                    ),
+                  ),
+                if (favorites.isNotEmpty)
+                  Padding(
+                    padding: const EdgeInsets.only(top: 12),
+                    child: Text('Your dedicated shop: ${favorites.join(', ')}'),
+                  ),
               ],
             ),
-            OutlinedButton.icon(
-              onPressed: onSave,
-              icon: const Icon(Icons.bookmark_outline),
-              label: Text(
-                favorites.isEmpty
-                    ? 'Save as my dedicated shop'
-                    : 'Change or remove saved choice',
-              ),
-            ),
-            if (onSaveContact != null)
-              TextButton.icon(
-                onPressed: onSaveContact,
-                icon: const Icon(Icons.contact_page_outlined),
-                label: const Text('Save contact for reviewed scheduling'),
-              ),
-            if (onSave == null && favorites.isEmpty)
-              const Text('Choose a saved vehicle to save a dedicated shop.'),
-          ],
+          ),
         ),
       ),
     );

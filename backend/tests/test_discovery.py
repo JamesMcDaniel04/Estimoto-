@@ -11,10 +11,12 @@ from test_api import clients as api_clients, create_vehicle, h
 
 
 @pytest.fixture
-def clients(tmp_path):
+def clients(tmp_path, monkeypatch):
     supplied = os.getenv('DISCOVERY_TEST_POSTGRES_URL')
     if not supplied:
-        yield from api_clients.__wrapped__(tmp_path)
+        for value in api_clients.__wrapped__(tmp_path):
+            install_review_fixtures(value[0], monkeypatch)
+            yield value
         return
     from sqlalchemy import create_engine, text
     from sqlalchemy.engine import make_url
@@ -35,6 +37,7 @@ def clients(tmp_path):
                      bridge_transport=httpx.MockTransport(lambda r: (sent.append(r), httpx.Response(202, json={'receipt_id': 'upstream-1'}))[1]))
     try:
         with TestClient(app) as client:
+            install_review_fixtures(client, monkeypatch)
             yield client, sent
     finally:
         app.state.engine.dispose()
@@ -43,10 +46,40 @@ def clients(tmp_path):
         admin.dispose()
 
 
+def install_review_fixtures(client, monkeypatch):
+    """Directory transport fixtures represent explicitly reviewed businesses.
+
+    Exercise the real identity/expiry/contact enrichment path, with no network
+    business research in unit tests. Negative tests remove approval explicitly.
+    """
+    from estimoto_plus import reviewed_shops
+    from estimoto_plus.discovery_provider import normalize_listing
+    from estimoto_plus.models import now
+    def approved():
+        stub = getattr(client.app.state, 'reviewed_business_fixtures', None)
+        entries = {}
+        for element in stub.elements if stub else []:
+            row = normalize_listing(element)
+            if row is None or element['id'] in stub.unreviewed_ids:
+                continue
+            entries[row['source_id']] = {
+                'source_id': row['source_id'], 'name': row['name'], 'address': row['address'],
+                'source_point': row['point'], 'business_verified': True,
+                'verified_address': row['address'] or '1 Fixture Street Denver CO 80204',
+                'website': 'https://fixture.example/', 'phone': row['phone'],
+                'verification_url': 'https://fixture.example/contact', 'checked_at': now().date().isoformat(),
+                'description': 'Fixture repair services', 'specialties': row['specialties'],
+                'evidence': 'Synthetic business verification fixture.',
+            }
+        return entries
+    monkeypatch.setattr(reviewed_shops, 'catalog', approved)
+
+
 class DirectoryStub:
     def __init__(self):
         self.calls = []
         self.fail = False
+        self.unreviewed_ids = set()
         self.elements = [self.shop(1, 'General repair'), self.shop(2, 'Audi specialist', {'service:vehicle:brand': 'Audi'})]
 
     @staticmethod
@@ -73,6 +106,7 @@ def setup(client):
     assert client.put('/v1/profile', headers=h('alice'), json={'name': 'Alice', 'phone': '3035550123', 'postal_code': '80204'}).status_code == 200
     client.app.state.settings.discovery_enabled = True
     stub = DirectoryStub()
+    client.app.state.reviewed_business_fixtures = stub
     client.app.state.discovery_transport = httpx.MockTransport(stub)
     return vehicle, stub
 
@@ -111,7 +145,7 @@ def test_public_filters_cap_provenance_and_vehicle_ownership(clients):
     stub.elements.append(stub.shop(1001, 'Audi chain brand', {'brand': 'Audi'}))
     client.put('/v1/vehicles/' + vehicle, headers=h('alice'), json={'make': 'Audi'})
     data = client.get('/v1/discovery', headers=h('alice'), params={'vehicle_id': vehicle}).json()
-    assert len(data['providers']) == 100 and data['truncated'] is True
+    assert len(data['providers']) == 30 and data['truncated'] is True
     assert not any(p['name'] in ('Do not list', 'Outside') for p in data['providers'])
     assert data['providers'][0]['name'] == 'Audi specialist'
     assert all(p['accepting_requests'] is False and p['request_modes'] == [] for p in data['providers'])

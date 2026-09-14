@@ -1,6 +1,7 @@
 import base64
 import hashlib
 import hmac
+from http.cookiejar import CookieJar, DefaultCookiePolicy
 import json
 import time
 
@@ -38,13 +39,27 @@ def verify_dev_token(settings: Settings, token: str):
         return None
 
 
+class _NoAuthCookies(DefaultCookiePolicy):
+    def set_ok(self, cookie, request):
+        return False
+
+
+def create_auth_client():
+    """One thread-safe client per app; its lifespan owner closes the pool."""
+    return httpx.Client(timeout=httpx.Timeout(5, connect=3, pool=2),
+                        limits=httpx.Limits(max_connections=20, max_keepalive_connections=10,
+                                            keepalive_expiry=30),
+                        cookies=CookieJar(policy=_NoAuthCookies()),
+                        follow_redirects=False, trust_env=False)
+
+
 def verify_supabase(settings: Settings, token: str, client: httpx.Client | None = None):
     if not settings.supabase_url or not settings.supabase_publishable_key:
         raise HTTPException(503, "Sign-in is unavailable. Please try again later.")
     url = settings.supabase_url.rstrip("/") + "/auth/v1/user"
     try:
         if client is None:
-            with httpx.Client(timeout=5) as local:
+            with create_auth_client() as local:
                 response = local.get(url, headers={"apikey": settings.supabase_publishable_key, "Authorization": f"Bearer {token}"})
         else:
             response = client.get(url, headers={"apikey": settings.supabase_publishable_key, "Authorization": f"Bearer {token}"})
@@ -78,7 +93,14 @@ def current_customer(request: Request, authorization: str | None = Header(defaul
         if token.startswith("dev."):
             raise HTTPException(401, "Sign in to continue.")
         verifier = request.app.state.auth_verifier
-        identity = verifier(token) if verifier else verify_supabase(settings, token, request.app.state.auth_client)
+        if verifier:
+            identity = verifier(token)
+        else:
+            def upstream():
+                return verify_supabase(settings, token, request.app.state.auth_client)
+            cache = getattr(request.app.state, 'auth_cache', None)
+            identity = (cache.verify(token, upstream, read_only=request.method in {'GET', 'HEAD'})
+                        if cache is not None else upstream())
     if not isinstance(identity, dict) or not identity.get("id") or not identity.get("email") or not (identity.get("email_confirmed_at") or identity.get("confirmed_at")) or identity.get("is_anonymous"):
         raise HTTPException(401, "Sign in to continue.")
     customer_id, email = str(identity["id"]), str(identity["email"])

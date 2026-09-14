@@ -10,6 +10,7 @@ import 'package:estimoto_plus/data/repository.dart';
 import 'package:estimoto_plus/data/demo_seed.dart';
 import 'package:estimoto_plus/domain/models.dart';
 import 'package:estimoto_plus/screens/calendar_screen.dart';
+import 'package:estimoto_plus/services/calendar_time.dart';
 import 'package:estimoto_plus/state/plus_controller.dart';
 import 'package:estimoto_plus/theme.dart';
 import 'package:estimoto_plus/widgets/calendar_slot_picker.dart';
@@ -225,6 +226,111 @@ Future<void> tapCalendar(WidgetTester tester, Finder finder) async {
 }
 
 void main() {
+  test('sample availability starts at 9 AM in the demo Denver zone', () async {
+    final repo = DemoPlusRepository();
+    final status = await repo.getCalendarStatus();
+    expect(status['time_zone'], 'America/Denver');
+    final response = await repo.findCalendarAvailability(
+      calendarAvailabilityBody(
+        date: DateTime(2026, 9, 14),
+        days: 7,
+        timeZone: status['time_zone'],
+        duration: 60,
+        dayStart: 9,
+        dayEnd: 17,
+      ),
+    );
+    expect(
+      rowsOf(response, 'slots').first['start'],
+      '2026-09-14T15:00:00.000Z',
+    );
+    expect(
+      calendarSlotLabel(
+        rowsOf(response, 'slots').first['start'],
+        response['time_zone'],
+      ),
+      contains('9:00 AM (America/Denver, UTC-06:00)'),
+    );
+  });
+  for (final (savedZone, expectedZone) in [
+    ('', 'America/Denver'),
+    ('Etc/UTC', 'Etc/UTC'),
+    ('Asia/Kathmandu', 'Asia/Kathmandu'),
+  ]) {
+    testWidgets(
+      'device zone seeds only unconfigured calendar zone: $savedZone',
+      (tester) async {
+        const channel = MethodChannel('io.estimoto.plus/device_time_zone');
+        tester.binding.defaultBinaryMessenger.setMockMethodCallHandler(
+          channel,
+          (_) async => 'America/Denver',
+        );
+        addTearDown(
+          () => tester.binding.defaultBinaryMessenger.setMockMethodCallHandler(
+            channel,
+            null,
+          ),
+        );
+        final repo = CalendarRepository();
+        repo.status.addAll({
+          'connected': true,
+          'status': 'connected',
+          'time_zone': savedZone,
+        });
+        final controller = await calendarController(repo);
+        await mountCalendar(tester, controller);
+        await tester.pumpAndSettle();
+        expect(
+          tester
+              .widget<TextFormField>(find.byKey(const Key('calendar-zone')))
+              .controller!
+              .text,
+          expectedZone,
+        );
+        expect(repo.preferences, isNull);
+        await tapCalendar(tester, find.byKey(const Key('calendar-choice-one')));
+        await tapCalendar(tester, find.byKey(const Key('calendar-save')));
+        expect(repo.preferences?['time_zone'], expectedZone);
+      },
+    );
+  }
+
+  testWidgets('unknown device zone requires an explicit valid calendar zone', (
+    tester,
+  ) async {
+    const channel = MethodChannel('io.estimoto.plus/device_time_zone');
+    tester.binding.defaultBinaryMessenger.setMockMethodCallHandler(
+      channel,
+      (_) async => 'MDT',
+    );
+    addTearDown(
+      () => tester.binding.defaultBinaryMessenger.setMockMethodCallHandler(
+        channel,
+        null,
+      ),
+    );
+    final repo = CalendarRepository();
+    repo.status.addAll({
+      'connected': true,
+      'status': 'connected',
+      'time_zone': '',
+    });
+    final controller = await calendarController(repo);
+    await mountCalendar(tester, controller);
+    await tester.pumpAndSettle();
+    expect(
+      tester
+          .widget<TextFormField>(find.byKey(const Key('calendar-zone')))
+          .controller!
+          .text,
+      '',
+    );
+    await tapCalendar(tester, find.byKey(const Key('calendar-choice-one')));
+    await tapCalendar(tester, find.byKey(const Key('calendar-save')));
+    expect(repo.preferences, isNull);
+    expect(find.textContaining('Enter an IANA time zone'), findsOneWidget);
+  });
+
   testWidgets('uncertain disconnect does not claim Google access stopped', (
     tester,
   ) async {
@@ -278,6 +384,49 @@ void main() {
       expect(find.text('Starting 9/21/2026'), findsOneWidget);
     },
   );
+  for (final (zone, instant, end) in [
+    (
+      'America/Denver',
+      DateTime.utc(2026, 9, 14, 5, 30),
+      '2026-09-21T06:00:00.000Z',
+    ),
+    ('Etc/UTC', DateTime.utc(2026, 9, 13, 23, 30), '2026-09-21T00:00:00.000Z'),
+    (
+      'Asia/Kathmandu',
+      DateTime.utc(2026, 9, 13, 17, 45),
+      '2026-09-20T18:15:00.000Z',
+    ),
+  ]) {
+    testWidgets('late-night $zone search still offers tomorrow', (
+      tester,
+    ) async {
+      final repo = CalendarRepository();
+      repo.status.addAll({
+        'connected': true,
+        'status': 'connected',
+        'selected_calendar_ids': ['one'],
+        'time_zone': zone,
+      });
+      final owner = await calendarController(repo);
+      await tester.pumpWidget(
+        MaterialApp(
+          home: CalendarSlotPicker(controller: owner, now: () => instant),
+        ),
+      );
+      await tester.pumpAndSettle();
+      expect(find.text('Starting 9/14/2026'), findsOneWidget);
+      await tapCalendar(tester, find.byKey(const Key('calendar-find-times')));
+      expect(find.byKey(const Key('calendar-slot-0')), findsOneWidget);
+      final start = DateTime.parse(
+        repo.availabilityQuery!['time_min'] as String,
+      );
+      expect(start.isAfter(instant.add(const Duration(hours: 1))), isTrue);
+      expect(start.isBefore(instant.add(const Duration(hours: 2))), isTrue);
+      expect(repo.availabilityQuery!['time_max'], end);
+      expect(repo.availabilityQuery!['time_zone'], zone);
+      expect(tester.takeException(), isNull);
+    });
+  }
   testWidgets(
     'changed Calendar generation invalidates selected offers before review',
     (tester) async {

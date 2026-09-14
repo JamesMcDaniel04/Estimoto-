@@ -3,6 +3,7 @@ import 'package:url_launcher/url_launcher.dart';
 import '../data/repository.dart';
 import '../domain/models.dart';
 import '../services/calendar_time.dart';
+import '../services/device_time_zone.dart';
 import '../state/plus_controller.dart';
 import '../widgets/common.dart';
 import '../widgets/workspace_widgets.dart';
@@ -39,7 +40,8 @@ class _CalendarScreenState extends WorkspaceState<CalendarScreen>
   Json? status;
   List<Json> calendars = [];
   final selected = <String>{};
-  final zone = TextEditingController(text: 'Etc/UTC');
+  final zone = TextEditingController();
+  String? localZone;
   bool sync = false, loading = true, dirty = false, resumePending = false;
   int epoch = 0;
   bool valid(int run) => active && run == epoch;
@@ -86,7 +88,8 @@ class _CalendarScreenState extends WorkspaceState<CalendarScreen>
       selected
         ..clear()
         ..addAll(stringRows(value, 'selected_calendar_ids'));
-      zone.text = textOf(value, 'time_zone', 'Etc/UTC');
+      final savedZone = textOf(value, 'time_zone');
+      zone.text = savedZone.isEmpty ? localZone ?? '' : savedZone;
       sync = value['sync_confirmed'] == true;
       dirty = false;
     }
@@ -105,6 +108,13 @@ class _CalendarScreenState extends WorkspaceState<CalendarScreen>
     try {
       var value = await controller.repository.getCalendarStatus();
       if (!valid(run)) return;
+      if (textOf(value, 'time_zone').isEmpty && localZone == null) {
+        localZone = await deviceTimeZone().timeout(
+          const Duration(seconds: 2),
+          onTimeout: () => null,
+        );
+        if (!valid(run)) return;
+      }
       setState(() => applyStatus(value));
       final attempt = textOf(value, 'attempt_id');
       if (!controller.isDemo &&

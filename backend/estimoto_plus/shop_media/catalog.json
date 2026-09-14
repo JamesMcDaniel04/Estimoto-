@@ -1,0 +1,1161 @@
+{
+  "schema": 1,
+  "checked_at": "2026-09-14T05:19:23.717999+00:00",
+  "shops": [
+    {
+      "source_id": "node:6037976510",
+      "name": "Bronco's Muffler Auto",
+      "address": "1225 Federal Boulevard Denver CO 80204",
+      "source_url": "https://www.exhaustbrakesmufflerdenver.com/contact-us/",
+      "kind": "logo",
+      "attribution": "Bronco's Muffler Auto \u00b7 Official website",
+      "evidence": "Official contact page states 1225 Federal Blvd, Denver CO 80204 and 303-825-3482. Homepage publishes the Bronco Muffler Auto logo; visually inspected.",
+      "sha256": "029a68094cf4a106ab007bcadbf1f360b1e1971cecbab9ffe86963ab18ec0722",
+      "background": "light"
+    },
+    {
+      "source_id": "way:386557023",
+      "name": "Latino's Auto Glass",
+      "address": "280 Federal Boulevard Denver CO 80219-1535",
+      "source_url": "https://latinosautoglass.com/contact-us/",
+      "kind": "logo",
+      "attribution": "Latino's Auto Glass \u00b7 Official website",
+      "evidence": "Official contact page states Latino Auto Glass, 280 Federal Blvd Denver CO 80219. Header publishes the visually inspected Latino's Auto Glass wordmark; exact address and supplied website match.",
+      "sha256": "ae401115fa549257d86fcb265836ef1652da14d08e6c74fe54af2ab4c15fb8dd",
+      "background": "light"
+    },
+    {
+      "source_id": "node:5310367293",
+      "name": "Les Schwab Tire Center",
+      "address": "2001 Federal Boulevard Denver CO 80211",
+      "source_url": "https://www.lesschwab.com/stores/co/denver/2001-federal-blvd",
+      "kind": "logo",
+      "attribution": "Les Schwab Tire Center \u00b7 Official website",
+      "evidence": "Official branch page matches Les Schwab Tire Center, 2001 Federal Blvd Denver CO 80211 and publishes this branded application icon. Visually inspected actual Les Schwab Tires logo.",
+      "sha256": "3eeb3f570d2665a7ca9216939adb95cc04d16db2f60d73baaf641d4e76be7167",
+      "background": "light"
+    },
+    {
+      "source_id": "node:3496486608",
+      "name": "Grease Monkey",
+      "address": "901 West 8th Avenue Denver CO 80204",
+      "source_url": "https://www.greasemonkey.com/locations/co/denver/",
+      "kind": "logo",
+      "attribution": "Grease Monkey \u00b7 Official website",
+      "evidence": "Current official Denver locator matches Center #91, 901 West 8th Ave Denver CO 80204, 303-825-5915. Actual Grease Monkey logo is published by official franchise site https://oilexgreasemonkey.com/locations/colorado/lakewood/ and visually inspected. Shared chain asset.",
+      "sha256": "acb9926936b6e683edd4cb6c17c5ef5324327f3da87dc4edb5554bde0d07cd9a",
+      "background": "dark"
+    },
+    {
+      "source_id": "node:3488960354",
+      "name": "Midas Auto Service Experts",
+      "address": "959 West 6th Avenue Denver CO 80204",
+      "source_url": "https://www.midas.com/",
+      "kind": "logo",
+      "attribution": "Midas Auto Service Experts \u00b7 Official website",
+      "evidence": "Official Midas #5524 branch page and JSON-LD match 959 W. 6th Avenue Denver CO 80204. Actual Midas logo extracted from header srcset and visually inspected.",
+      "sha256": "443b1c997545b507e077d27219b0e8f92d608baf8ebc63bf888c94f49e2e8c33",
+      "background": "light"
+    },
+    {
+      "source_id": "node:3512792161",
+      "name": "Snyders Auto Works",
+      "address": "1200 Santa Fe Drive Denver CO 80204",
+      "source_url": "https://snydersautoworks.com/",
+      "kind": "photo",
+      "attribution": "Snyders Auto Works \u00b7 Official website",
+      "evidence": "Official site names Snyder's Auto Works and lists 1200 Santa Fe Drive, Denver, CO 80204, phone 303-893-5745. Photo is the shop exterior mural published as the site Open Graph image. Visually inspected.",
+      "sha256": "f651c8877352df9ed02dc0b6c6e1749dcecf291fa848609a713e4604c3fa0fbd",
+      "background": "light"
+    },
+    {
+      "source_id": "node:3499401426",
+      "name": "Strictly Automotive",
+      "address": "804 West 10th Avenue Denver CO 80204",
+      "source_url": "https://www.strictlyautomotivedenver.com/",
+      "kind": "logo",
+      "attribution": "Strictly Automotive \u00b7 Official website",
+      "evidence": "Official site JSON-LD lists 804 W. 10th Ave., Denver. Header/footer logo visibly reads Strictly Automotive, Inc.; rendered the original SVG to PNG.",
+      "sha256": "49bfaed988522bdc589b4593ed59006003fa834cb7d3daf1d2fda48183906cb9",
+      "background": "light"
+    },
+    {
+      "source_id": "node:12681115501",
+      "name": "Mile High Classics",
+      "address": "325 South Lowell Boulevard   80219",
+      "source_url": "https://milehighclassics.com/",
+      "kind": "logo",
+      "attribution": "Mile High Classics \u00b7 Official website",
+      "evidence": "Official footer and contact page list 325 S. Lowell Blvd, Denver 80219. Footer logo visibly reads Mile High Classics LTD.",
+      "sha256": "435c6f1dd703651bd1e3f235a2ffc71705326782106bcb06b2abc339a9cc716d",
+      "background": "light"
+    },
+    {
+      "source_id": "way:920614581",
+      "name": "Gaylord's Garage",
+      "address": "1451 Depew Street Lakewood CO 80214",
+      "source_url": "https://www.gaylordsgarage.com/",
+      "kind": "logo",
+      "attribution": "Gaylord's Garage \u00b7 Official website",
+      "evidence": "Official contact page lists 1451 Depew, Lakewood CO 80214 and phone 303-232-7645. Original shop logo visibly reads Gaylord's Garage, family owned since 1978.",
+      "sha256": "bf2323c9264f6d9b483bef4b933c5e6ee824ff3ff1faad4ba6b0fc47ed58f196",
+      "background": "light"
+    },
+    {
+      "source_id": "way:714373223",
+      "name": "Astro Automotive",
+      "address": "65 South Cherokee Street Denver CO 80223",
+      "source_url": "https://astroautomotive.com/",
+      "kind": "logo",
+      "attribution": "Astro Automotive \u00b7 Official website",
+      "evidence": "Official site lists 65 S. Cherokee Street, Denver CO 80223 and 303-722-2808. Header custom-logo visibly reads Astro Automotive.",
+      "sha256": "b890011ec4b345906bd8b0883e9fad84995ed7a3d2671475b2d3b3ff64f4bfd8",
+      "background": "light"
+    },
+    {
+      "source_id": "node:5209847566",
+      "name": "Goodyear Auto Service Center",
+      "address": "2007 Broadway Denver CO 80205",
+      "source_url": "https://www.goodyear.com/",
+      "kind": "logo",
+      "attribution": "Goodyear Auto Service Center \u00b7 Official website",
+      "evidence": "Official corporate Goodyear header SVG rendered to PNG. Goodyear network location page identifies Goodyear Auto Service - Broadway at 2007 Broadway, Denver CO 80205; exact chain and address match.",
+      "sha256": "cd00c362f08026ca0cd84d9f9ed3f21073305d5fd7001dcfe05aa389b4d3226f",
+      "background": "dark"
+    },
+    {
+      "source_id": "way:1382568853",
+      "name": "Midas",
+      "address": "5770 West Alameda Avenue Lakewood CO 80226",
+      "source_url": "https://www.midas.com/",
+      "kind": "logo",
+      "attribution": "Midas \u00b7 Official website",
+      "evidence": "Official Midas #5648 page lists 5770 West Alameda, Lakewood CO 80226 and 720-465-2460. Original Midas header mark visually inspected.",
+      "sha256": "443b1c997545b507e077d27219b0e8f92d608baf8ebc63bf888c94f49e2e8c33",
+      "background": "dark"
+    },
+    {
+      "source_id": "way:1382569656",
+      "name": "SLP Auto Glass",
+      "address": "5700 West Alameda Avenue Lakewood CO 80226",
+      "source_url": "https://slpautoglass.com",
+      "kind": "logo",
+      "attribution": "SLP Auto Glass \u00b7 Official website",
+      "evidence": "Official site JSON-LD lists 5700 W Alameda Ave, Lakewood and 303-936-6666. Site branded icon visibly reads SLP Auto Glass.",
+      "sha256": "606f4215f6fd27ed2296f2b620042782655df117a9afda952c1c6162b217959c",
+      "background": "light"
+    },
+    {
+      "source_id": "way:360642270",
+      "name": "Gianni's Repair Center",
+      "address": "",
+      "source_url": "https://www.instagram.com/giannis.repair/",
+      "kind": "logo",
+      "attribution": "Gianni's Repair Center \u00b7 Official Instagram",
+      "evidence": "OSM supplied this exact Instagram account; public page title identifies Gianni's Repair Center. Profile logo visibly reads Gianni's Repair Center. BBB corroborates listing phone 720-445-9386 and 6001 W Alameda Ave, matching listing coordinates.",
+      "sha256": "2a6de962cd5fd5c43998025797faf93482e51a031cb9f99d6ed235c427bfdd2e",
+      "background": "light"
+    },
+    {
+      "source_id": "way:108400808",
+      "name": "Pep Boys",
+      "address": "487 South Broadway  CO 80209",
+      "source_url": "https://info.pepboys.com/",
+      "kind": "logo",
+      "attribution": "Pep Boys \u00b7 Official website",
+      "evidence": "Official Denver store locator https://www.pepboys.com/stores/co/denver matches 487 S Broadway. Logo extracted without recreation from the left 180x97 pixels of the supplier-site header image linked by https://info.pepboys.com/header.js.",
+      "sha256": "b66930ab1e0bb982c7a206847a5b6e0d2eb398cd3cdca2d008d81bde4a8fac53",
+      "background": "light"
+    },
+    {
+      "source_id": "way:148757357",
+      "name": "Grease Monkey",
+      "address": "East Colfax Avenue Denver CO 80218",
+      "source_url": "https://oilexgreasemonkey.com/locations/colorado/lakewood/",
+      "kind": "logo",
+      "attribution": "Grease Monkey \u00b7 Official website",
+      "evidence": "Official current branch https://www.greasemonkey.com/locations/co/denver/1010-east-colfax-ave/ confirms Center #76 at 1010 East Colfax Ave, Denver CO 80218, phone 303-860-7000, matching public listing phone and street. Exact chain logo from official franchise website.",
+      "sha256": "acb9926936b6e683edd4cb6c17c5ef5324327f3da87dc4edb5554bde0d07cd9a",
+      "background": "dark"
+    },
+    {
+      "source_id": "way:664768410",
+      "name": "Downing Street Garage",
+      "address": "401 Downing Street Denver CO 80218",
+      "source_url": "https://downingstreetgarage.com/",
+      "kind": "logo",
+      "attribution": "Downing Street Garage \u00b7 Official website",
+      "evidence": "Official site footer identifies 401 N Downing St, Denver CO 80218, matching public shop address. Header logo downloaded from its linked zapwp CDN.",
+      "sha256": "41c11f58e50e07ea6ba501d15d09e1e50e4001508c0e3c05d779f409743bb285",
+      "background": "light"
+    },
+    {
+      "source_id": "node:4394613154",
+      "name": "Kurtis 4 Less Auto Repair",
+      "address": "2301 West 44th Avenue Denver CO 80211",
+      "source_url": "https://kurtis4less.com/",
+      "kind": "logo",
+      "attribution": "Kurtis 4 Less Auto Repair \u00b7 Official website",
+      "evidence": "Official site identifies Kurtis 4 Less Auto Repair and phone 720-502-4114. Waze matches 2301 W 44th Ave, phone and official domain: https://www.waze.com/live-map/directions/kurtis-4-less-auto-repair-w-44th-ave-2301-denver?to=place.w.167117198.1671106442.3239514 .",
+      "sha256": "01580d9cc24356b408aca208e48d34ec78ba1a806b3c88c90abd737bfa805167",
+      "background": "light"
+    },
+    {
+      "source_id": "node:3628013042",
+      "name": "Walmart Tire & Lube Express",
+      "address": "7455 West Colfax Avenue Lakewood  80214",
+      "source_url": "https://corporate.walmart.com/",
+      "kind": "logo",
+      "attribution": "Walmart Tire & Lube Express \u00b7 Official website",
+      "evidence": "Official Walmart branch https://www.walmart.com/store/2125-lakewood-co matches 7455 W Colfax Ave; official auto center link is https://www.walmart.com/store/2125-lakewood-co/auto-care-center/ . Brand wordmark extracted from corporate site footer SVG; pure local SVG rasterization.",
+      "sha256": "aaed818be7647d321c2a53e68975fb0fc857e542a277dc7b064943e3e43471ae",
+      "background": "light"
+    },
+    {
+      "source_id": "node:9405490565",
+      "name": "Goodyear",
+      "address": "7201 West Alameda Avenue Lakewood CO 80226",
+      "source_url": "https://www.goodyear.com/en-us/shops/CO/Lakewood/000908127",
+      "kind": "logo",
+      "attribution": "Goodyear \u00b7 Official website",
+      "evidence": "Official Goodyear shop page names Goodyear Auto Service - Lakewood, 7201 West Alameda Ave, matching listing. Header brand SVG locally rasterized.",
+      "sha256": "2928dec238891df3657588877d923e18d929651af5ddaba7f1cc0586fb4af27a",
+      "background": "light"
+    },
+    {
+      "source_id": "way:79673831",
+      "name": "Grease Monkey",
+      "address": "395 South Wadsworth Boulevard  CO",
+      "source_url": "https://oilexgreasemonkey.com/locations/colorado/lakewood/",
+      "kind": "logo",
+      "attribution": "Grease Monkey \u00b7 Official website",
+      "evidence": "Official franchise page identifies Grease Monkey #734 at 395 S Wadsworth Blvd. Corporate locator also confirms https://www.greasemonkey.com/locations/co/lakewood/395-wadsworth-blvd/ .",
+      "sha256": "acb9926936b6e683edd4cb6c17c5ef5324327f3da87dc4edb5554bde0d07cd9a",
+      "background": "dark"
+    },
+    {
+      "source_id": "way:359507304",
+      "name": "Safelite AutoGlass",
+      "address": "100 South Wadsworth Boulevard;Wadsworth Boulevard Lakewood CO 80226",
+      "source_url": "https://www.safelite.com/stores/lakewood",
+      "kind": "logo",
+      "attribution": "Safelite AutoGlass \u00b7 Official website",
+      "evidence": "Official Safelite Lakewood page identifies 100 Wadsworth Blvd, Lakewood CO 80226 at W 1st Ave, matching OSM coordinates and street number despite malformed public street string. Header SVG locally rasterized after correcting its erroneous utf-16 declaration to match actual UTF-8 bytes; paths unchanged.",
+      "sha256": "65650eb1e61c6514b5ccd8d1b447c48879c02bb664fbf63b2b178d51fe837f55",
+      "background": "light"
+    },
+    {
+      "source_id": "way:823570895",
+      "name": "The Toy Shop",
+      "address": "1185 South Cherokee Street Denver CO 80223",
+      "source_url": "https://thetoyshopdenver.com/",
+      "kind": "logo",
+      "attribution": "The Toy Shop \u00b7 Official website",
+      "evidence": "Official site logo link and contact block identify The Toy Shop, 1185 S Cherokee Street, Denver 80223, phone 303-744-7621. Exact name, address and phone match.",
+      "sha256": "c3b640b520f20208c7787d3ca1bc39f483c01f5fa18d7173fb09c138598155d0",
+      "background": "light"
+    },
+    {
+      "source_id": "node:10241547409",
+      "name": "Urban Autocare",
+      "address": "1701 High Street Denver CO 80218",
+      "source_url": "https://www.urbanautocare.com/location/",
+      "kind": "logo",
+      "attribution": "Urban Autocare \u00b7 Official website",
+      "evidence": "Official location page identifies North Denver branch at 1701 High Street, Denver CO 80218. Header image alt and title explicitly say Urban Autocare Logo.",
+      "sha256": "695709efcdff7448a49e4dbf4dfe2d66cce3f4a237e8234eca36197039b4246d",
+      "background": "light"
+    },
+    {
+      "source_id": "node:9646414104",
+      "name": "Denver's Quality Automotive",
+      "address": "6915 West 38th Avenue Wheat Ridge CO 80033",
+      "source_url": "https://www.qualityautocare.com/",
+      "kind": "logo",
+      "attribution": "Denver's Quality Automotive \u00b7 Official website",
+      "evidence": "Official Denver's Quality Automotive homepage gives 6915 W 38th Ave, Wheat Ridge CO 80033, matching listing. Header logo downloaded from linked irp.cdn-website.com CDN.",
+      "sha256": "1fa5787375ccaeb5ee29fe4e43fa13a8f4a228c0fe99f094e39ae9e8af112c2a",
+      "background": "light"
+    },
+    {
+      "source_id": "way:563518812",
+      "name": "Les Schwab Tire Center",
+      "address": "5871 West 44th Avenue Lakeside CO 80212",
+      "source_url": "https://www.lesschwab.com/stores/co/denver/5871-w-44th-ave",
+      "kind": "logo",
+      "attribution": "Les Schwab Tire Center \u00b7 Official website",
+      "evidence": "Official locator gives 5871 W 44th Ave, Denver CO 80212, Lakeside store. Street/ZIP and name match despite city label Denver/Lakeside variation. Brand header SVG locally rasterized.",
+      "sha256": "69bb1a74df7e458c3cefbeef68729a7eddb8f5e021761ebcfb9ba5f6f8324416",
+      "background": "light"
+    }
+  ],
+  "businesses": [
+    {
+      "source_id": "node:6037976510",
+      "name": "Bronco's Muffler Auto",
+      "address": "1225 Federal Boulevard Denver CO 80204",
+      "website": "https://www.exhaustbrakesmufflerdenver.com/",
+      "phone": "+13038253482",
+      "verified_address": "1225 Federal Boulevard Denver CO 80204",
+      "business_verified": true,
+      "verification_url": "https://www.exhaustbrakesmufflerdenver.com/contact-us/",
+      "checked_at": "2026-09-13",
+      "source_point": [
+        39.735264,
+        -105.025489
+      ],
+      "evidence": "Official contact page confirms 1225 Federal Blvd and 303-825-3482. Official home and service navigation advertise exhaust and muffler repairs, catalytic converters, brakes, suspension/alignment and A/C. Logo identifies Bronco Muffler Auto.",
+      "source_urls": [
+        "https://www.exhaustbrakesmufflerdenver.com/contact-us/",
+        "https://www.exhaustbrakesmufflerdenver.com/"
+      ],
+      "specialties": [
+        "mechanical"
+      ],
+      "service_details": [
+        "Muffler and exhaust repair",
+        "Catalytic converter replacement",
+        "Brake service",
+        "Alignment and suspension",
+        "Air conditioning and heating"
+      ],
+      "phone_kind": "local",
+      "description": "Muffler and exhaust repair shop on Federal Boulevard offering brake, suspension, alignment, and air-conditioning service."
+    },
+    {
+      "source_id": "way:386557023",
+      "name": "Latino's Auto Glass",
+      "address": "280 Federal Boulevard Denver CO 80219-1535",
+      "website": "https://latinosautoglass.com/",
+      "phone": "+13039353561",
+      "verified_address": "280 Federal Boulevard Denver CO 80219",
+      "business_verified": true,
+      "verification_url": "https://latinosautoglass.com/contact-us/",
+      "checked_at": "2026-09-13",
+      "source_point": [
+        39.7210295,
+        -105.0248354
+      ],
+      "evidence": "Official contact page confirms Latino's Auto Glass at 280 Federal Blvd and phone 303-935-3561. Official home lists chip/crack repair and window replacement. Official phone supersedes older OSM phone.",
+      "source_urls": [
+        "https://latinosautoglass.com/contact-us/",
+        "https://latinosautoglass.com/"
+      ],
+      "specialties": [
+        "collision"
+      ],
+      "service_details": [
+        "Windshield chip and crack repair",
+        "Windshield replacement",
+        "Side and rear window replacement",
+        "Window tinting"
+      ],
+      "phone_kind": "local",
+      "description": "Auto-glass shop on Federal Boulevard offering windshield chip repairs and replacement of windshields, side windows, and rear windows."
+    },
+    {
+      "source_id": "node:5310367293",
+      "name": "Les Schwab Tire Center",
+      "address": "2001 Federal Boulevard Denver CO 80211",
+      "website": "https://www.lesschwab.com/stores/co/denver/2001-federal-blvd",
+      "phone": "+13034559424",
+      "verified_address": "2001 Federal Boulevard Denver CO 80211",
+      "business_verified": true,
+      "verification_url": "https://www.lesschwab.com/stores/co/denver/2001-federal-blvd",
+      "checked_at": "2026-09-13",
+      "source_point": [
+        39.7477394,
+        -105.025564
+      ],
+      "evidence": "Official Denver Federal Blvd branch page identifies Les Schwab Tire Center at 2001 Federal Blvd, Denver CO 80211 and 303-455-9424. Its available-services section lists flat repair, alignments, tire balancing/rotations, brakes and shocks/struts. Site rating was not copied as Google-verified.",
+      "source_urls": [
+        "https://www.lesschwab.com/stores/co/denver/2001-federal-blvd"
+      ],
+      "specialties": [
+        "maintenance",
+        "mechanical"
+      ],
+      "service_details": [
+        "Tire sales and installation",
+        "Flat tire repair",
+        "Tire rotation and balancing",
+        "Wheel alignment",
+        "Brake service",
+        "Shocks and struts",
+        "Battery service"
+      ],
+      "phone_kind": "local",
+      "description": "Denver Federal Boulevard tire center offering flat repairs, tire installation and balancing, wheel alignment, brakes, and suspension service."
+    },
+    {
+      "source_id": "node:3496486608",
+      "name": "Grease Monkey",
+      "address": "901 West 8th Avenue Denver CO 80204",
+      "website": "https://www.greasemonkey.com/locations/co/denver/901-west-8th-ave/",
+      "phone": "+13038255915",
+      "verified_address": "901 West 8th Avenue Denver CO 80204",
+      "business_verified": true,
+      "verification_url": "https://www.greasemonkey.com/locations/co/denver/901-west-8th-ave/",
+      "checked_at": "2026-09-13",
+      "source_point": [
+        39.7290798,
+        -104.9989547
+      ],
+      "evidence": "Official Center #91 page confirms 901 West 8th Ave, Denver CO 80204 and 303-825-5915. Branch page explicitly describes local automotive repair and advertises brake, A/C, battery and maintenance services. Site rating was not copied as Google-verified.",
+      "source_urls": [
+        "https://www.greasemonkey.com/locations/co/denver/901-west-8th-ave/"
+      ],
+      "specialties": [
+        "maintenance",
+        "mechanical"
+      ],
+      "service_details": [
+        "Oil changes",
+        "Brake service",
+        "Battery service",
+        "Air conditioning service",
+        "Fluid exchanges",
+        "Filter replacement",
+        "Tire rotation and balancing"
+      ],
+      "phone_kind": "local",
+      "description": "Grease Monkey Center #91 offers oil changes and automotive repair, with brakes, batteries, air conditioning, and routine maintenance advertised on its branch page."
+    },
+    {
+      "source_id": "node:3488960354",
+      "name": "Midas Auto Service Experts",
+      "address": "959 West 6th Avenue Denver CO 80204",
+      "website": "https://www.midas.com/store/co/denver/959-w-6th-avenue-80204?shopnum=5524",
+      "phone": "+17204008852",
+      "verified_address": "959 West 6th Avenue Denver CO 80204",
+      "business_verified": true,
+      "verification_url": "https://www.midas.com/store/co/denver/959-w-6th-avenue-80204?shopnum=5524",
+      "checked_at": "2026-09-13",
+      "source_point": [
+        39.7260202,
+        -104.999688
+      ],
+      "evidence": "Official Midas #5524 branch page and JSON-LD match 959 W. 6th Avenue, Denver CO 80204 and 720-400-8852. Local service descriptions name brake repair, tire balancing/repair, oil changes and suspension/alignment.",
+      "source_urls": [
+        "https://www.midas.com/store/co/denver/959-w-6th-avenue-80204?shopnum=5524"
+      ],
+      "specialties": [
+        "maintenance",
+        "mechanical"
+      ],
+      "service_details": [
+        "Oil changes",
+        "Brake repair",
+        "Tire repair and balancing",
+        "Tire installation",
+        "Wheel alignment",
+        "Suspension service"
+      ],
+      "phone_kind": "local",
+      "description": "Midas on West 6th Avenue provides brake repair, tire repair and installation, oil changes, wheel alignment, and suspension service."
+    },
+    {
+      "source_id": "node:3512792161",
+      "name": "Snyders Auto Works",
+      "address": "1200 Santa Fe Drive Denver CO 80204",
+      "website": "https://snydersautoworks.com/",
+      "phone": "+1-303-893-5745",
+      "verified_address": "1200 Santa Fe Drive, Denver, CO 80204",
+      "business_verified": true,
+      "verification_url": "https://snydersautoworks.com/",
+      "checked_at": "2026-09-13",
+      "source_point": [
+        39.7354582,
+        -104.9984519
+      ],
+      "evidence": "Live official homepage names this exact address and phone, offers auto body/collision/hail/bumpers/PDR, and publishes walk-in estimate hours Monday\u2013Thursday. HTTP 200 on 2026-09-13.",
+      "source_urls": [
+        "https://snydersautoworks.com/"
+      ],
+      "specialties": [
+        "pdr",
+        "collision"
+      ],
+      "service_details": [
+        "Collision repair",
+        "Hail damage repair",
+        "Paintless dent repair",
+        "Bumper repair"
+      ],
+      "phone_kind": "local",
+      "description": "Services advertised by this shop include collision repair, hail damage repair, paintless dent repair, bumper repair."
+    },
+    {
+      "source_id": "node:3499401426",
+      "name": "Strictly Automotive",
+      "address": "804 West 10th Avenue Denver CO 80204",
+      "website": "https://www.strictlyautomotivedenver.com/",
+      "phone": "+1-303-436-1700",
+      "verified_address": "804 West 10th Avenue, Denver, CO 80204",
+      "business_verified": true,
+      "verification_url": "https://www.strictlyautomotivedenver.com/",
+      "checked_at": "2026-09-13",
+      "source_point": [
+        39.7317649,
+        -104.9980169
+      ],
+      "evidence": "Live official homepage identifies 804 W 10th Ave and phone, advertises active repair/maintenance and Subaru specialty, and has appointment links/current hours. HTTP 200 on 2026-09-13.",
+      "source_urls": [
+        "https://www.strictlyautomotivedenver.com/"
+      ],
+      "specialties": [
+        "maintenance",
+        "mechanical"
+      ],
+      "service_details": [
+        "General auto repair",
+        "Vehicle maintenance",
+        "Subaru service",
+        "Japanese, American and Korean vehicle service"
+      ],
+      "phone_kind": "local",
+      "description": "Services advertised by this shop include general auto repair, vehicle maintenance, subaru service, japanese, American and Korean vehicle service.",
+      "listed_makes": [
+        "Subaru"
+      ]
+    },
+    {
+      "source_id": "node:12681115501",
+      "name": "Mile High Classics",
+      "address": "325 South Lowell Boulevard   80219",
+      "website": "https://milehighclassics.com/",
+      "phone": "+1-303-379-9664",
+      "verified_address": "325 South Lowell Boulevard, Denver, CO 80219",
+      "business_verified": true,
+      "verification_url": "https://milehighclassics.com/form",
+      "checked_at": "2026-09-13",
+      "source_point": [
+        39.7106238,
+        -105.0352164
+      ],
+      "evidence": "Live official /form contact page confirms address and phone and solicits restoration projects; homepage specifies mechanical, interior, body and paint services at this facility. HTTP 200 on 2026-09-13.",
+      "source_urls": [
+        "https://milehighclassics.com/form",
+        "https://milehighclassics.com/"
+      ],
+      "specialties": [
+        "collision",
+        "mechanical"
+      ],
+      "service_details": [
+        "Classic car restoration",
+        "Mechanical upgrades",
+        "Interior restoration",
+        "Auto body and paint"
+      ],
+      "phone_kind": "local",
+      "description": "Services advertised by this shop include classic car restoration, mechanical upgrades, interior restoration, auto body and paint."
+    },
+    {
+      "source_id": "way:920614581",
+      "name": "Gaylord's Garage",
+      "address": "1451 Depew Street Lakewood CO 80214",
+      "website": "https://www.gaylordsgarage.com/",
+      "phone": "+1-303-232-7645",
+      "verified_address": "1451 Depew Street, Lakewood, CO 80214",
+      "business_verified": true,
+      "verification_url": "https://www.gaylordsgarage.com/contact-us/",
+      "checked_at": "2026-09-13",
+      "source_point": [
+        39.739373,
+        -105.0582232
+      ],
+      "evidence": "Live official /contact-us page confirms 1451 Depew, Lakewood and phone and accepts repair appointment inquiries; homepage offers Honda/Acura repair, filters/fluids and tuneups. HTTP 200 on 2026-09-13.",
+      "source_urls": [
+        "https://www.gaylordsgarage.com/contact-us/",
+        "https://www.gaylordsgarage.com/"
+      ],
+      "specialties": [
+        "maintenance",
+        "mechanical"
+      ],
+      "service_details": [
+        "Honda and Acura repair",
+        "Vehicle maintenance",
+        "Fluid and filter service",
+        "Tune-ups and checkups"
+      ],
+      "phone_kind": "local",
+      "description": "Services advertised by this shop include honda and Acura repair, vehicle maintenance, fluid and filter service, tune-ups and checkups.",
+      "listed_makes": [
+        "Honda",
+        "Acura"
+      ]
+    },
+    {
+      "source_id": "way:714373223",
+      "name": "Astro Automotive",
+      "address": "65 South Cherokee Street Denver CO 80223",
+      "website": "https://astroautomotive.com/",
+      "phone": "+1-303-722-2808",
+      "verified_address": "65 South Cherokee Street, Denver, CO 80223",
+      "business_verified": true,
+      "verification_url": "https://astroautomotive.com/contact-us/",
+      "checked_at": "2026-09-13",
+      "source_point": [
+        39.7152398,
+        -104.992548
+      ],
+      "evidence": "Live official /contact-us page confirms exact address and phone, weekday operating hours and shop services; homepage identifies the current Baker neighborhood repair shop. HTTP 200 on 2026-09-13.",
+      "source_urls": [
+        "https://astroautomotive.com/contact-us/",
+        "https://astroautomotive.com/"
+      ],
+      "specialties": [
+        "maintenance",
+        "mechanical"
+      ],
+      "service_details": [
+        "General auto repair",
+        "Brake repair",
+        "Engine diagnostics and repair",
+        "Transmission service",
+        "Suspension and wheel alignment",
+        "Oil changes and maintenance"
+      ],
+      "phone_kind": "local",
+      "description": "Services advertised by this shop include general auto repair, brake repair, engine diagnostics and repair, transmission service."
+    },
+    {
+      "source_id": "node:5209847566",
+      "name": "Goodyear Auto Service Center",
+      "address": "2007 Broadway Denver CO 80205",
+      "website": "https://www.goodyear.com/en-us/shops/CO/Denver/000908165?src=goodyearautoservice.com",
+      "phone": "+1-303-297-9122",
+      "verified_address": "2007 North Broadway, Denver, CO 80205",
+      "business_verified": true,
+      "verification_url": "https://www.goodyear.com/en-us/shops/CO/Denver/000908165?src=goodyearautoservice.com",
+      "checked_at": "2026-09-13",
+      "source_point": [
+        39.7496011,
+        -104.987776
+      ],
+      "evidence": "Live official store page redirected to current Goodyear website and explicitly identifies Goodyear Auto Service - Broadway, Goodyear-owned Tire & Service Network, 2007 N Broadway, phone and current hours including Labor Day 2026. HTTP 200 on 2026-09-13. Kept services broad because the current location block does not enumerate individual repairs.",
+      "source_urls": [
+        "https://www.goodyear.com/en-us/shops/CO/Denver/000908165?src=goodyearautoservice.com"
+      ],
+      "specialties": [
+        "maintenance",
+        "mechanical"
+      ],
+      "service_details": [
+        "Tires and tire service",
+        "General auto service"
+      ],
+      "phone_kind": "local",
+      "description": "Services advertised by this shop include tires and tire service, general auto service."
+    },
+    {
+      "source_id": "way:1382568853",
+      "name": "Midas",
+      "address": "5770 West Alameda Avenue Lakewood CO 80226",
+      "website": "https://www.midas.com/store/co/lakewood/5770-west-alameda-80226?shopnum=5648",
+      "phone": "+1-720-465-2460",
+      "verified_address": "5770 West Alameda Avenue, Lakewood, CO 80226",
+      "business_verified": true,
+      "verification_url": "https://www.midas.com/store/co/lakewood/5770-west-alameda-80226?shopnum=5648",
+      "checked_at": "2026-09-13",
+      "source_point": [
+        39.7106354,
+        -105.0597994
+      ],
+      "evidence": "Live Midas store #5648 page confirms exact address and phone, hours, appointment request and location-specific descriptions of oil/brakes/tires/alignment/exhaust repair. HTTP 200 on 2026-09-13.",
+      "source_urls": [
+        "https://www.midas.com/store/co/lakewood/5770-west-alameda-80226?shopnum=5648"
+      ],
+      "specialties": [
+        "maintenance",
+        "mechanical"
+      ],
+      "service_details": [
+        "Auto repair",
+        "Oil changes",
+        "Brake repair",
+        "Tire service",
+        "Wheel alignment",
+        "Exhaust and muffler repair"
+      ],
+      "phone_kind": "local",
+      "description": "Services advertised by this shop include auto repair, oil changes, brake repair, tire service."
+    },
+    {
+      "source_id": "way:1382569656",
+      "name": "SLP Auto Glass",
+      "address": "5700 West Alameda Avenue Lakewood CO 80226",
+      "website": "https://slpautoglass.com/",
+      "phone": "+1-303-936-6666",
+      "verified_address": "5700 West Alameda Avenue, Lakewood, CO 80226",
+      "business_verified": true,
+      "verification_url": "https://slpautoglass.com/",
+      "checked_at": "2026-09-13",
+      "source_point": [
+        39.710695,
+        -105.059613
+      ],
+      "evidence": "Live official site publishes exact 5700 W Alameda address and phone in business structured data and contact content, current auto-glass/window-motor service and mobile service offers. HTTP 200 on 2026-09-13.",
+      "source_urls": [
+        "https://slpautoglass.com/"
+      ],
+      "specialties": [
+        "collision"
+      ],
+      "service_details": [
+        "Windshield repair and replacement",
+        "Windshield chip repair",
+        "Side and rear window replacement",
+        "Sunroof glass replacement",
+        "Window motor repair",
+        "Mobile auto glass service"
+      ],
+      "phone_kind": "local",
+      "description": "Services advertised by this shop include windshield repair and replacement, windshield chip repair, side and rear window replacement, sunroof glass replacement."
+    },
+    {
+      "source_id": "way:360642270",
+      "name": "Gianni's Repair Center",
+      "address": "",
+      "website": "https://giannisrepair.com/",
+      "phone": "+1-720-445-9386",
+      "verified_address": "6001 West Alameda Avenue, Lakewood, CO 80226",
+      "business_verified": true,
+      "verification_url": "https://giannisrepair.com/",
+      "checked_at": "2026-09-13",
+      "source_point": [
+        39.7115018,
+        -105.0630289
+      ],
+      "evidence": "Live official Gianni's Repair Center site confirms 6001 W Alameda Ave, 80226 and exact OSM phone, offers car repair/vehicle maintenance and publishes operating hours. Official site uses Denver as city; BBB exact phone/street profile identifies Lakewood, matching OSM coordinates. HTTP 200 on 2026-09-13.",
+      "source_urls": [
+        "https://giannisrepair.com/",
+        "https://www.bbb.org/us/co/lakewood/profile/auto-repair/giannis-repair-center-inc-1296-1000123960"
+      ],
+      "specialties": [
+        "maintenance",
+        "mechanical"
+      ],
+      "service_details": [
+        "General auto repair",
+        "Vehicle maintenance"
+      ],
+      "phone_kind": "local",
+      "description": "Services advertised by this shop include general auto repair, vehicle maintenance."
+    },
+    {
+      "source_id": "way:108400808",
+      "name": "Pep Boys",
+      "address": "487 South Broadway  CO 80209",
+      "website": "https://www.pepboys.com/stores/co/denver/487-s-broadway",
+      "phone": "+1-303-778-0440",
+      "verified_address": "487 S Broadway, Denver, CO 80209",
+      "business_verified": true,
+      "verification_url": "https://www.pepboys.com/stores/co/denver/487-s-broadway",
+      "checked_at": "2026-09-13",
+      "source_point": [
+        39.7078448,
+        -104.9907145
+      ],
+      "evidence": "Current official Broadway location page confirms 487 S Broadway, 303-778-0440, weekly hours, and current tire installation, brake service and wheel alignment offers. The dynamic services module returns an empty state in fetched HTML; service labels retained only where current location offers substantiate them.",
+      "source_urls": [
+        "https://www.pepboys.com/stores/co/denver/487-s-broadway"
+      ],
+      "specialties": [
+        "maintenance",
+        "mechanical"
+      ],
+      "service_details": [
+        "Tire installation",
+        "Brake services",
+        "Wheel alignment"
+      ],
+      "phone_kind": "local",
+      "description": "Services advertised by this shop include tire installation, brake services, wheel alignment."
+    },
+    {
+      "source_id": "way:148757357",
+      "name": "Grease Monkey",
+      "address": "East Colfax Avenue Denver CO 80218",
+      "website": "https://www.greasemonkey.com/locations/co/denver/1010-east-colfax-ave/",
+      "phone": "+1-303-860-7000",
+      "verified_address": "1010 East Colfax Avenue, Denver, CO 80218",
+      "business_verified": true,
+      "verification_url": "https://www.greasemonkey.com/locations/co/denver/1010-east-colfax-ave/",
+      "checked_at": "2026-09-13",
+      "source_point": [
+        39.7396813,
+        -104.9745812
+      ],
+      "evidence": "Current official exact-location page confirms operating repair or auto maintenance business, contact details and offered services.",
+      "source_urls": [
+        "https://www.greasemonkey.com/locations/co/denver/1010-east-colfax-ave/"
+      ],
+      "specialties": [
+        "maintenance",
+        "mechanical"
+      ],
+      "service_details": [
+        "Oil changes",
+        "Brake services",
+        "Fluid exchange",
+        "Headlight services",
+        "Power steering service",
+        "Fleet services"
+      ],
+      "phone_kind": "local",
+      "description": "Services advertised by this shop include oil changes, brake services, fluid exchange, headlight services."
+    },
+    {
+      "source_id": "way:664768410",
+      "name": "Downing Street Garage",
+      "address": "401 Downing Street Denver CO 80218",
+      "website": "https://downingstreetgarage.com/",
+      "phone": "+1-720-797-8602",
+      "verified_address": "401 N Downing Street, Denver, CO 80218",
+      "business_verified": true,
+      "verification_url": "https://downingstreetgarage.com/",
+      "checked_at": "2026-09-13",
+      "source_point": [
+        39.7221929,
+        -104.973309
+      ],
+      "evidence": "Current official exact-location page confirms operating repair or auto maintenance business, contact details and offered services.",
+      "source_urls": [
+        "https://downingstreetgarage.com/"
+      ],
+      "specialties": [
+        "mechanical"
+      ],
+      "service_details": [
+        "Auto repair",
+        "Air conditioning repair",
+        "Battery, starter and alternator repair",
+        "Brake repair",
+        "Diagnostics",
+        "Cooling system repair",
+        "Electrical repair"
+      ],
+      "phone_kind": "local",
+      "description": "Services advertised by this shop include auto repair, air conditioning repair, battery, starter and alternator repair, brake repair."
+    },
+    {
+      "source_id": "node:4394613154",
+      "name": "Kurtis 4 Less Auto Repair",
+      "address": "2301 West 44th Avenue Denver CO 80211",
+      "website": "https://kurtis4less.com/",
+      "phone": "+1-720-502-4114",
+      "verified_address": "2301 W 44th Avenue, Denver, CO 80211",
+      "business_verified": true,
+      "verification_url": "https://kurtis4less.com/contact.html",
+      "checked_at": "2026-09-13",
+      "source_point": [
+        39.7768005,
+        -105.0151066
+      ],
+      "evidence": "Official contact page confirms 2301 W 44th Avenue and 720-502-4114; current official homepage describes collision and mechanical repairs.",
+      "source_urls": [
+        "https://kurtis4less.com/contact.html"
+      ],
+      "specialties": [
+        "collision",
+        "mechanical"
+      ],
+      "service_details": [
+        "Collision repair",
+        "Dent and scratch removal",
+        "Bumper repair",
+        "Paint matching",
+        "Frame straightening",
+        "Headlight restoration",
+        "Brake repair",
+        "Suspension repair"
+      ],
+      "phone_kind": "local",
+      "description": "Services advertised by this shop include collision repair, dent and scratch removal, bumper repair, paint matching."
+    },
+    {
+      "source_id": "node:3628013042",
+      "name": "Walmart Tire & Lube Express",
+      "address": "7455 West Colfax Avenue Lakewood  80214",
+      "website": "https://www.walmart.com/store/2125-lakewood-co/auto-care-center",
+      "phone": "+1-303-274-5219",
+      "verified_address": "7455 W Colfax Avenue, Lakewood, CO 80214",
+      "business_verified": true,
+      "verification_url": "https://www.walmart.com/store/2125-lakewood-co/auto-care-center",
+      "checked_at": "2026-09-13",
+      "source_point": [
+        39.7428585,
+        -105.080542
+      ],
+      "evidence": "Current official exact-location page confirms operating repair or auto maintenance business, contact details and offered services.",
+      "source_urls": [
+        "https://www.walmart.com/store/2125-lakewood-co/auto-care-center"
+      ],
+      "specialties": [
+        "maintenance"
+      ],
+      "service_details": [
+        "Oil changes",
+        "Tire maintenance",
+        "Tire installation",
+        "Battery installation",
+        "General maintenance"
+      ],
+      "phone_kind": "local",
+      "description": "Services advertised by this shop include oil changes, tire maintenance, tire installation, battery installation."
+    },
+    {
+      "source_id": "node:9405490565",
+      "name": "Goodyear",
+      "address": "7201 West Alameda Avenue Lakewood CO 80226",
+      "website": "https://www.goodyear.com/en-us/shops/CO/Lakewood/000908127",
+      "phone": "+1-303-238-7658",
+      "verified_address": "7201 West Alameda Avenue, Lakewood, CO 80226",
+      "business_verified": true,
+      "verification_url": "https://www.goodyear.com/en-us/shops/CO/Lakewood/000908127",
+      "checked_at": "2026-09-13",
+      "source_point": [
+        39.7116136,
+        -105.0773483
+      ],
+      "evidence": "Current official Goodyear listing confirms Goodyear-owned Lakewood location 7201 West Alameda and 303-238-7658; Goodyear Auto Service branch page lists available service categories.",
+      "source_urls": [
+        "https://www.goodyear.com/en-us/shops/CO/Lakewood/000908127"
+      ],
+      "specialties": [
+        "maintenance",
+        "mechanical"
+      ],
+      "service_details": [
+        "Tires",
+        "Oil changes",
+        "Brake service and repair",
+        "Battery replacement",
+        "Wheel alignment",
+        "Tire repair",
+        "Tire rotation"
+      ],
+      "phone_kind": "local",
+      "description": "Services advertised by this shop include tires, oil changes, brake service and repair, battery replacement."
+    },
+    {
+      "source_id": "way:79673831",
+      "name": "Grease Monkey",
+      "address": "395 South Wadsworth Boulevard  CO",
+      "website": "https://www.greasemonkey.com/locations/co/lakewood/395-wadsworth-blvd/",
+      "phone": "+1-303-232-2455",
+      "verified_address": "395 Wadsworth Boulevard, Lakewood, CO 80226",
+      "business_verified": true,
+      "verification_url": "https://www.greasemonkey.com/locations/co/lakewood/395-wadsworth-blvd/",
+      "checked_at": "2026-09-13",
+      "source_point": [
+        39.721886,
+        -105.0820288
+      ],
+      "evidence": "Current official exact-location page confirms operating repair or auto maintenance business, contact details and offered services.",
+      "source_urls": [
+        "https://www.greasemonkey.com/locations/co/lakewood/395-wadsworth-blvd/"
+      ],
+      "specialties": [
+        "maintenance",
+        "mechanical"
+      ],
+      "service_details": [
+        "Oil changes",
+        "Air conditioning services",
+        "Battery services",
+        "Brake services",
+        "Engine services"
+      ],
+      "phone_kind": "local",
+      "description": "Services advertised by this shop include oil changes, air conditioning services, battery services, brake services."
+    },
+    {
+      "source_id": "way:359507304",
+      "name": "Safelite AutoGlass",
+      "address": "100 South Wadsworth Boulevard;Wadsworth Boulevard Lakewood CO 80226",
+      "website": "https://www.safelite.com/stores/lakewood",
+      "phone": "+1-800-800-2727",
+      "verified_address": "100 Wadsworth Boulevard, Lakewood, CO 80226",
+      "business_verified": true,
+      "verification_url": "https://www.safelite.com/stores/lakewood",
+      "checked_at": "2026-09-13",
+      "source_point": [
+        39.7187758,
+        -105.0811829
+      ],
+      "evidence": "Official Lakewood page confirms current auto glass repair shop at 100 Wadsworth Boulevard and exact services. Phone is official national customer service, published as tel:18008002727 on the location page; a local phone was not published. Displayed website ratings are Yotpo, not verified Google ratings.",
+      "source_urls": [
+        "https://www.safelite.com/stores/lakewood"
+      ],
+      "specialties": [
+        "collision"
+      ],
+      "service_details": [
+        "Windshield repair",
+        "Windshield replacement",
+        "Safety system recalibration",
+        "Rear window replacement",
+        "Side window replacement",
+        "Power window repair"
+      ],
+      "phone_kind": "national_customer_service",
+      "description": "Services advertised by this shop include windshield repair, windshield replacement, safety system recalibration, rear window replacement."
+    },
+    {
+      "source_id": "way:823570895",
+      "name": "The Toy Shop",
+      "address": "1185 South Cherokee Street Denver CO 80223",
+      "website": "https://thetoyshopdenver.com/",
+      "phone": "+1-303-744-7621",
+      "verified_address": "1185 S Cherokee Street, Denver, CO 80223",
+      "business_verified": true,
+      "verification_url": "https://thetoyshopdenver.com/",
+      "checked_at": "2026-09-13",
+      "source_point": [
+        39.6950827,
+        -104.9916422
+      ],
+      "evidence": "Current official exact-location page confirms operating repair or auto maintenance business, contact details and offered services.",
+      "source_urls": [
+        "https://thetoyshopdenver.com/"
+      ],
+      "specialties": [
+        "maintenance",
+        "mechanical"
+      ],
+      "service_details": [
+        "Toyota, Lexus and Scion repair",
+        "Oil changes",
+        "Brake repair",
+        "Scheduled maintenance",
+        "Suspension and steering",
+        "Timing belts and water pumps",
+        "Heating and air conditioning"
+      ],
+      "phone_kind": "local",
+      "description": "Services advertised by this shop include toyota, Lexus and Scion repair, oil changes, brake repair, scheduled maintenance.",
+      "listed_makes": [
+        "Toyota",
+        "Lexus",
+        "Scion"
+      ]
+    },
+    {
+      "source_id": "node:10241547409",
+      "name": "Urban Autocare",
+      "address": "1701 High Street Denver CO 80218",
+      "website": "https://www.urbanautocare.com/location/north-denver/",
+      "phone": "+1-303-355-5099",
+      "verified_address": "1701 High Street, Denver, CO 80218",
+      "business_verified": true,
+      "verification_url": "https://www.urbanautocare.com/location/north-denver/",
+      "checked_at": "2026-09-13",
+      "source_point": [
+        39.7435041,
+        -104.965187
+      ],
+      "evidence": "Current official exact-location page confirms operating repair or auto maintenance business, contact details and offered services.",
+      "source_urls": [
+        "https://www.urbanautocare.com/location/north-denver/"
+      ],
+      "specialties": [
+        "maintenance",
+        "mechanical"
+      ],
+      "service_details": [
+        "Oil services",
+        "Vehicle inspections",
+        "Brake repair",
+        "Diagnostics",
+        "Engine repair",
+        "Transmission repair"
+      ],
+      "phone_kind": "local",
+      "description": "Services advertised by this shop include oil services, vehicle inspections, brake repair, diagnostics."
+    },
+    {
+      "source_id": "node:9646414104",
+      "name": "Denver's Quality Automotive",
+      "address": "6915 West 38th Avenue Wheat Ridge CO 80033",
+      "website": "https://www.qualityautocare.com/",
+      "phone": "+1-720-295-6533",
+      "verified_address": "6915 W 38th Avenue, Wheat Ridge, CO 80033",
+      "business_verified": true,
+      "verification_url": "https://www.qualityautocare.com/",
+      "checked_at": "2026-09-13",
+      "source_point": [
+        39.7696164,
+        -105.0737231
+      ],
+      "evidence": "Current official exact-location page confirms operating repair or auto maintenance business, contact details and offered services.",
+      "source_urls": [
+        "https://www.qualityautocare.com/"
+      ],
+      "specialties": [
+        "maintenance",
+        "mechanical"
+      ],
+      "service_details": [
+        "Auto repair",
+        "Oil changes",
+        "Brake services",
+        "Suspension repair",
+        "Electrical repair",
+        "Preventive maintenance"
+      ],
+      "phone_kind": "local",
+      "description": "Services advertised by this shop include auto repair, oil changes, brake services, suspension repair."
+    },
+    {
+      "source_id": "way:563518812",
+      "name": "Les Schwab Tire Center",
+      "address": "5871 West 44th Avenue Lakeside CO 80212",
+      "website": "https://www.lesschwab.com/stores/co/denver/5871-w-44th-ave",
+      "phone": "+1-303-477-4336",
+      "verified_address": "5871 W 44th Avenue, Denver, CO 80212",
+      "business_verified": true,
+      "verification_url": "https://www.lesschwab.com/stores/co/denver/5871-w-44th-ave",
+      "checked_at": "2026-09-13",
+      "source_point": [
+        39.7769914,
+        -105.0608987
+      ],
+      "evidence": "Current official exact-location page confirms operating repair or auto maintenance business, contact details and offered services.",
+      "source_urls": [
+        "https://www.lesschwab.com/stores/co/denver/5871-w-44th-ave"
+      ],
+      "specialties": [
+        "maintenance",
+        "mechanical"
+      ],
+      "service_details": [
+        "Tire installation",
+        "Brake service",
+        "Wheel alignment",
+        "Tire repair",
+        "Tire balancing",
+        "Tire rotation",
+        "Battery services",
+        "Shocks and struts"
+      ],
+      "phone_kind": "local",
+      "description": "Services advertised by this shop include tire installation, brake service, wheel alignment, tire repair."
+    }
+  ],
+  "brands": [],
+  "partners": [
+    {
+      "source_id": "516c3543-cf4e-43ca-b6b4-a505e1f67bd5",
+      "name": "Demolition Dent",
+      "address": "6870 Broadway Street Unit C Denver Colorado 80221",
+      "phone": "720-409-0515",
+      "website": "https://demodenthq.com/",
+      "checked_at": "2026-09-13",
+      "evidence": "Official headquarters website confirms Denver shop at 6870 Broadway Ste C, Denver CO 80221, phone 720-409-0515 and PDR/collision services. Existing owner-published provider identity and request routing remain unchanged."
+    }
+  ]
+}

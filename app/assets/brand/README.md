@@ -1,7 +1,39 @@
-# Estimoto + icon
+# Estimoto + icon artwork
 
-`estimoto-plus-icon.png` is the selected app artwork: the existing Estimoto white E and teal dot on navy, with a white plus sign centered in the teal dot. The built-in image-generation edit tool produced the artwork from the existing Estimoto app icon on 2026-09-13. It was copied into this repository and packaged at 1024×1024 RGB with no alpha channel.
+`estimoto-plus-icon.png` is the selected 1024×1024 opaque master artwork for the
+build-8 update: a white geometric E on a darker sky-blue background, a
+green/teal brand dot, and a smaller navy plus outside the dot. The dot sits
+above-left of the plus. The header and welcome screen use the generated
+`plusIconAsset` constant from `app/lib/brand_assets.dart`. It points to a copy
+whose filename includes the first 16 hexadecimal characters of the master
+SHA-256, so a changed image gets a new browser-cache identity.
+This asset description does not establish which artwork is installed on a
+device or distributed in a released build.
 
-Edit prompt: “Preserve the existing navy square background (#0D3F7A), the exact white geometric E, and the existing teal circular dot (#00B8A9), all at their current positions and proportions. Add one crisp white plus sign (+) centered inside the existing teal circle. The plus must be clearly legible at small app-icon sizes, with equal-length perpendicular bars, flat ends, balanced spacing, and no outline or shadow. Make only that change; preserve all other artwork, flat colors, edges, and layout. Output a full-bleed square app icon with opaque background, no rounded outer corners, no words, no border, no extra symbols.”
+The Android launcher uses a scalable companion encoded in
+[`scripts/sync_app_icons.py`](../../../scripts/sync_app_icons.py). Its palette is
+sky blue `#58A4E5`, white `#FFFFFF`, navy `#0D3F7A`, and teal `#00B8A9`.
+The script writes the companion as adaptive and circular legacy vector resources
+with padding for the launcher mask. It separately resizes the master for iOS
+app icons, native launch images, the web favicon and web app icons. These are
+packaged derivatives of the selected design; the script does not edit the master.
+It also writes the content-hashed asset copy and its Dart constant. Native build 8
+already contains the correct image. The asset reference for returning browsers
+shipped with the shop-profile changes in build 9. Its exact image SHA-256 is
+`fc3222881ab13091274c6571bf2adb2353da05200107b87c7eb288397237a5b3`.
+The new logo was verified on the exact public Android-9 APK installed on an
+emulator and in a returning browser without clearing its cache. This does not
+establish a physical customer-device check. Release evidence is in
+[release status](../../../docs/release-status.md).
 
-Run `python3 scripts/sync_app_icons.py` from the repository root on macOS to produce native and web sizes with `sips`. The header and welcome screen consume the master asset directly.
+From the repository root on macOS:
+
+```sh
+python3 scripts/sync_app_icons.py
+```
+
+The full command regenerates native/web derivatives using `sips`. Use
+`--android-launcher-only` to update only the Android launcher vectors and palette.
+Review the master and companion together after an artwork change, including the
+dot/plus separation and small-size launcher appearance. Changing the master alone
+does not update the companion paths stored in the script.

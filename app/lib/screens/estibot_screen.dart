@@ -62,7 +62,7 @@ class _EstibotScreenState extends WorkspaceState<EstibotScreen> {
                   children: [
                     const PageHeading(
                       'A little clarity.\nThe right connection.',
-                      'Ask Estibot about your car or find someone to help.',
+                      'Understand estimates, plan routine care, find repair help, or schedule with your saved shop.',
                     ),
                     VehiclePicker(controller: widget.controller),
                     const SizedBox(height: 12),
@@ -117,12 +117,12 @@ class _EstibotScreenState extends WorkspaceState<EstibotScreen> {
                             ),
                             const SizedBox(height: 16),
                             Text(
-                              'What does your car need?',
+                              'What would you like help with?',
                               style: Theme.of(context).textTheme.titleLarge,
                             ),
                             const SizedBox(height: 8),
                             const Text(
-                              'Tell me what’s happening. I can explain common car-care topics and help you request the right technician.',
+                              'Choose a topic below. I can explain estimate terms and routine care, help find a technician, or prepare a scheduling request. I cannot diagnose vehicle problems.',
                             ),
                           ],
                         ),
@@ -309,7 +309,7 @@ class _EstibotScreenState extends WorkspaceState<EstibotScreen> {
                   textInputAction: TextInputAction.send,
                   onSubmitted: (_) => send(),
                   decoration: const InputDecoration(
-                    hintText: 'Ask about your car…',
+                    hintText: 'Ask about estimates, care, or finding help…',
                     counterText: '',
                   ),
                 ),

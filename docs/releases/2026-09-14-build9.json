@@ -1,0 +1,217 @@
+{
+  "schema": 1,
+  "version": "0.1.0",
+  "build": 9,
+  "source_sha": "9dc9e750f63b73cbbd920c27b5f6d14534e4c5e8",
+  "record_status": "web_android_delivery_and_ios_internal_testing_verified_with_remaining_checks",
+  "previous_release_record": "2026-09-14-build8.json",
+  "scope": [
+    "Shop-card taps open the profile.",
+    "Contact, review, request and save actions are presented in the shop profile when available.",
+    "Generated content-hashed brand asset refreshes returning-browser artwork."
+  ],
+  "validation": {
+    "build9_source_sha": "9dc9e750f63b73cbbd920c27b5f6d14534e4c5e8",
+    "flutter": {
+      "passed": 209,
+      "analysis": "No issues found"
+    },
+    "capture_web": {
+      "passed": 19,
+      "test_files": 3,
+      "build_exit_code": 0
+    },
+    "backend_files_unchanged_from_build8": true,
+    "full_backend_gate_source_sha": "47f8eedfb749509d8540e8468b1cf0eada639308",
+    "full_backend_gate": {
+      "passed": 410,
+      "skipped": 0,
+      "failed": 0
+    },
+    "full_gate_socket_smokes": [
+      "api-and-dart-socket",
+      "discovery-socket",
+      "calendar-socket"
+    ],
+    "full_gate_previously_skipped_now_passed": 34,
+    "publisher_followup": {
+      "source_sha": "e5d0e4ad40ba93866e1905f55c6046d6b4824588",
+      "changed_paths": [
+        "backend/scripts/publish_android_release.py",
+        "backend/tests/test_android_release_publish.py"
+      ],
+      "scope": "Follow the bounded GitHub repository-rename redirect during Android publication.",
+      "focused_tests_passed": 16
+    },
+    "full_backend_gate_rerun_for_build9": false,
+    "counts_note": "Build9 Flutter/capture checks are current. The 410-test backend and socket gate ran on 47f8eed; e5d0e4a added the publisher redirect fix covered by 16 focused tests. No backend files changed between e5d0e4a and 9dc9e75; test counts from different runs are not combined."
+  },
+  "live": {
+    "origin": "https://estimoto-plus-api.fly.dev",
+    "source_sha": "9dc9e750f63b73cbbd920c27b5f6d14534e4c5e8",
+    "version_source_verified": true,
+    "ready_status": "ready",
+    "schema_revision": "a63e90b72d14",
+    "verified_at": "2026-09-14T06:39:10.675211+00:00",
+    "main_js_matches_local_build": true,
+    "brand_asset_sha256": "fc3222881ab13091274c6571bf2adb2353da05200107b87c7eb288397237a5b3",
+    "brand_asset_bytes_match": true,
+    "returning_browser_new_logo_verified_without_cache_clear": true,
+    "historical_security_directory_evidence": "2026-09-14-build8.json",
+    "historical_evidence_note": "The prior release record retains the 20 live surface checks and authenticated 27-result directory/media checks; those counts are not presented as a new build9 run."
+  },
+  "directory": {
+    "result_limit": 30,
+    "radius_miles": 30,
+    "curated": true,
+    "exhaustive": false,
+    "last_authenticated_check_release": 8,
+    "last_authenticated_check_provider_count": 27,
+    "last_authenticated_check_logos": 26,
+    "last_authenticated_check_shop_photos": 1,
+    "google_numeric_ratings_supplied": false,
+    "contact_review_does_not_establish_workmanship_or_appointment_availability": true
+  },
+  "android": {
+    "package": "io.estimoto.plus",
+    "version_code": 9,
+    "release_tag": "v0.1.0-beta.9",
+    "stable_url": "https://estimoto-plus-api.fly.dev/android/download",
+    "metadata_url": "https://estimoto-plus-api.fly.dev/android/current",
+    "source_sha": "9dc9e750f63b73cbbd920c27b5f6d14534e4c5e8",
+    "apk_bytes": 62533943,
+    "apk_sha256": "2b09fb67d7db2120930711fd34056febcebb799498ba2d16c1536e2032ce93c2",
+    "aab_bytes": 60303839,
+    "aab_sha256": "a097f13d2e19bec303f6f4770936dc8c54b66ca36621863c182b897acbfa6fea",
+    "signer_sha256": "e6d106fccc6c0e77e04a46c64f8edffdafb11b502d4857e51606c725086581dd",
+    "signer_unchanged": true,
+    "public_apk_download_hash_verified": true,
+    "installed_exact_public_apk_over_build8_on_emulator": true,
+    "emulator_version9_verified": true,
+    "emulator_new_logo_welcome_verified": true,
+    "emulator_demo_card_profile_save_dialog_verified": true,
+    "emulator_demo_pdr_choice_saved_and_list_label_verified": true,
+    "live_owner_signed_in_qa_repeated_for_build9": false,
+    "physical_device_install_verified": false,
+    "google_play_published": false
+  },
+  "ios": {
+    "app_id": "6811678079",
+    "build_id": "dd9ff8ea-63b9-4f01-a6f3-b723eeca283d",
+    "build_number": 9,
+    "source_sha": "9dc9e750f63b73cbbd920c27b5f6d14534e4c5e8",
+    "ipa_bytes": 25894533,
+    "ipa_sha256": "d6f975da327bcc93a8c88424c551247bc28a63869f60f1eba7b33730b4a11441",
+    "signature_verified": true,
+    "uploaded": true,
+    "upload_exit_code": 0,
+    "upload_finished_at": "2026-09-14T06:41:54.462506+00:00",
+    "processing": "VALID",
+    "what_to_test_chars": 632,
+    "what_to_test_sha256": "15dd52bd93f6e722957ceb378d37be5836572f0c9fe02abf1fd657ddf537b9a5",
+    "what_to_test_matches_source": true,
+    "groups_attached": [
+      "Internal Testers",
+      "Customer Preview"
+    ],
+    "internal_state": "IN_BETA_TESTING",
+    "external_state": "READY_FOR_BETA_SUBMISSION",
+    "final_asc_readback": "complete",
+    "asc_readback_at": "2026-09-14T06:44:57.057785+00:00",
+    "asc_readback_method": "GET only",
+    "external_review_submission_attempted": false,
+    "build9_review_submission_exists": false,
+    "existing_build2_review_preserved": true,
+    "existing_build2_submission_state": "WAITING_FOR_REVIEW",
+    "public_link": "https://testflight.apple.com/join/RZCXF6vx",
+    "customer_preview_public_link_enabled": true,
+    "external_installability_verified": false,
+    "physical_device_verification": false
+  },
+  "ui_verification": {
+    "recorded_at": "2026-09-14T06:44:08.446455+00:00",
+    "returning_browser_new_logo_verified": true,
+    "web_demo_card_profile_pdr_save_verified": true,
+    "android_demo_card_profile_pdr_save_verified": true,
+    "web_and_android_demo_sessions_left_to_welcome": true,
+    "owned_qa_browser_tab_closed": true,
+    "real_owner_code_tab_and_user_preview_preserved": true,
+    "new_live_qa_accounts_created": false,
+    "real_shop_contacted": false,
+    "real_shop_request_sent": false,
+    "real_owner_mailbox_verified": false,
+    "live_owner_saved_shop_mutation_verified": false,
+    "screenshot_sha256": {
+      "plus9-web-welcome.png": "cafb56d74545f72402701bf1079326d07820af9e0b541dc26c15068f994e9e88",
+      "plus9-web-shop-profile.png": "18514cbf43319e0990357e749d0e2d975f582fbb7e160760e6c9f234d0aac898",
+      "plus9-web-shop-list.png": "af1137a30d2e5db959daa1e5b44c8e690ee78c6e9671bbcd4f2078ede55b58c3",
+      "plus9-android-welcome.png": "c7438dcacfc96ee21bae675eec5864f0a7363a1f4d0b1542da8985f6af40dbef",
+      "plus9-android-profile.png": "2bc25bd3d06b6b730fda82c24c67b8f4ce1860494c0f3007f90f04e845533c86"
+    }
+  },
+  "real_customer_signin": {
+    "normal_code_requested_via_ui": true,
+    "inbox_delivery_verified": false,
+    "code_entry_verified": false,
+    "state": "waiting_for_user_code_entry",
+    "synthetic_signin_is_not_mailbox_proof": true
+  },
+  "invite": {
+    "provider": "Resend",
+    "send_count_total_for_this_update_chain": 1,
+    "original_invite_release": 8,
+    "accepted_at": "2026-09-14T06:16:05.193430+00:00",
+    "provider_status": "delivered",
+    "delivery_confirmed_at": "2026-09-14T06:16:26.802724+00:00",
+    "stable_android_url": "https://estimoto-plus-api.fly.dev/android/download",
+    "stable_url_now_serves_build": 9,
+    "duplicate_email_sent_for_build9": false,
+    "recipient_read_or_open_confirmed": false,
+    "physical_install_verified": false,
+    "recipient_provider_id_and_send_journal_kept_private": true
+  },
+  "hosted_ci": {
+    "status": "blocked_by_account_billing",
+    "source_sha": "9dc9e750f63b73cbbd920c27b5f6d14534e4c5e8",
+    "run_id": 34814184249,
+    "run_url": "https://github.com/JamesMcDaniel04/Estimoto-plus/actions/runs/34814184249",
+    "run_status": "completed",
+    "run_conclusion": "failure",
+    "annotation_check_id": 103881307863,
+    "jobs_configured": 4,
+    "jobs_started": 0,
+    "steps_per_job": 0,
+    "annotation": "The job was not started because your account is locked due to a billing issue.",
+    "hosted_pass_claimed": false,
+    "previous_release_run_preserved_in": "2026-09-14-build8.json"
+  },
+  "cleanup": {
+    "build9_new_live_auth_accounts_created": false,
+    "build9_demo_sessions_left": true,
+    "build9_owned_qa_tab_closed": true,
+    "prior_build8_synthetic_cleanup": "completed",
+    "prior_build8_cleanup_record": "2026-09-14-build8.json",
+    "real_customer_account_untouched": true
+  },
+  "remaining_limits": [
+    "Plus external TestFlight approval remains unverified; the existing build2 review is preserved.",
+    "Real customer mailbox/code entry and physical iOS/Android QA are unverified.",
+    "Build9 demo profile/save checks do not establish a live owner saved-shop or request outcome.",
+    "Hosted GitHub Actions remains blocked by account billing; no hosted pass is claimed.",
+    "First real customer-to-shop handoff and shop acceptance remain unverified.",
+    "Google Calendar customer connection remains disabled pending verified provider setup.",
+    "PDR LINX location/service ZIP information is still required.",
+    "Google Play, CARFAX, push reminders, automated phone/SMS booking and corpus-wide model training are not connected."
+  ],
+  "evidence_sha256": {
+    "plus9-live-web.json": "bffc7e60306422260de1cfd5a73ec366006e636a4021fa209cae21f5db1b29c7",
+    "plus9-android-current.json": "5b69847606dc80cd0a65ee15c2c82bed2b6b376c56be8eb0b2452d9dacea5415",
+    "plus9-ios-artifact-evidence.json": "503762cef105e74bde94047bcc9eda79794cce0fbf36aae0ac3a199dc09eabca",
+    "plus9-ui-verification.json": "085ffee636254f57b7806041b9b818e396ce3d103a82621572fc9b53e339db15",
+    "plus9-asc-evidence.json": "c985aed5c3484df639be083959230840c3b2a197ea0e1bc580ac3f6d941eecf1",
+    "plus9-flutter-tests.log": "e3b58905dd7fd07ef369d9455b96fd24d01b9d56fcaac403c26354f808cccda2",
+    "plus9-flutter-analyze-final.log": "9035510a287c6ba995287de51dd47576121fac349420b1d733f3daefb8dbed82",
+    "plus9-build.log": "1bc71b9bcbf0652bc89ff3eca55f5625c82871d5dc664c08dd1707ce9ff1f0ee"
+  },
+  "evidence_note": "Sanitized summary only. Raw logs, screenshots, account identifiers, credentials and provider message IDs remain outside Git."
+}

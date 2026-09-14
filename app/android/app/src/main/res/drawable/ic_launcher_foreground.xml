@@ -6,10 +6,10 @@
     <group android:scaleX="0.0673828125" android:scaleY="0.0673828125"
         android:translateX="19.5" android:translateY="19.5">
         <path android:fillColor="#FFFFFF"
-            android:pathData="M115,282 H576 V405 H254 V486 H526 V604 H254 V686 H576 V794 H115 Z" />
+            android:pathData="M125,278 H529 V382 H245 V454 H502 V552 H245 V625 H544 V725 H125 Z" />
         <path android:fillColor="#00B8A9"
-            android:pathData="M909,333 A103,103 0,1 1,703 333 A103,103 0,1 1,909 333 Z" />
-        <path android:fillColor="#FFFFFF"
-            android:pathData="M791,272 H821 V318 H867 V348 H821 V394 H791 V348 H745 V318 H791 Z" />
+            android:pathData="M724,370 A66,66 0,1 1,592 370 A66,66 0,1 1,724 370 Z" />
+        <path android:fillColor="#0D3F7A"
+            android:pathData="M731,426 H803 V498 H881 V570 H803 V646 H731 V570 H656 V498 H731 Z" />
     </group>
 </vector>

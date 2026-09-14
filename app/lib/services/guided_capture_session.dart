@@ -65,9 +65,12 @@ class GuidedCaptureSession {
     required this.estimateId,
     required this.store,
   }) : ownerId = controller.snapshot!.profile.id,
-       discipline = controller.snapshot!.estimates
-           .firstWhere((e) => e.id == estimateId)
-           .discipline;
+       discipline =
+           controller.snapshot!.estimates
+               .where((e) => e.id == estimateId)
+               .firstOrNull
+               ?.discipline ??
+           '';
   final PlusController controller;
   final String ownerId, estimateId, discipline;
   final GuidedCapturePendingStore store;
@@ -85,7 +88,10 @@ class GuidedCaptureSession {
 
   final _seen = <String>{};
   bool Function()? documentIsCurrent;
-  bool get current => !disposed && controller.isCurrentCustomer(ownerId);
+  bool get current =>
+      !disposed &&
+      controller.isCurrentCustomer(ownerId) &&
+      controller.snapshot!.estimates.any((e) => e.id == estimateId);
   bool valid(int run) =>
       current && enabled && run == epoch && (documentIsCurrent?.call() ?? true);
   void activate({

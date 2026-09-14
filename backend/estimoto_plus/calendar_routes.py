@@ -62,7 +62,7 @@ def status_view(db, customer, settings):
     return {'configured': available, 'connected': connected, 'status': status,
             'generation': row.generation if row else 0,
             'selected_calendar_ids': row.selected_calendar_ids if row else [],
-            'time_zone': row.time_zone if row else 'Etc/UTC',
+            'time_zone': row.time_zone if row else '',
             'sync_confirmed': bool(row and row.sync_confirmed),
             'attempt_id': row.attempt_id if row and row.status == 'connecting' else None,
             'sync_issues': issues}

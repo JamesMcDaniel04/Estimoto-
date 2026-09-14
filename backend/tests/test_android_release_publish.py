@@ -8,8 +8,23 @@ import httpx
 
 from scripts.publish_android_release import (
     asset_names, checksum_text, check_existing_assets, release_lock,
-    verify_aab, verify_build_receipt, release_target, check_release_source,
+    verify_aab, verify_build_receipt, release_target, check_release_source, get_release,
 )
+
+
+def test_release_lookup_follows_repository_rename_and_preserves_tag_checks():
+    tag, requests = 'v0.1.0-beta.8', []
+    def transport(request):
+        requests.append(str(request.url))
+        if '/repos/' in request.url.path:
+            return httpx.Response(301, headers={'Location':
+                f'https://api.github.com/repositories/1368714055/releases/tags/{tag}'})
+        return httpx.Response(200, json={'tag_name': tag, 'draft': False, 'prerelease': True})
+    with httpx.Client(transport=httpx.MockTransport(transport), follow_redirects=False) as client:
+        assert get_release(client, tag)['tag_name'] == tag
+        assert len(requests) == 2
+        with pytest.raises(ValueError, match='unexpected tag'):
+            get_release(client, 'v0.1.0-beta.7')
 
 
 def test_release_assets_and_checksums_are_bound_to_apk_version(tmp_path):

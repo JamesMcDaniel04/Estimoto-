@@ -385,8 +385,9 @@ class _HistoryReceiptsScreenState extends State<HistoryReceiptsScreen>
   @override
   Widget build(BuildContext context) {
     if (!current) {
-      return const Scaffold(
-        body: Center(child: Text('Sign in again to view your history.')),
+      return const UnavailableRecordScreen(
+        title: 'History & receipts',
+        message: 'Sign in again to view your history.',
       );
     }
     final receipts = record == null ? <Json>[] : rowsOf(record!, 'receipts');
@@ -726,8 +727,9 @@ class _PrivateReceiptViewState extends State<PrivateReceiptView> {
   @override
   Widget build(BuildContext context) {
     if (!current) {
-      return const Scaffold(
-        body: Center(child: Text('Sign in again to view your receipt.')),
+      return const UnavailableRecordScreen(
+        title: 'Receipt',
+        message: 'Sign in again to view your receipt.',
       );
     }
     return Scaffold(

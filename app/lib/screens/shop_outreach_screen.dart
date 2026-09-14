@@ -11,6 +11,7 @@ import '../widgets/calendar_slot_picker.dart';
 import '../widgets/calendar_booking_details.dart';
 
 String outreachStatusLabel(Json draft) {
+  if (draft['status'] == 'call_required') return 'Call the shop • not sent';
   if (draft['delivery_status'] == 'local_preview') {
     return 'Demo preview • no shop contacted';
   }
@@ -29,6 +30,9 @@ String outreachStatusLabel(Json draft) {
 }
 
 String _statusDescription(Json draft) {
+  if (draft['status'] == 'call_required') {
+    return 'No message was sent and no appointment was booked. Call the shop to discuss your preferred times.';
+  }
   if (draft['delivery_status'] == 'local_preview') {
     return 'This is a local demo preview. No message was sent and no appointment was booked.';
   }

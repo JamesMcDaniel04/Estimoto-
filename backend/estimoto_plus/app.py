@@ -12,7 +12,8 @@ from urllib.parse import urlparse
 from sqlalchemy import create_engine, event, text as sql_text
 from sqlalchemy.orm import sessionmaker
 
-from .auth import dev_allowed, make_dev_token
+from .auth import create_auth_client, dev_allowed, make_dev_token
+from .auth_cache import VerifiedAuthCache
 from .bridge import router as bridge_router
 from .bridge_sync import sync_providers, sync_request_statuses
 from .config import Settings
@@ -32,6 +33,7 @@ from .capture_routes import router as capture_router
 from .discovery import router as discovery_router
 from .receipts import router as receipts_router, reconcile_receipts
 from .vehicle_valuation import router as valuation_router
+from .shop_media_catalog import router as shop_media_router
 
 
 def create_app(settings: Settings | None = None, *, auth_verifier=None, auth_client=None, bridge_transport=None):
@@ -91,16 +93,31 @@ def create_app(settings: Settings | None = None, *, auth_verifier=None, auth_cli
                 task.cancel()
                 with suppress(asyncio.CancelledError):
                     await task
+            app.state.auth_cache.clear()
+            if app.state.owns_auth_client:
+                app.state.auth_client.close()
 
-    app = FastAPI(title="Estimoto + API", version="1.0", lifespan=lifespan)
+    production = settings.environment == 'production'
+    app = FastAPI(title="Estimoto + API", version="1.0", lifespan=lifespan,
+                  docs_url=None if production else '/docs',
+                  redoc_url=None if production else '/redoc',
+                  openapi_url=None if production else '/openapi.json')
     @app.middleware("http")
     async def privacy_headers(request, call_next):
         response = await call_next(request)
         response.headers["Referrer-Policy"] = "no-referrer"
         response.headers["X-Content-Type-Options"] = "nosniff"
+        if production:
+            response.headers['Strict-Transport-Security'] = 'max-age=31536000; includeSubDomains'
+            response.headers['Content-Security-Policy'] = "frame-ancestors 'none'; base-uri 'self'; object-src 'none'"
+            response.headers['X-Frame-Options'] = 'DENY'
+        if request.url.path in ('/', '/index.html', '/flutter_bootstrap.js',
+                                '/flutter_service_worker.js', '/main.dart.js', '/version.json', '/manifest.json'):
+            response.headers['Cache-Control'] = 'no-cache, max-age=0, must-revalidate'
         if request.url.path.startswith("/v1/"):
             response.headers["Cache-Control"] = "private, no-store"
         if request.url.path.startswith('/capture/'):
+            response.headers['X-Frame-Options'] = 'SAMEORIGIN'
             response.headers['Content-Security-Policy'] = (
                 "default-src 'none'; script-src 'self'; style-src 'self' 'unsafe-inline'; "
                 "img-src 'self' data: blob:; font-src 'self'; media-src 'self' blob:; "
@@ -135,7 +152,9 @@ def create_app(settings: Settings | None = None, *, auth_verifier=None, auth_cli
     app.state.settings = settings
     app.state.session_factory = sessionmaker(engine, expire_on_commit=False)
     app.state.auth_verifier = auth_verifier
-    app.state.auth_client = auth_client
+    app.state.auth_cache = VerifiedAuthCache()
+    app.state.owns_auth_client = auth_client is None and auth_verifier is None
+    app.state.auth_client = create_auth_client() if app.state.owns_auth_client else auth_client
     app.state.bridge_transport = bridge_transport
     app.state.calendar_transport = None
     app.state.capture_transport = None
@@ -151,6 +170,7 @@ def create_app(settings: Settings | None = None, *, auth_verifier=None, auth_cli
     app.include_router(discovery_router)
     app.include_router(receipts_router)
     app.include_router(valuation_router)
+    app.include_router(shop_media_router)
 
     @app.get("/health/live")
     def health_live():

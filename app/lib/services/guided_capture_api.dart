@@ -1,6 +1,6 @@
 import 'dart:typed_data';
 import '../domain/models.dart';
-import 'guided_capture_pending.dart';
+import 'guided_capture_pending_types.dart';
 
 /// The native/web host binds the estimate and account guard once, outside JS.
 abstract class GuidedCaptureApi {

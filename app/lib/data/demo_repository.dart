@@ -126,7 +126,7 @@ class DemoPlusRepository extends PlusRepository {
     'status': 'connected',
     'generation': 1,
     'selected_calendar_ids': ['sample-personal'],
-    'time_zone': 'Etc/UTC',
+    'time_zone': 'America/Denver',
     'sync_confirmed': false,
     'attempt_id': null,
     'sync_issues': <Json>[],
@@ -380,7 +380,15 @@ class DemoPlusRepository extends PlusRepository {
         422,
       );
     }
-    row['status'] = 'draft';
+    final phoneOnly = textOf(row, 'recipient_email').trim().isEmpty;
+    final phone = textOf(
+      row,
+      'recipient_phone',
+    ).replaceAll(RegExp(r'[^+0-9]'), '');
+    row['status'] = phoneOnly ? 'call_required' : 'draft';
+    row['call_link'] = phoneOnly && RegExp(r'^\+?\d{7,15}$').hasMatch(phone)
+        ? 'tel:$phone'
+        : null;
     row['delivery_status'] = 'local_preview';
     return row;
   });
@@ -396,11 +404,27 @@ class DemoPlusRepository extends PlusRepository {
     _find('vehicles', vehicleId);
     return {
       'vehicle_id': vehicleId,
-      'status': 'unavailable',
-      'provider': 'CarsXE',
+      'status': 'available',
+      'sample': true,
+      'provider': 'Demo sample',
       'currency': 'USD',
       ...body,
-      'buckets': <Json>[],
+      'buckets': [
+        for (final (kind, amount) in [
+          ('retail', 2500000),
+          ('wholesale', 2100000),
+        ])
+          {
+            'kind': kind,
+            'condition': body['condition'],
+            'amount_cents': amount,
+            'base_cents': amount,
+            'mileage_adjustment_cents': 0,
+            'equipment_adjustment_cents': 0,
+            'regional_adjustment_cents': 0,
+            'amount_basis': 'provider_adjusted',
+          },
+      ],
       'history': {
         'records_count': _history
             .where((r) => r['vehicle_id'] == vehicleId)
@@ -408,7 +432,7 @@ class DemoPlusRepository extends PlusRepository {
         'factors': <String>[],
       },
       'message':
-          'Live vehicle value estimates are unavailable in the demo. Your documented history is still available.',
+          'Fixed fictional amounts show how a valuation appears. No valuation provider was contacted. These amounts do not value this vehicle or change with your selections.',
     };
   }
 

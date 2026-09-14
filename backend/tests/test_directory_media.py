@@ -182,11 +182,12 @@ def test_same_location_public_photo_survives_partner_dedupe(clients, monkeypatch
     client, _ = clients
     _, stub = setup(client)
     provider_id = partner(client)
-    row = normalize_listing(stub.shop(1, 'Demolition Dent fixture', {
+    stub.elements = [stub.shop(1, 'Demolition Dent fixture', {
         'phone': '3035550100', 'service:vehicle:pdr': 'yes',
         'addr:housenumber': '1', 'addr:street': 'Example St',
         'addr:city': 'Denver', 'addr:state': 'CO', 'addr:postcode': '80221',
-    }))
+    })]
+    row = normalize_listing(stub.elements[0])
     row['media'] = {'url': 'https://commons.wikimedia.org/wiki/Special:Redirect/file/Shop.jpg?width=320',
                     'kind': 'photo', 'attribution': 'Jane Doe · CC BY 4.0',
                     'source_url': 'https://commons.wikimedia.org/wiki/File:Shop.jpg'}
@@ -195,6 +196,7 @@ def test_same_location_public_photo_survives_partner_dedupe(clients, monkeypatch
     assert len(matched) == 1
     assert matched[0]['request_modes'] == ['shop_visit']
     assert matched[0]['media'] == row['media']
+    assert matched[0]['media_identity'] == {'source': 'openstreetmap', 'source_id': 'node:1'}
 
 
 def test_preupgrade_cached_public_listing_has_explicit_null_media(clients, monkeypatch):
@@ -203,7 +205,8 @@ def test_preupgrade_cached_public_listing_has_explicit_null_media(clients, monke
     from estimoto_plus.models import now
     client, _ = clients
     _, stub = setup(client)
-    row = normalize_listing(stub.shop(1, 'Cached old listing'))
+    stub.elements = [stub.shop(1, 'Cached old listing')]
+    row = normalize_listing(stub.elements[0])
     row.pop('media')
     monkeypatch.setattr(discovery, 'public_directory', lambda *_: ({'listings': [row]}, 'stale', now()))
     response = client.get('/v1/discovery', headers=h('alice'))

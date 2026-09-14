@@ -52,19 +52,52 @@ class Vehicle {
   String get imageVersion => textOf(json, 'image_version');
 }
 
-/// Only owner-published logos or licensed Commons photos from the API contract.
-/// Website, arbitrary OSM image fields and private signed URLs are never images.
+/// Published provider media, reviewed local artwork or licensed Commons photos.
+/// Arbitrary website images and private signed URLs are never accepted.
 class ProviderMedia {
-  const ProviderMedia._(this.url, this.kind, this.attribution, this.sourceUrl);
+  const ProviderMedia._(
+    this.url,
+    this.kind,
+    this.attribution,
+    this.sourceUrl, {
+    this.darkBackground = false,
+  });
   final Uri url, sourceUrl;
   final String kind, attribution;
+  final bool darkBackground;
 
   static ProviderMedia? fromJson(
     Object? value, {
     required String providerSource,
     required String providerSourceId,
+    Object? mediaIdentity,
   }) {
     if (value is! Map) return null;
+    var imageSource = providerSource, imageSourceId = providerSourceId;
+    if (mediaIdentity != null) {
+      if (mediaIdentity is! Map ||
+          mediaIdentity['source'] is! String ||
+          mediaIdentity['source_id'] is! String) {
+        return null;
+      }
+      final source = mediaIdentity['source'] as String;
+      final sourceId = mediaIdentity['source_id'] as String;
+      // Discovery may retain the participating provider for requests while
+      // borrowing artwork from its exact, reviewed public-listing duplicate.
+      // An independent row cannot override its own listing identity.
+      if ((source != providerSource || sourceId != providerSourceId) &&
+          !(providerSource == 'estimoto' && source == 'openstreetmap')) {
+        return null;
+      }
+      imageSource = source;
+      imageSourceId = sourceId;
+    }
+    if (imageSource == 'openstreetmap' &&
+        !RegExp(
+          r'^(node|way|relation):[1-9][0-9]{0,18}$',
+        ).hasMatch(imageSourceId)) {
+      return null;
+    }
     final url = value['url'], kind = value['kind'];
     final attribution = value['attribution'], source = value['source_url'];
     if (url is! String ||
@@ -95,18 +128,35 @@ class ProviderMedia {
     if (imageUri == null || sourceUri == null || sourceUri.hasQuery) {
       return null;
     }
-    if (kind == 'logo' && providerSource == 'estimoto') {
+    if (kind == 'logo' && imageSource == 'estimoto') {
       if (!RegExp(
             r'^[a-f0-9]{8}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{12}$',
-          ).hasMatch(providerSourceId) ||
+          ).hasMatch(imageSourceId) ||
           imageUri.host != 'pdr-estimating-api.fly.dev' ||
-          imageUri.path != '/public/plus/providers/$providerSourceId/logo' ||
+          imageUri.path != '/public/plus/providers/$imageSourceId/logo' ||
           imageUri.hasQuery ||
           sourceUri.host != 'www.estimoto.io' ||
           !const ['', '/'].contains(sourceUri.path)) {
         return null;
       }
-    } else if (kind == 'photo' && providerSource == 'openstreetmap') {
+    } else if (imageSource == 'openstreetmap' &&
+        const ['logo', 'photo'].contains(kind) &&
+        imageUri.host == 'estimoto-plus-api.fly.dev') {
+      final sourceParts = imageSourceId.split(':');
+      final parts = imageUri.pathSegments;
+      if (sourceParts.length != 2 ||
+          !const ['node', 'way', 'relation'].contains(sourceParts[0]) ||
+          !RegExp(r'^[1-9][0-9]{0,18}$').hasMatch(sourceParts[1]) ||
+          parts.length != 5 ||
+          parts[0] != 'public' ||
+          parts[1] != 'shop-media' ||
+          parts[2] != sourceParts[0] ||
+          parts[3] != sourceParts[1] ||
+          !RegExp(r'^[a-f0-9]{64}\.png$').hasMatch(parts[4]) ||
+          imageUri.hasQuery) {
+        return null;
+      }
+    } else if (kind == 'photo' && imageSource == 'openstreetmap') {
       final parts = imageUri.pathSegments;
       if (imageUri.host != 'commons.wikimedia.org' ||
           parts.length != 4 ||
@@ -130,7 +180,13 @@ class ProviderMedia {
     } else {
       return null;
     }
-    return ProviderMedia._(imageUri, kind, attribution.trim(), sourceUri);
+    return ProviderMedia._(
+      imageUri,
+      kind,
+      attribution.trim(),
+      sourceUri,
+      darkBackground: value['background'] == 'dark',
+    );
   }
 }
 
@@ -142,6 +198,11 @@ class ProviderProfile {
   String get kind => textOf(json, 'kind', 'shop');
   String get city => textOf(json, 'city');
   String get address => textOf(json, 'address');
+  String get displayAddress =>
+      json['verification'] is Map &&
+          json['verification']['status'] == 'contact_confirmed'
+      ? '${json['verification']['address']}'
+      : address;
   String get phone => textOf(json, 'phone');
   String get description => textOf(json, 'description');
   List<String> get specialties =>
@@ -154,6 +215,7 @@ class ProviderProfile {
     json['media'],
     providerSource: source,
     providerSourceId: sourceId,
+    mediaIdentity: json['media_identity'],
   );
   bool get independent => source != 'estimoto';
   List<String> get requestModes => independent || !acceptingRequests

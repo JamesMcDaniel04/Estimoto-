@@ -1,64 +1,94 @@
-# Mobile customer preview
+# Mobile customer preview — build 9
 
-Estimoto + uses `io.estimoto.plus`, display name `Estimoto +`, and the E+ icon.
-Live builds connect to https://estimoto-plus-api.fly.dev/. Explicit demo mode
-is isolated and does not send requests.
+Estimoto + uses bundle/package `io.estimoto.plus` and connects to
+https://estimoto-plus-api.fly.dev/. Explicit demo mode keeps fictional data local.
+Current release evidence is in [build 9](releases/2026-09-14-build9.json).
 
-## Android 0.1.0 (7)
+## Android 0.1.0 (9)
 
-[Download the latest Plus APK](https://estimoto-plus-api.fly.dev/android/download) · [Current build and hash](https://estimoto-plus-api.fly.dev/android/current) · [Build-7 assets](https://github.com/JamesMcDaniel04/Estimoto-/releases/tag/v0.1.0-beta.7)
+[Download the latest Plus APK](https://estimoto-plus-api.fly.dev/android/download) ·
+[Current build and hash](https://estimoto-plus-api.fly.dev/android/current) ·
+[Build-9 assets](https://github.com/JamesMcDaniel04/Estimoto-/releases/tag/v0.1.0-beta.9)
 
-The permanent URL currently serves signed build 7 from source
-`ebb7f47275b018f276744322bbb2c191438e4f7a`. This release adds private receipt
-photos/PDFs, maintenance/repair/modification cost totals, CarsXE retail and
-wholesale estimates, and available shop logos and credited photos. Guided
-PDR/Collision capture and VIN confirmation remain available.
+The permanent URL serves signed build 9 from
+`9dc9e750f63b73cbbd920c27b5f6d14534e4c5e8`. Tapping a shop card opens the profile,
+which holds Call, Website, Google Maps/reviews and available request/save actions.
+See the [build-9 notes](releases/0.1.0-9-beta-notes.md).
 
-- APK: 61,615,687 bytes; SHA-256 `ab4e7af170f261fece55b978bdb3fb8c4c5e2172b167c18069f1177c7050f661`.
-- AAB: 59,353,890 bytes; SHA-256 `313ce63ed57d9f12ae51c79dfd3983b6beaa1dbafdb20d0178ce5241aa630063`.
-- Signer SHA-256: `e6d106fccc6c0e77e04a46c64f8edffdafb11b502d4857e51606c725086581dd` (unchanged).
-- Min SDK 24, target SDK 36. Signed identity/version and exact public artifact bytes verified.
-- Installing build 7 over the prior Plus app preserved the synthetic signed-in
-  session. The Android emulator showed the recorded-cost rollup and rendered a
-  private receipt PDF fetched from the live API; the viewer was then closed.
-  After synthetic cleanup, the old session was rejected and explicit Sign out
-  returned the emulator to the sign-in screen.
-- The previously requested build-6 email was delivered with the permanent link.
-  That same link now serves build 7; no new build-7 email was sent.
+| Artifact | Bytes | SHA-256 |
+| --- | ---: | --- |
+| APK | 62,533,943 | `2b09fb67d7db2120930711fd34056febcebb799498ba2d16c1536e2032ce93c2` |
+| AAB | 60,303,839 | `a097f13d2e19bec303f6f4770936dc8c54b66ca36621863c182b897acbfa6fea` |
 
-Installation is customer initiated. This is direct APK distribution; Google Play
-publication and physical-device receipt/camera checks remain separate.
+Signer SHA-256 remains
+`e6d106fccc6c0e77e04a46c64f8edffdafb11b502d4857e51606c725086581dd`.
+The exact public APK was downloaded, hash-checked and installed over build 8 on
+an emulator. Version 9 and the new welcome logo were verified. Native demo QA
+opened a shop card and its profile, saved PDR in the dedicated-shop choice dialog,
+and verified “Your dedicated shop: PDR” on the returned list. No new Auth account
+or shop outreach was used. These checks do not prove a live customer's
+saved-shop outcome, real mailbox/code entry or a physical-device install.
 
-## iOS 0.1.0 (7)
+The fresh invite was sent once for build 8, accepted at 06:16:05 UTC and confirmed
+`delivered` by Resend readback at 06:16:26 UTC, September 14. Its permanent URL
+now serves build 9. No duplicate email was sent. Recipient details, the provider
+message ID and send journal stay private. Delivery does not prove that the
+recipient opened the email or installed the APK.
 
-[App Store Connect](https://appstoreconnect.apple.com/apps/6811678079/testflight) · [Customer Preview](https://testflight.apple.com/join/RZCXF6vx)
+Installation remains customer initiated, with no automatic updater. This is
+direct APK distribution; Google Play publication is separate.
 
-IPA: 24,877,153 bytes; SHA-256
-`6b673b4861e2ad7b8602316a8b7784b644c429d163c23d54aea69ec64df47193`.
-App Store Connect build `b31d8a1f-99a3-40b7-9841-137e854631c4` processed **VALID**.
-Read-only Apple API verification on September 14 at 04:34 UTC confirmed:
+## iOS 0.1.0 (9)
 
-- Internal Testers and Customer Preview are attached.
-- Internal state: `IN_BETA_TESTING`; external state: `READY_FOR_BETA_SUBMISSION`.
-- The 1,103-character en-US What to Test exactly matches the [build-7 notes](releases/0.1.0-7-beta-notes.md).
-- Build 7 has no Beta App Review submission. Apple's attempted submission
-  returned `ANOTHER_BUILD_IN_REVIEW`; build 2's existing submission remains
-  `WAITING_FOR_REVIEW`. Its first review was preserved.
+[App Store Connect](https://appstoreconnect.apple.com/apps/6811678079/testflight) ·
+[Customer Preview](https://testflight.apple.com/join/RZCXF6vx)
 
-Group attachment and an enabled public link do not make build 7 installable by
-external testers before Apple approval.
+IPA: **25,894,533 bytes**, SHA-256
+`d6f975da327bcc93a8c88424c551247bc28a63869f60f1eba7b33730b4a11441`.
+The signed artifact uses source `9dc9e750f63b73cbbd920c27b5f6d14534e4c5e8`.
+Upload completed successfully at 06:41:54 UTC on September 14. Read-only Apple
+verification at 06:44:57 UTC confirmed build
+`dd9ff8ea-63b9-4f01-a6f3-b723eeca283d` **VALID**, with exact 632-character notes and
+Internal Testers/Customer Preview attached. Internal state is `IN_BETA_TESTING`;
+external state is `READY_FOR_BETA_SUBMISSION`. Build 9 has no review submission,
+and none was attempted; build 2 remains `WAITING_FOR_REVIEW`. The public link does
+not establish external build-9 installability. Physical iPhone
+sign-in/camera/receipt behavior remains unverified.
 
-The new iOS simulator debug build succeeded, but simulator Keychain/signing
-blocked authentication (`-34018`; subsequent signing attempts were rejected by
-AMFI). The build-7 native iOS receipt view is therefore **unverified**. The signed
-App Store IPA and its VALID processing state are unaffected; its signed
-application identifier and `get-task-allow=false` were verified. Earlier simulator
-Photo Library checks do not substitute for this new receipt check or a physical
-iPhone test.
+## Browser branding and local validation
 
-Apple team `J9HNN7TB36`; bundle registration `SFACWALLYZ`; distribution profile
-`82QT2M2C8V`. Signing material and private synthetic QA evidence stay outside Git.
-See [build-7 evidence](releases/2026-09-13-build7.json) and [build-6 history](releases/2026-09-13-build6.json).
+The hashed brand asset generated by `sync_app_icons.py` and referenced through
+`brand_assets.dart` is now deployed. The live JavaScript matches the local build,
+and the image SHA-256 is
+`fc3222881ab13091274c6571bf2adb2353da05200107b87c7eb288397237a5b3`.
+A returning browser displayed the new artwork without clearing its cache. Web demo
+QA opened a shop card, its profile and the saved PDR-shop choice. Both demo
+sessions were left at welcome and the owned QA browser tab was closed; the
+real-owner code tab and user preview were preserved.
+
+Build 9 passed 209 Flutter tests with clean analysis and 19 capture-web tests plus
+the build. Backend files are unchanged from build 8. The full backend evidence
+remains 410 passed, zero skipped on `47f8eed`, with all three socket smokes; the
+publisher-only follow-up in `e5d0e4a` passed 16 focused tests. These are distinct
+runs, not a repeated build-9 backend gate.
+
+## Historical build 8
+
+The [build-8 record](releases/2026-09-14-build8.json) preserves its exact
+`e5d0e4a` APK/AAB/IPA hashes and earlier live/device checks. Its public APK upgraded
+build 7, completed synthetic native sign-in, loaded the live directory, showed
+Bronco's Muffler's real logo and opened the mini profile. Synthetic QA cleanup
+removed only the exact new account/profile/rate rows after global sign-out and
+empty-table checks; the old token was rejected on write and GET. The native
+ended-session screen and sign-out back to welcome were verified. The real
+customer account was untouched. Build-9 checks do not repeat or relabel that
+signed-in evidence.
+
+Apple readback at 06:22:53 UTC confirmed build 8 VALID, exact 1,960-character
+notes, both groups and internal testing. Build 8 had no review submission and
+remained `READY_FOR_BETA_SUBMISSION` externally; the preserved build-2 submission
+was `WAITING_FOR_REVIEW`. Build-9 readback confirmed that review remains. Original Estimoto build
+232 has separate external approval, which does not approve Plus.
 
 ## Reproduce and publish
 
@@ -68,10 +98,12 @@ credentials stay on the backend. The mobile build writes an ignored receipt of
 source SHA and signed APK/AAB hashes.
 
 For Android, run `scripts/publish_android.sh --notes docs/releases/<notes>.md`
-after building. It verifies identities, signatures and public bytes, then advances
-the permanent pointer last. A GitHub upload alone is not current distribution.
-Follow the permanent URL and compare its hash before any authorized invite.
-See [release workflow](../backend/docs/android-download.md).
+after building. It verifies identities, signatures and public bytes, follows only
+the bounded trusted repository-rename redirect, and advances the permanent pointer
+last. A GitHub upload alone is not current distribution. Follow the permanent URL
+and compare its hash before any authorized invite. See the
+[release workflow](../backend/docs/android-download.md).
 
-`build_beta.sh` produces a labeled demo. Current capability limits and remaining
-provider setup are in [release status](release-status.md).
+`build_beta.sh` produces a labeled demo. See [release status](release-status.md)
+for current provider/device limits and [build-7 evidence](releases/2026-09-13-build7.json)
+for historical receipt/emulator checks. Earlier proof is not relabeled as build-9 QA.
