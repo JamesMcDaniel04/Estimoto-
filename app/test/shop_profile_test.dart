@@ -69,9 +69,9 @@ void main() {
       tester.binding.defaultBinaryMessenger.setMockMethodCallHandler(channel, (
         call,
       ) async {
-          if (call.method == 'launch') {
-            launches.add(call.arguments['url'] as String);
-          }
+        if (call.method == 'launch') {
+          launches.add(call.arguments['url'] as String);
+        }
         return true;
       });
       addTearDown(
@@ -115,6 +115,57 @@ void main() {
       await tester.pumpAndSettle();
       expect(saved, isTrue);
       expect(find.byType(ShopProfile), findsNothing);
+      expect(tester.takeException(), isNull);
+    },
+  );
+
+  testWidgets(
+    'network request badge acts directly while card taps still open the profile',
+    (tester) async {
+      final network = ProviderProfile.fromJson({
+        ...profile().json,
+        'source': 'estimoto',
+        'id': 'network-shop',
+        'accepting_requests': true,
+        'request_modes': ['shop_visit'],
+      });
+      var requests = 0;
+      Future<void> mountProvider(ProviderProfile provider) => tester.pumpWidget(
+        MaterialApp(
+          home: Scaffold(
+            body: SingleChildScrollView(
+              child: DiscoveryProviderCard(
+                provider: provider,
+                onRequest: () => requests++,
+              ),
+            ),
+          ),
+        ),
+      );
+      await mountProvider(network);
+      final badge = find.byKey(const ValueKey('shop-request-network-shop'));
+      expect(badge, findsOneWidget);
+      await tester.ensureVisible(badge);
+      await tester.tap(badge);
+      await tester.pumpAndSettle();
+      expect(requests, 1);
+      expect(find.byType(ShopProfile), findsNothing);
+      await tester.tap(find.text(network.name));
+      await tester.pumpAndSettle();
+      expect(find.byType(ShopProfile), findsOneWidget);
+      expect(requests, 1);
+      await tester.tap(find.byTooltip('Close shop profile'));
+      await tester.pumpAndSettle();
+      await mountProvider(profile());
+      expect(find.text('Request help'), findsNothing);
+      await mountProvider(
+        ProviderProfile.fromJson({
+          ...network.json,
+          'accepting_requests': false,
+        }),
+      );
+      expect(find.text('Request help'), findsNothing);
+      expect(requests, 1);
       expect(tester.takeException(), isNull);
     },
   );

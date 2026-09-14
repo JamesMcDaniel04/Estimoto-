@@ -1,6 +1,7 @@
 import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:estimoto_plus/widgets/shop_profile.dart';
 import 'package:estimoto_plus/app.dart';
 import 'package:estimoto_plus/data/customer_auth.dart';
 import 'package:estimoto_plus/data/demo_repository.dart';
@@ -201,7 +202,10 @@ void main() {
       await tester.ensureVisible(shopCard);
       await tester.tap(shopCard);
       await tester.pumpAndSettle();
-      final action = find.text('Request help').first;
+      final action = find.descendant(
+        of: find.byType(ShopProfile),
+        matching: find.text('Request help'),
+      );
       await tester.ensureVisible(action);
       await tester.tap(action);
       await tester.pumpAndSettle();

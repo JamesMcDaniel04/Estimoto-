@@ -436,6 +436,21 @@ class DiscoveryProviderCard extends StatelessWidget {
                     padding: const EdgeInsets.only(top: 12),
                     child: Text('Your dedicated shop: ${favorites.join(', ')}'),
                   ),
+                if (!provider.independent &&
+                    provider.requestModes.isNotEmpty &&
+                    onRequest != null)
+                  Padding(
+                    padding: const EdgeInsets.only(top: 12),
+                    child: SizedBox(
+                      width: double.infinity,
+                      child: FilledButton.icon(
+                        key: ValueKey('shop-request-${provider.id}'),
+                        onPressed: onRequest,
+                        icon: const Icon(Icons.handshake_outlined),
+                        label: const Text('Request help'),
+                      ),
+                    ),
+                  ),
               ],
             ),
           ),

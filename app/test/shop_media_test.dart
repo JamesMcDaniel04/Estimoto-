@@ -4,6 +4,7 @@ import 'dart:io';
 
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:estimoto_plus/widgets/shop_profile.dart';
 import 'package:estimoto_plus/domain/models.dart';
 import 'package:estimoto_plus/theme.dart';
 import 'package:estimoto_plus/widgets/discovery_results.dart';
@@ -372,8 +373,18 @@ void main() {
       expect(client.headers, isNot(contains('authorization')));
       expect(client.headers, isNot(contains('referer')));
       await openProfile(tester);
-      await tester.ensureVisible(find.text('Request help'));
-      await tester.tap(find.text('Request help'));
+      await tester.ensureVisible(
+        find.descendant(
+          of: find.byType(ShopProfile),
+          matching: find.text('Request help'),
+        ),
+      );
+      await tester.tap(
+        find.descendant(
+          of: find.byType(ShopProfile),
+          matching: find.text('Request help'),
+        ),
+      );
       await tester.pumpAndSettle();
       await openProfile(tester);
       await tester.ensureVisible(find.text('Save as my dedicated shop'));
@@ -430,8 +441,18 @@ void main() {
     await tester.tap(find.byTooltip('Close shop profile'));
     await tester.pumpAndSettle();
     await openProfile(tester);
-    await tester.ensureVisible(find.text('Request help'));
-    await tester.tap(find.text('Request help'));
+    await tester.ensureVisible(
+      find.descendant(
+        of: find.byType(ShopProfile),
+        matching: find.text('Request help'),
+      ),
+    );
+    await tester.tap(
+      find.descendant(
+        of: find.byType(ShopProfile),
+        matching: find.text('Request help'),
+      ),
+    );
     await tester.pumpAndSettle();
     await openProfile(tester);
     await tester.ensureVisible(find.text('Save as my dedicated shop'));
