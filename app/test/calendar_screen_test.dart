@@ -6,6 +6,7 @@ import 'package:flutter/services.dart';
 import 'package:flutter/rendering.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:estimoto_plus/data/demo_repository.dart';
+import 'package:estimoto_plus/data/repository.dart';
 import 'package:estimoto_plus/data/demo_seed.dart';
 import 'package:estimoto_plus/domain/models.dart';
 import 'package:estimoto_plus/screens/calendar_screen.dart';
@@ -35,6 +36,7 @@ class CalendarRepository extends DemoPlusRepository {
   Completer<Json>? connecting, calendarList;
   String connectLink = 'https://connect.nango.dev/session';
   Json? retried;
+  bool disconnectFails = false;
   @override
   Future<PlusSnapshot> bootstrap() async {
     final value = demoSeed();
@@ -91,6 +93,7 @@ class CalendarRepository extends DemoPlusRepository {
 
   @override
   Future<Json> disconnectGoogleCalendar() async {
+    if (disconnectFails) throw const PlusApiException('Connection timed out.');
     status = {
       ...status,
       'status': 'disconnected',
@@ -222,6 +225,59 @@ Future<void> tapCalendar(WidgetTester tester, Finder finder) async {
 }
 
 void main() {
+  testWidgets('uncertain disconnect does not claim Google access stopped', (
+    tester,
+  ) async {
+    final repo = CalendarRepository()..disconnectFails = true;
+    repo.status.addAll({'connected': true, 'status': 'connected'});
+    final owner = await calendarController(repo);
+    await mountCalendar(tester, owner);
+    await tester.pumpAndSettle();
+    await tapCalendar(tester, find.byKey(const Key('calendar-disconnect')));
+    expect(
+      find.textContaining('Disconnection is not confirmed'),
+      findsOneWidget,
+    );
+    expect(find.text('Connect Google Calendar'), findsNothing);
+    expect(find.byKey(const Key('calendar-disconnect')), findsOneWidget);
+    expect(repo.status['connected'], true);
+    await tapCalendar(tester, find.byTooltip('Refresh Calendar'));
+    expect(find.textContaining('Personal calendar'), findsOneWidget);
+    expect(find.textContaining('Disconnection is not confirmed'), findsNothing);
+  });
+  testWidgets(
+    'date picker remains usable when its open session crosses a day boundary',
+    (tester) async {
+      final repo = CalendarRepository();
+      repo.status.addAll({
+        'connected': true,
+        'status': 'connected',
+        'selected_calendar_ids': ['one'],
+        'time_zone': 'Etc/UTC',
+      });
+      final owner = await calendarController(repo);
+      var now = DateTime.utc(2026, 9, 13, 12);
+      await tester.pumpWidget(
+        MaterialApp(
+          home: CalendarSlotPicker(controller: owner, now: () => now),
+        ),
+      );
+      await tester.pumpAndSettle();
+      expect(find.text('Starting 9/14/2026'), findsOneWidget);
+      now = DateTime.utc(2026, 9, 17, 12);
+      tester.binding.handleAppLifecycleStateChanged(AppLifecycleState.paused);
+      tester.binding.handleAppLifecycleStateChanged(AppLifecycleState.resumed);
+      await tester.pumpAndSettle();
+      expect(find.text('Starting 9/18/2026'), findsOneWidget);
+      // Also cross a boundary while foregrounded, without a lifecycle event.
+      now = DateTime.utc(2026, 9, 20, 12);
+      await tapCalendar(tester, find.byKey(const Key('calendar-start-date')));
+      expect(find.byType(DatePickerDialog), findsOneWidget);
+      expect(tester.takeException(), isNull);
+      await tapCalendar(tester, find.text('OK'));
+      expect(find.text('Starting 9/21/2026'), findsOneWidget);
+    },
+  );
   testWidgets(
     'changed Calendar generation invalidates selected offers before review',
     (tester) async {

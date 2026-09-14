@@ -16,8 +16,13 @@ Future<CalendarSelection?> pickCalendarSlots(
 );
 
 class CalendarSlotPicker extends StatefulWidget {
-  const CalendarSlotPicker({super.key, required this.controller});
+  const CalendarSlotPicker({
+    super.key,
+    required this.controller,
+    this.now = DateTime.now,
+  });
   final PlusController controller;
+  final DateTime Function() now;
   @override
   State<CalendarSlotPicker> createState() => _CalendarSlotPickerState();
 }
@@ -78,8 +83,8 @@ class _CalendarSlotPickerState extends WorkspaceState<CalendarSlotPicker>
         if (value['time_zone'] != status?['time_zone']) startDate = null;
         status = value;
         if (validCalendarZone(timeZone)) {
-          final today = tz.TZDateTime.now(calendarLocation(timeZone));
-          startDate ??= DateTime(today.year, today.month, today.day + 1);
+          final (first, last) = dateBounds();
+          startDate = boundedDate(first, last);
         }
       });
     } catch (e) {
@@ -98,15 +103,37 @@ class _CalendarSlotPickerState extends WorkspaceState<CalendarSlotPicker>
     }
   }
 
+  (DateTime, DateTime) dateBounds() {
+    final today = tz.TZDateTime.from(widget.now(), calendarLocation(timeZone));
+    return (
+      DateTime(today.year, today.month, today.day + 1),
+      DateTime(today.year, today.month, today.day + 89),
+    );
+  }
+
+  DateTime boundedDate(DateTime first, DateTime last) {
+    final value = startDate;
+    if (value == null || value.isBefore(first)) return first;
+    return value.isAfter(last) ? last : value;
+  }
+
   Future<void> date() async {
-    if (!active || !ready || busy) return;
-    final today = tz.TZDateTime.now(calendarLocation(timeZone));
+    if (!active || !ready || busy || loading) return;
+    // A foregrounded picker can cross midnight without a resume event.
+    final (first, last) = dateBounds();
+    final initial = boundedDate(first, last);
+    if (initial != startDate) {
+      setState(() {
+        clearChoices();
+        startDate = initial;
+      });
+    }
     final run = epoch;
     final value = await showDatePicker(
       context: context,
-      initialDate: startDate!,
-      firstDate: DateTime(today.year, today.month, today.day + 1),
-      lastDate: DateTime(today.year, today.month, today.day + 89),
+      initialDate: initial,
+      firstDate: first,
+      lastDate: last,
     );
     if (value == null || !valid(run)) return;
     setState(() {
@@ -135,7 +162,7 @@ class _CalendarSlotPickerState extends WorkspaceState<CalendarSlotPicker>
     );
     final start = calendarInstant(body['time_min'] as String),
         end = calendarInstant(body['time_max'] as String);
-    final now = DateTime.now().toUtc();
+    final now = widget.now().toUtc();
     if (!start.isAfter(now.add(const Duration(hours: 1))) ||
         end.isAfter(now.add(const Duration(days: 90))) ||
         end.difference(start) > const Duration(days: 14)) {

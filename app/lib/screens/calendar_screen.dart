@@ -229,18 +229,21 @@ class _CalendarScreenState extends WorkspaceState<CalendarScreen>
       status = {
         ...?status,
         'connected': false,
-        'status': 'disconnected',
+        'status': 'disconnecting',
         'attempt_id': null,
       };
     });
     try {
       await controller.repository.disconnectGoogleCalendar();
       if (!valid(run)) return;
+      setState(() {
+        status = {...?status, 'status': 'disconnected'};
+      });
     } catch (e) {
       if (valid(run)) {
         setState(() {
-          error =
-              'Refresh to confirm disconnection. ${PlusController.readableError(e)}';
+          status = {...?status, 'status': 'disconnect_uncertain'};
+          error = PlusController.readableError(e);
         });
       }
     } finally {
@@ -319,6 +322,9 @@ class _CalendarScreenState extends WorkspaceState<CalendarScreen>
           if (status != null && !connected) ...[
             const SizedBox(height: 24),
             Text(switch (state) {
+              'disconnecting' => 'Checking that Google access is disconnected…',
+              'disconnect_uncertain' =>
+                'Disconnection is not confirmed. Google access and automatic copies may still be active. Refresh or retry disconnect.',
               'unavailable' =>
                 'Google Calendar connections are not available yet. You can still offer times manually.',
               'connecting' =>
@@ -328,7 +334,10 @@ class _CalendarScreenState extends WorkspaceState<CalendarScreen>
               _ => 'Connect your Google account to check availability.',
             }),
             const SizedBox(height: 16),
-            if (!controller.isDemo && status?['configured'] == true)
+            if (!controller.isDemo &&
+                status?['configured'] == true &&
+                state != 'disconnecting' &&
+                state != 'disconnect_uncertain')
               BusyButton(
                 busy: busy,
                 onPressed: connect,
@@ -446,7 +455,9 @@ class _CalendarScreenState extends WorkspaceState<CalendarScreen>
           if (!controller.isDemo &&
               (connected ||
                   state == 'connecting' ||
-                  state == 'reconnect_required')) ...[
+                  state == 'reconnect_required' ||
+                  state == 'disconnecting' ||
+                  state == 'disconnect_uncertain')) ...[
             const SizedBox(height: 20),
             OutlinedButton.icon(
               key: const Key('calendar-disconnect'),
