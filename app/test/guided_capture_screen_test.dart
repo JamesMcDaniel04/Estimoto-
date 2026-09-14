@@ -16,8 +16,10 @@ import 'package:estimoto_plus/theme.dart';
 import 'guided_capture_session_test.dart' as fake;
 
 class LiveCaptureRepository extends fake.CaptureRepositoryFake {
+  Future<PlusSnapshot>? heldBootstrap;
   @override
   Future<PlusSnapshot> bootstrap() async {
+    if (heldBootstrap != null) return heldBootstrap!;
     final snapshot = await super.bootstrap();
     snapshot.capabilities.json['demo'] = false;
     return snapshot;
@@ -118,6 +120,75 @@ void main() {
         );
       await font.load();
     }
+  });
+  testWidgets('old close completion cannot pop the resumed recovery screen', (
+    tester,
+  ) async {
+    final repo = LiveCaptureRepository(),
+        store = MemoryGuidedCapturePendingStore();
+    final s = await fake.session(repo, store);
+    late VoidCallback closeGuide;
+    await mount(
+      tester,
+      s.controller,
+      Builder(
+        builder: (context) => TextButton(
+          onPressed: () => Navigator.of(context).push(
+            MaterialPageRoute<void>(
+              builder: (_) => GuidedCaptureScreen(
+                controller: s.controller,
+                estimateId: s.estimateId,
+                store: store,
+                viewBuilder: (session, close, error) {
+                  closeGuide = close;
+                  return const Text('Camera page');
+                },
+              ),
+            ),
+          ),
+          child: const Text('Open guide'),
+        ),
+      ),
+    );
+    await tap(tester, 'Open guide');
+    final refresh = Completer<PlusSnapshot>();
+    repo.heldBootstrap = refresh.future;
+    closeGuide();
+    await tester.pump();
+    tester.binding.handleAppLifecycleStateChanged(AppLifecycleState.paused);
+    tester.binding.handleAppLifecycleStateChanged(AppLifecycleState.resumed);
+    await tester.pumpAndSettle();
+    refresh.complete(s.controller.snapshot!);
+    await tester.pumpAndSettle();
+    expect(find.text('Guided photos'), findsOneWidget);
+    expect(find.text('Camera page'), findsOneWidget);
+  });
+  testWidgets('an old queued page error cannot reset resumed capture', (
+    tester,
+  ) async {
+    final repo = LiveCaptureRepository(),
+        store = MemoryGuidedCapturePendingStore();
+    final s = await fake.session(repo, store);
+    late ValueChanged<String> failGuide;
+    await mount(
+      tester,
+      s.controller,
+      GuidedCaptureScreen(
+        controller: s.controller,
+        estimateId: s.estimateId,
+        store: store,
+        viewBuilder: (session, close, error) {
+          failGuide = error;
+          return const Text('Camera page');
+        },
+      ),
+    );
+    failGuide('Old page error');
+    tester.binding.handleAppLifecycleStateChanged(AppLifecycleState.paused);
+    tester.binding.handleAppLifecycleStateChanged(AppLifecycleState.resumed);
+    await tester.pumpAndSettle();
+    expect(find.text('Old page error'), findsNothing);
+    expect(find.text('Camera page'), findsOneWidget);
   });
   for (final discipline in ['pdr', 'collision']) {
     testWidgets(

@@ -4,6 +4,7 @@ import 'dart:js_interop';
 import 'package:flutter/material.dart';
 import 'package:web/web.dart' as web;
 import '../services/guided_capture_session.dart';
+import '../services/guided_capture_document.dart';
 
 @JS('JSON.stringify')
 external JSString stringifyCapture(JSAny? value);
@@ -25,23 +26,46 @@ class GuidedCaptureView extends StatefulWidget {
 class _GuidedCaptureViewState extends State<GuidedCaptureView> {
   web.HTMLIFrameElement? frame;
   late final JSFunction listener;
+  late final GuidedCaptureDocument document;
   Timer? timer;
   bool ready = false, stopped = false;
   GuidedCaptureSession get session => widget.session;
   Uri get page => Uri.parse(web.window.location.origin).resolve('/capture/');
   bool valid(int run) => mounted && !stopped && session.valid(run);
-  bool exactPage() {
+  Object? readDocument() {
     try {
-      return frame?.contentWindow != null &&
-          trustedCapturePage(page, frame!.contentWindow!.location.href);
+      final window = frame?.contentWindow;
+      if (window == null || !trustedCapturePage(page, window.location.href)) {
+        return null;
+      }
+      return window.document;
     } catch (_) {
-      return false;
+      return null;
+    }
+  }
+
+  void startTimer() {
+    timer?.cancel();
+    timer = Timer(const Duration(seconds: 30), () {
+      if (mounted && !ready && !stopped) {
+        widget.onError(
+          'The photo guide is taking too long to load. Reopen it to try again.',
+        );
+      }
+    });
+  }
+
+  void synchronizeDocument() {
+    if (document.synchronize()) {
+      setState(() => ready = false);
+      startTimer();
     }
   }
 
   @override
   void initState() {
     super.initState();
+    document = GuidedCaptureDocument(session, readDocument);
     listener = ((web.MessageEvent event) {
       unawaited(receive(event));
     }).toJS;
@@ -49,11 +73,13 @@ class _GuidedCaptureViewState extends State<GuidedCaptureView> {
   }
 
   Future<void> receive(web.MessageEvent event) async {
-    final run = session.epoch;
-    if (!valid(run) ||
+    if (!mounted ||
+        stopped ||
+        !session.current ||
+        !session.foreground ||
         event.origin != page.origin ||
         event.source != frame?.contentWindow ||
-        !exactPage()) {
+        readDocument() == null) {
       return;
     }
     try {
@@ -65,7 +91,8 @@ class _GuidedCaptureViewState extends State<GuidedCaptureView> {
           value['channel'] == captureChannel &&
           value['type'] == 'ready' &&
           value['version'] == 1) {
-        if (valid(run)) {
+        synchronizeDocument();
+        if (document.current && valid(session.epoch)) {
           setState(() {
             ready = true;
             timer?.cancel();
@@ -73,8 +100,11 @@ class _GuidedCaptureViewState extends State<GuidedCaptureView> {
         }
         return;
       }
+      // A new page must identify itself before it can use the channel.
+      if (!ready || !document.current) return;
+      final run = session.epoch;
       final response = await session.receive(raw);
-      if (response == null || !valid(run) || !exactPage()) return;
+      if (response == null || !valid(run) || !document.current) return;
       frame!.contentWindow!.postMessage(response.jsify(), page.origin.toJS);
       if (valid(run) && session.closeRequested) widget.onClose();
     } catch (_) {
@@ -86,7 +116,10 @@ class _GuidedCaptureViewState extends State<GuidedCaptureView> {
     final iframe = element as web.HTMLIFrameElement;
     frame = iframe;
     iframe.title = 'Private vehicle photo guide';
-    iframe.setAttribute('sandbox', 'allow-scripts allow-same-origin allow-forms');
+    iframe.setAttribute(
+      'sandbox',
+      'allow-scripts allow-same-origin allow-forms',
+    );
     iframe.setAttribute('allow', "camera 'self'; microphone 'none'");
     iframe.referrerPolicy = 'no-referrer';
     iframe.style
@@ -97,30 +130,26 @@ class _GuidedCaptureViewState extends State<GuidedCaptureView> {
       'load',
       ((web.Event _) {
         if (!mounted || stopped) return;
-        if (!exactPage()) {
+        if (readDocument() == null) {
           session.pause();
           widget.onError(
             'The photo guide was closed after a navigation change.',
           );
+          return;
         }
+        synchronizeDocument();
       }).toJS,
     );
-    session.activate();
+    session.pause();
     iframe.src = page.toString();
-    timer = Timer(const Duration(seconds: 30), () {
-      if (mounted && !ready && !stopped) {
-        widget.onError(
-          'The photo guide is taking too long to load. Reopen it to try again.',
-        );
-      }
-    });
+    startTimer();
   }
 
   @override
   void dispose() {
     stopped = true;
     timer?.cancel();
-    session.pause();
+    document.dispose();
     web.window.removeEventListener('message', listener);
     try {
       frame?.contentWindow?.postMessage(

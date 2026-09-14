@@ -175,21 +175,23 @@ class _GuidedCaptureScreenState extends WorkspaceState<GuidedCaptureScreen>
 
   Future<void> close() async {
     if (!active) return;
+    final run = generation;
     session.pause();
     setState(() {
       showing = false;
       checking = true;
     });
     await controller.refresh();
-    if (!active || !mounted) return;
+    if (!valid(run) || !mounted) return;
     Navigator.of(context).pop();
   }
 
   void failed(String message) {
     if (!active) return;
+    final run = generation;
     // Platform callbacks can occur while their widget is being built.
     WidgetsBinding.instance.addPostFrameCallback((_) {
-      if (active) load(notice: message);
+      if (valid(run)) load(notice: message);
     });
   }
 

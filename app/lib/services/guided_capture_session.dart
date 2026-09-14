@@ -84,10 +84,19 @@ class GuidedCaptureSession {
   }
 
   final _seen = <String>{};
+  bool Function()? documentIsCurrent;
   bool get current => !disposed && controller.isCurrentCustomer(ownerId);
-  bool valid(int run) => current && enabled && run == epoch;
-  void activate() {
+  bool valid(int run) =>
+      current && enabled && run == epoch && (documentIsCurrent?.call() ?? true);
+  void activate({
+    bool newDocument = false,
+    bool Function()? documentIsCurrent,
+  }) {
     epoch++;
+    if (newDocument) {
+      this.documentIsCurrent = documentIsCurrent;
+      _seen.clear();
+    }
     enabled = current && foreground;
     closeRequested = false;
     if (enabled) {
@@ -277,7 +286,7 @@ class GuidedCaptureSession {
 
   /// Called only after the platform has validated the exact page/window origin.
   Future<Json?> receive(String raw) async {
-    if (!current || !enabled || !boundedCaptureMessage(raw)) return null;
+    if (!valid(epoch) || !boundedCaptureMessage(raw)) return null;
     Json request;
     try {
       final value = jsonDecode(raw);

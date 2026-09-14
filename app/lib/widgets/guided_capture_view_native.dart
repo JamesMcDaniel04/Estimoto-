@@ -143,7 +143,7 @@ class _GuidedCaptureViewState extends State<GuidedCaptureView> {
               );
               return;
             }
-            session.activate();
+            session.activate(newDocument: true);
           },
           onUrlChange: (change) {
             if (!mounted || stopped || change.url == null) return;
