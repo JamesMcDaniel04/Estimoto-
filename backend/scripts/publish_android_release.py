@@ -194,7 +194,10 @@ def verify_source_version(manifest: dict, source_sha: str) -> None:
 
 
 def get_release(client: httpx.Client, tag: str) -> dict | None:
-    response = client.get(f"{API}/releases/tags/{tag}", headers={"Accept": "application/vnd.github+json"})
+    # GitHub redirects the original repository path after a rename. Existing
+    # customer download URLs remain valid and should not need to change.
+    response = client.get(f"{API}/releases/tags/{tag}", headers={"Accept": "application/vnd.github+json"},
+                          follow_redirects=True)
     if response.status_code == 404:
         return None
     response.raise_for_status()
