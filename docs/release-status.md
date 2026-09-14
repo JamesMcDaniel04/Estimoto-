@@ -1,52 +1,125 @@
 # Live customer preview — September 13, 2026
 
-Estimoto + is deployed at https://estimoto-plus-api.fly.dev with dedicated customer authentication/storage and a production bridge to Estimoto. It is a live customer preview; the remaining checks below prevent a blanket production-readiness claim.
+Estimoto + is deployed at https://estimoto-plus-api.fly.dev with dedicated
+customer authentication/storage and a production bridge to Estimoto. This is a
+live customer preview; the remaining checks below prevent a blanket readiness claim.
 
 ## Delivered surfaces
 
 | Surface | Verified state |
 | --- | --- |
-| Customer web/API | Live source `08c156de08b626da9de1ba10975f214a2a89d41b`; `/ready` 200, PostgreSQL schema `32ac7f618b90` |
-| Original Estimoto API | Live source `ca5241a82136de7a49fd98f772775fc245a1c304`; `/ready` 200; migration `0212_estimoto_plus_bridge` |
-| Staff dashboard | https://www.estimoto.io; asset source `82b52bcbbdb801e952ec144d056c80dbd17af51e`; Plus inbox, opt-in listing and owner-only contributed insights |
-| Android customer app | Signed 0.1.0 (6), 100-result local directory and shared 3D/VIN capture; permanent-link APK and AAB hashes verified; build-5 upgrade preserved synthetic login/draft in Android emulator |
-| iOS customer app | Separate App Store Connect app 6811678079; 0.1.0 (6) processed VALID, notes and both tester groups attached; first external review for build 2 pending |
-| Original Estimoto mobile | Estibot presets plus CRM-entitled texting in 1.1.12 (231), source `b3e4a5241d0be49377aa7700b133a10d22f0a831`; TestFlight VALID and external beta approved; Android served hashes verified |
+| Customer web/API | Live source `ebb7f47275b018f276744322bbb2c191438e4f7a`; `/ready` 200; PostgreSQL schema `a63e90b72d14` |
+| Original Estimoto API | Live source `ca5241a82136de7a49fd98f772775fc245a1c304`; `/ready` 200; published partner logos gated by current opt-in |
+| Staff dashboard | https://www.estimoto.io; previously verified source `82b52bcbbdb801e952ec144d056c80dbd17af51e`; Plus inbox, explicit listing controls and owner-only contributed insights |
+| Android customer app | Signed 0.1.0 (7); permanent-link APK and AAB bytes/hashes verified; emulator upgrade retained authentication and displayed costs/private PDF |
+| iOS customer app | App 6811678079, 0.1.0 (7) VALID; exact notes and both groups attached; internal testing active; external build-7 access awaits Apple review |
+| Original Estimoto mobile | Previously verified 1.1.12 (231), source `b3e4a5241d0be49377aa7700b133a10d22f0a831`; Estibot presets and CRM-entitled texting; separate from the Plus build-7 release |
 
-[Download latest Android](https://estimoto-plus-api.fly.dev/android/download) · [Mobile delivery details](mobile-release.md)
+[Download latest Android](https://estimoto-plus-api.fly.dev/android/download) · [Mobile delivery details](mobile-release.md) · [Build-7 evidence](releases/2026-09-13-build7.json)
 
 ## Implemented customer workflows
 
-- Confirmed-email sign-in with native encrypted session storage and memory-only web authentication. Existing email codes can be entered on another device without requesting another email.
-- Saved contact, vehicle and optional insurance details; date/mileage reminders. Representative CarsXE vehicle images are matched conservatively to year/make/model. Private camera/gallery uploads take priority; removal restores stock. Garage photos remain separate from estimate evidence.
-- PDR/Collision guided required-photo capture, private byte readback, interrupted-picker recovery and durable handoff to a selected shop. Existing billable-link and review/evidence requirements remain authoritative; customer screens do not invent estimate prices.
-- Opt-in shop/technician directory, explicit customer requests, durable delivery/status sync, cancellation, and staff acceptance/scheduling/completion.
-- Private My shops contacts; immutable scheduling drafts; exact-message/contact/time review; authorization before email dispatch; shop acceptance of an offered time before appointment confirmation. Phone-only entries provide a call action. Provider acceptance is distinct from inbox delivery.
-- Customer-reported service/parts/shop history, a typed private GraphRAG projection with source references, and bounded Estibot retrieval/advice. Customer data is not turned into verified repair outcomes by inference.
-- Optional contributed insights default off and can be revoked. Only coarse categories with at least ten consenting contributors are exposed; counts round down to multiples of five. Raw records, contacts and free-text supplier/shop names are not exposed to other shops.
+- Confirmed-email sign-in with native encrypted session storage and memory-only
+  web authentication. Existing email codes can be entered on another device.
+- Saved contact, vehicle and optional insurance details; date/mileage reminders.
+  Representative CarsXE vehicle images are matched conservatively to year/make/model.
+  Private camera/gallery images take priority and remain separate from estimate evidence.
+- Guided PDR/Collision required-photo capture, VIN confirmation, private byte
+  readback, interrupted-picker recovery and durable handoff to a selected shop.
+  Existing billing and evidence/review requirements remain authoritative.
+- A directory within approximately 30 miles of the ZIP center, capped at 100
+  combined results. Participating providers and public OpenStreetMap listings
+  retain separate provenance; mobile-only results and shop-visit alternatives
+  are labeled. Coverage is not claimed to be exhaustive. Vehicle-specific
+  dedicated choices remain private. Available published logos and licensed
+  Commons photos have attribution and a fallback when unavailable.
+- Explicit service requests, durable delivery/status sync, cancellation and staff
+  acceptance/scheduling/completion. Private My shops contacts support reviewed
+  scheduling drafts, explicit email authorization and shop acceptance of an
+  offered time. Provider acceptance is distinct from inbox delivery.
+- Customer-reported repair, maintenance and modification history, integer USD
+  costs and private receipt photos/PDFs. Upload retries preserve the original
+  operation and bytes. Receipts can be viewed or deleted; pending attachments
+  require review after restart. Receipts are not automatically sent to shops.
+- CarsXE retail and wholesale estimates use the saved vehicle's VIN/mileage and
+  the customer's selected state/condition. Exact-input caching, leases and
+  provider-call budgets bound lookups. Recorded care, receipt coverage and costs
+  are shown separately; spending is not added to the vehicle's estimated value.
+- A typed private automotive graph with source references supports bounded
+  Estibot retrieval. Customer-reported history does not establish verified
+  workmanship. Receipt contents and calendar event text are not sent to this graph.
+- Optional contributed insights default off and can be revoked. Only coarse
+  groups with at least ten consenting contributors appear; counts round down
+  to multiples of five. Raw contacts, records and free-text names remain private.
 
-See [automotive knowledge architecture](automotive-knowledge.md) for exact graph and sharing boundaries.
+See [automotive knowledge architecture](automotive-knowledge.md) for graph and
+sharing boundaries.
 
-## Verification evidence
+## Build-7 verification
 
-Build 6 backend verification passed **271 tests with zero skipped**, including actual original-source bridge contracts and isolated PostgreSQL; Flutter passed **144 tests** plus focused final-capture checks and clean analysis. Guided-capture live smoke passed 72 checks across 44 HTTP requests. Android upgrade, explicit interrupted-photo recovery, VIN confirmation and photo-helper interaction were exercised in the emulator. iOS native and guided Photo Library pickers opened with the same synthetic fixture. The rounded icon passed native AAPT resource checks. Build 7 receipt/valuation checks are recorded separately when released.
+The backend suite passed **313 tests**, with seven original-source contract cases
+gated in that invocation. A separate actual-original-source contract run passed
+**12 tests with zero skipped**, including all seven gated cases: **320 unique
+backend cases were exercised**. Receipt/PDF/history and valuation focused checks
+also passed, including isolated PostgreSQL, fresh migration/round-trip checks,
+RLS/direct-access denial, concurrent replay and lost commit acknowledgment.
+Flutter passed **176 tests**, with clean analysis. Focused and phone-size runs
+are overlapping evidence, not added to the full-suite total.
 
-Real local sockets connected the customer API to the actual Estimoto receiver and PostgreSQL, exercising request replay, cancellation, staff status return and required photo packages. The reviewed amount fixture in that scenario was synthetic, not a generated production estimate. See [socket proof](launch/2026-09-13-socket-proof.md).
+The live receipt smoke passed **33 checks**. Synthetic web QA exercised the actual
+PDF chooser/upload and private renderer, a $1,420 recorded-cost rollup with
+missing-cost handling and vehicle isolation, a cached CarsXE result, and
+Demolition Dent's real published logo. Android build 7 upgraded the prior app
+without losing the synthetic session, displayed the rollup, and opened/closed a
+private PDF from the live API. No shop request, estimate submission, customer
+handoff or shop message was sent by these receipt checks.
 
-Production synthetic checks established authenticated customer isolation, missing/invalid token denial, private photo exact-byte readback, cross-account photo denial, anon Data API denial and RLS/restricted-role configuration. Live browser checks at 390×844 signed in through the email-code form, created a private shop and unsent scheduling draft, recorded service/parts history, retrieved the exact recorded parts source through Estibot, and found Demolition Dent in ZIP 80221. These did not contact a shop or create a production CRM job. Live vehicle-image checks verified CarsXE, upload priority, digest/readback, replacement, removal, and a second authenticated customer being denied read/write/delete. The signed Android build used its real camera and system photo picker in an emulator; uploads appeared in the UI and removal restored CarsXE. An Android process-death test recovered the saved camera photo to its original vehicle and required explicit retry. Physical-device evidence remains distinct.
+The signed iOS IPA processed VALID and its notes/groups were independently read
+back from Apple. The new simulator build succeeded, but Keychain/signing blocked
+its login; native build-7 iOS receipt rendering remains unverified. Android emulator,
+web and prior iOS picker evidence do not establish physical-device behavior.
 
-Earlier synthetic customer records and private photos were removed after their completed checks. The marked build-6/7 QA cohort is retained temporarily for receipt and release checks and is separate from the real customer account. No real shop contact was made.
+Previous local socket checks connected Plus to the real Estimoto receiver and
+isolated PostgreSQL for request replay, cancellation, status and photo-package
+contracts. Their amount fixture was synthetic. See [socket proof](launch/2026-09-13-socket-proof.md)
+and [backend validation details](releases/2026-09-13-receipt-backend-validation.json).
 
-The requested replacement Android invite was delivered to `j.mcdan@anonymousventures.org` with the permanent `/android/download` URL. This public URL resolves a freshly read release pointer to the verified versioned APK; `/android/current` exposes its version and digest. Downloading through the permanent URL returned the exact signed build-5 bytes. Future release publishing advances the pointer without changing the emailed URL or redeploying the API. Installation remains customer initiated; this is not an automatic in-app updater.
+Synthetic release QA cleanup is complete. The two explicitly marked test accounts
+were removed; verification found zero scoped owned rows across 30 tables and zero
+known private files remaining. Old and freshly issued test tokens were denied
+with HTTP 401; the Android UI then showed the ended session and returned to
+sign-in after Sign out. The real customer account was excluded and left untouched.
+Credentials, account identifiers, private receipts and cleanup journals remain
+outside Git.
 
-The user-requested `hello@estimoto.io` account exists as a normal live customer (`demo=false`) with no fabricated vehicles or jobs. Its normal Supabase confirmation email was delivered through the configured sender. Email verification/sign-in still requires the customer's code; no confirmation bypass or session impersonation was performed. This persistent customer account is not part of the cleaned synthetic QA fixtures.
-
-Original Estimoto now requires CRM entitlement for platform texting, provisioning, queues and voice. Assigned technicians connected to an eligible CRM shop retain its delivery path; others prepare customer links and open the native phone messenger. The live audit found four active number leases and zero ineligible shops. No real SMS/calls were sent, and physical composer behavior remains unverified.
+The previously requested Android email was delivered with `/android/download`.
+Publishing build 7 advanced that same link to its verified APK; no new build-7
+email was sent. Installation remains customer initiated, with no automatic updater.
 
 ## Participants and remaining launch checks
 
-Demolition Dent is published and accepting PDR/collision in its saved ZIP **80221**, with its existing business address and phone. Production bridge sync and actual customer matching both passed. PDR LINX is authorized as the second participant, but its account has no address/service ZIP and its phone did not match the official public contact page; its location routing awaits the user's ZIP information. No unrelated shops or technicians were opted in.
+Demolition Dent is published with its existing business address/phone and accepts
+PDR/collision requests. Mobile service continues to require published ZIP coverage;
+nearby customers can choose the explicitly supported shop-visit mode. PDR LINX
+is authorized as the second participant, but its saved account lacks location/
+service ZIP information and the phone did not match the official public contact
+page. Its location routing still awaits the user's ZIP information. No unrelated
+shops or technicians were opted in.
 
-Remaining: physical iOS/Android sign-in and camera/recovery QA; first real customer-to-shop handoff and shop acceptance; customer confirmation-code entry; Apple external beta approval. Authentication-email provider delivery is verified, but the customer's reading/sign-in is separate. Google Play listing/publication is not performed. CARFAX, push reminder delivery, automated phone/SMS booking and corpus-wide model training are not connected.
+Remaining checks and limits:
 
-The target customer sharing time is September 14, 2026, at 2 p.m. America/Denver. Apple review timing is external to this deployment.
+- Apple's build-2 review is still pending. Build 7 is internally testable but
+  external access is blocked by `ANOTHER_BUILD_IN_REVIEW`; no review was reset.
+- Native iOS build-7 receipt QA and physical iOS/Android sign-in, receipt/camera
+  quality and recovery checks remain unverified.
+- The first real customer-to-shop handoff and shop acceptance remain unverified.
+  A delivered sign-in email does not prove the customer's code entry.
+- Google Calendar customer connection remains disabled pending verified provider
+  setup. No customer Google account was connected and no real calendar event was created.
+- Google Play publication, CARFAX, push reminder delivery, automated phone/SMS
+  booking and corpus-wide model training are not connected.
+- Original Estimoto's CRM texting entitlement gate was separately verified;
+  this Plus release did not send real SMS or calls.
+
+The target customer sharing time is September 14, 2026, at 2 p.m. America/Denver.
+Apple review timing is outside this deployment's control.

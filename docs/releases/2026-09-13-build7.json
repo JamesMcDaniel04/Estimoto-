@@ -1,0 +1,109 @@
+{
+  "version": "0.1.0",
+  "build": 7,
+  "source_sha": "ebb7f47275b018f276744322bbb2c191438e4f7a",
+  "live": {
+    "plus_source_sha": "ebb7f47275b018f276744322bbb2c191438e4f7a",
+    "plus_schema_revision": "a63e90b72d14",
+    "plus_version_and_ready_http_status": 200,
+    "original_source_sha": "ca5241a82136de7a49fd98f772775fc245a1c304",
+    "original_version_and_ready_http_status": 200
+  },
+  "android": {
+    "stable_url": "https://estimoto-plus-api.fly.dev/android/download",
+    "metadata_url": "https://estimoto-plus-api.fly.dev/android/current",
+    "release_tag": "v0.1.0-beta.7",
+    "apk_bytes": 61615687,
+    "apk_sha256": "ab4e7af170f261fece55b978bdb3fb8c4c5e2172b167c18069f1177c7050f661",
+    "aab_bytes": 59353890,
+    "aab_sha256": "313ce63ed57d9f12ae51c79dfd3983b6beaa1dbafdb20d0178ce5241aa630063",
+    "signer_sha256": "e6d106fccc6c0e77e04a46c64f8edffdafb11b502d4857e51606c725086581dd",
+    "public_bytes_verified": true,
+    "signer_unchanged": true,
+    "min_sdk": 24,
+    "target_sdk": 36,
+    "emulator_upgrade_session_preserved": true,
+    "emulator_cost_rollup_verified": true,
+    "emulator_private_pdf_opened_and_closed": true,
+    "build7_email_sent": false,
+    "prior_build6_requested_email_delivered": true,
+    "prior_email_stable_url_now_serves_build7": true,
+    "google_play_published": false,
+    "post_cleanup_session_rejected_and_signout_verified": true
+  },
+  "ios": {
+    "app_id": "6811678079",
+    "build_id": "b31d8a1f-99a3-40b7-9841-137e854631c4",
+    "ipa_bytes": 24877153,
+    "ipa_sha256": "6b673b4861e2ad7b8602316a8b7784b644c429d163c23d54aea69ec64df47193",
+    "processing": "VALID",
+    "internal_state": "IN_BETA_TESTING",
+    "external_state": "READY_FOR_BETA_SUBMISSION",
+    "groups": [
+      "Internal Testers",
+      "Customer Preview"
+    ],
+    "customer_preview_public_link_enabled": true,
+    "public_link": "https://testflight.apple.com/join/RZCXF6vx",
+    "what_to_test_set": true,
+    "what_to_test_matches_source": true,
+    "what_to_test_chars": 1103,
+    "what_to_test_sha256": "9109b26ffc42b026271fc7036df6e0dd4bc6783cdd17a4207d0bd1c9fac0a6ed",
+    "asc_readback_at": "2026-09-14T04:34:45.153850+00:00",
+    "asc_readback_method": "GET only",
+    "build7_review_submission_exists": false,
+    "external_submission_error": "ENTITY_UNPROCESSABLE.ANOTHER_BUILD_IN_REVIEW",
+    "existing_build2_submission_state": "WAITING_FOR_REVIEW",
+    "existing_build2_review_preserved": true,
+    "build7_external_installability_verified": false,
+    "simulator_debug_build_succeeded": true,
+    "simulator_receipt_view_verified": false,
+    "simulator_blocker": "Keychain entitlement/signing blocked login (-34018); subsequent signing attempts rejected by AMFI. Signed App Store IPA unaffected.",
+    "signed_application_identifier_verified": true,
+    "signed_get_task_allow": false
+  },
+  "validation": {
+    "backend_full_suite": {
+      "passed": 313,
+      "skipped_original_contract_cases": 7,
+      "failed": 0
+    },
+    "actual_original_contract_followup": {
+      "passed": 12,
+      "skipped": 0,
+      "covers_all_seven_gated_cases": true
+    },
+    "backend_unique_cases_exercised": 320,
+    "flutter_full_suite_passed": 176,
+    "flutter_analyzer_clean": true,
+    "counts_note": "Focused test runs overlap full suites and are not summed. The 320 unique backend cases came from two invocations.",
+    "live_receipt_checks_passed": 33,
+    "web_actual_pdf_picker_upload_and_private_view": true,
+    "web_selected_vehicle_cost_total_cents": 142000,
+    "web_missing_cost_and_vehicle_isolation": true,
+    "web_cached_carsxe_result": true,
+    "web_demolition_dent_logo": true,
+    "receipt_qa_shop_requests_or_submissions": 0,
+    "receipt_qa_outbound_shop_messages": 0,
+    "physical_device_verification": false
+  },
+  "synthetic_qa_cleanup": {
+    "status": "complete_verified",
+    "real_customer_account_excluded": true,
+    "credentials_account_identifiers_and_private_evidence_in_repository": false,
+    "marked_accounts_removed": 2,
+    "scoped_tables_checked": 30,
+    "scoped_owned_rows_remaining": 0,
+    "known_private_files_remaining": 0,
+    "old_and_fresh_test_tokens_http_status": 401,
+    "real_customer_account_untouched": true
+  },
+  "remaining_limits": [
+    "External TestFlight approval pending; build2 review preserved.",
+    "Native iOS build7 receipt view and physical iOS/Android receipt/camera QA unverified.",
+    "First real customer-to-shop handoff and acceptance unverified.",
+    "Google Calendar customer connection disabled pending provider setup.",
+    "PDR LINX service/location ZIPs still required.",
+    "Google Play, CARFAX, push reminders, automated phone/SMS booking and corpus-wide model training not connected."
+  ]
+}

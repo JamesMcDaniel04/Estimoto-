@@ -4,46 +4,61 @@ Estimoto + uses `io.estimoto.plus`, display name `Estimoto +`, and the E+ icon.
 Live builds connect to https://estimoto-plus-api.fly.dev/. Explicit demo mode
 is isolated and does not send requests.
 
-## Android 0.1.0 (6)
+## Android 0.1.0 (7)
 
-[Download the latest Plus APK](https://estimoto-plus-api.fly.dev/android/download) · [Current build and hash](https://estimoto-plus-api.fly.dev/android/current) · [Build-6 assets](https://github.com/JamesMcDaniel04/Estimoto-/releases/tag/v0.1.0-beta.6)
+[Download the latest Plus APK](https://estimoto-plus-api.fly.dev/android/download) · [Current build and hash](https://estimoto-plus-api.fly.dev/android/current) · [Build-7 assets](https://github.com/JamesMcDaniel04/Estimoto-/releases/tag/v0.1.0-beta.7)
 
-The permanent URL follows the current verified release pointer and currently
-serves build 6. Installing over an existing Plus installation preserves the
-account. Installation is customer initiated; this is a direct APK distribution.
+The permanent URL currently serves signed build 7 from source
+`ebb7f47275b018f276744322bbb2c191438e4f7a`. This release adds private receipt
+photos/PDFs, maintenance/repair/modification cost totals, CarsXE retail and
+wholesale estimates, and available shop logos and credited photos. Guided
+PDR/Collision capture and VIN confirmation remain available.
 
-Source `08c156de08b626da9de1ba10975f214a2a89d41b` includes the capped local shop
-directory, dedicated shops, shared 3D customer capture, VIN photo confirmation,
-continuous guided camera and compact Estibot photo help.
+- APK: 61,615,687 bytes; SHA-256 `ab4e7af170f261fece55b978bdb3fb8c4c5e2172b167c18069f1177c7050f661`.
+- AAB: 59,353,890 bytes; SHA-256 `313ce63ed57d9f12ae51c79dfd3983b6beaa1dbafdb20d0178ce5241aa630063`.
+- Signer SHA-256: `e6d106fccc6c0e77e04a46c64f8edffdafb11b502d4857e51606c725086581dd` (unchanged).
+- Min SDK 24, target SDK 36. Signed identity/version and exact public artifact bytes verified.
+- Installing build 7 over the prior Plus app preserved the synthetic signed-in
+  session. The Android emulator showed the recorded-cost rollup and rendered a
+  private receipt PDF fetched from the live API; the viewer was then closed.
+  After synthetic cleanup, the old session was rejected and explicit Sign out
+  returned the emulator to the sign-in screen.
+- The previously requested build-6 email was delivered with the permanent link.
+  That same link now serves build 7; no new build-7 email was sent.
 
-- APK SHA-256: `13bf8d789ea9a099d4708e7c8d3e1b8278885e949caa165d157a10ba380851f6`
-- AAB SHA-256: `2d2ddf88ede240df4f16d97314f27e58c2d3191938ad5570e8913c79f37990c5`
-- Signer SHA-256: `e6d106fccc6c0e77e04a46c64f8edffdafb11b502d4857e51606c725086581dd`
-- Min SDK 24, target SDK 36. Signed package/version and public exact bytes verified.
-- The build-5 upgrade preserved the synthetic account, vehicle, draft and photo.
-  Interrupted capture recovery required explicit retry. Live Estibot photo help
-  and VIN confirmation were exercised in the Android emulator.
-- The latest specifically requested Android email was delivered with the permanent
-  link. Google Play publication and physical camera-quality checks are separate.
+Installation is customer initiated. This is direct APK distribution; Google Play
+publication and physical-device receipt/camera checks remain separate.
 
-## iOS 0.1.0 (6)
+## iOS 0.1.0 (7)
 
 [App Store Connect](https://appstoreconnect.apple.com/apps/6811678079/testflight) · [Customer Preview](https://testflight.apple.com/join/RZCXF6vx)
 
-IPA SHA-256 `ff8d1a9dce044c7e6c0f08e42021b1d28510d2866c593a038c9c8385dfccc0a7`.
-App Store Connect build `151a340f-7220-4b08-8c74-cabaa53c8ee2` processed VALID,
-What to Test is set, and Internal Testers plus Customer Preview are attached.
-Internal state is `IN_BETA_TESTING`; external state is `READY_FOR_BETA_SUBMISSION`.
+IPA: 24,877,153 bytes; SHA-256
+`6b673b4861e2ad7b8602316a8b7784b644c429d163c23d54aea69ec64df47193`.
+App Store Connect build `b31d8a1f-99a3-40b7-9841-137e854631c4` processed **VALID**.
+Read-only Apple API verification on September 14 at 04:34 UTC confirmed:
 
-Apple refused simultaneous external review with `ANOTHER_BUILD_IN_REVIEW`.
-Build 2 (`71673590-792c-4fcd-828b-c30cc92d2255`) remains
-`WAITING_FOR_BETA_REVIEW`; its first review was preserved. Attaching groups or
-uploading does not establish public-link installation. Native and guided Photo
-Library pickers opened in the iOS simulator; physical-device checks remain separate.
+- Internal Testers and Customer Preview are attached.
+- Internal state: `IN_BETA_TESTING`; external state: `READY_FOR_BETA_SUBMISSION`.
+- The 1,103-character en-US What to Test exactly matches the [build-7 notes](releases/0.1.0-7-beta-notes.md).
+- Build 7 has no Beta App Review submission. Apple's attempted submission
+  returned `ANOTHER_BUILD_IN_REVIEW`; build 2's existing submission remains
+  `WAITING_FOR_REVIEW`. Its first review was preserved.
+
+Group attachment and an enabled public link do not make build 7 installable by
+external testers before Apple approval.
+
+The new iOS simulator debug build succeeded, but simulator Keychain/signing
+blocked authentication (`-34018`; subsequent signing attempts were rejected by
+AMFI). The build-7 native iOS receipt view is therefore **unverified**. The signed
+App Store IPA and its VALID processing state are unaffected; its signed
+application identifier and `get-task-allow=false` were verified. Earlier simulator
+Photo Library checks do not substitute for this new receipt check or a physical
+iPhone test.
 
 Apple team `J9HNN7TB36`; bundle registration `SFACWALLYZ`; distribution profile
-`82QT2M2C8V`. Signing material and private customer QA evidence stay outside Git.
-See [build-6 evidence](releases/2026-09-13-build6.json).
+`82QT2M2C8V`. Signing material and private synthetic QA evidence stay outside Git.
+See [build-7 evidence](releases/2026-09-13-build7.json) and [build-6 history](releases/2026-09-13-build6.json).
 
 ## Reproduce and publish
 
