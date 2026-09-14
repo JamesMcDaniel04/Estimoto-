@@ -2,7 +2,7 @@ import { fireEvent, render, screen, waitFor, within } from "@testing-library/rea
 import "@testing-library/jest-dom/vitest";
 import { expect, it, vi } from "vitest";
 import { CaptureApp } from "./CaptureApp";
-import type { CaptureRPC } from "./rpc";
+import { RPCError, type CaptureRPC } from "./rpc";
 import type { PhotoStep } from "./shared/template";
 
 const camera = vi.hoisted(() => ({ save: null as null | ((key: string, panel: string, file: File) => Promise<boolean>) }));
@@ -74,4 +74,28 @@ it("rejects a saved operation receipt superseded by a newer photo of the same st
     name: "PhotoRejected", message: expect.stringContaining("newer photo"),
   });
   expect(request).toHaveBeenCalledWith("captureState", {}, 12_000);
+});
+
+it.each([true, false])("releases only a proven superseded photo and preserves uncertain retry (%s)", async (superseded) => {
+  const state = { estimate_id: "draft", discipline: "collision", vehicle, photos: [], vin_suggestion: null };
+  const operations: string[] = [];
+  const request = vi.fn(async (method: string, params: Record<string, unknown>) => {
+    if (method === "captureState") return state;
+    if (method === "saveCapture") {
+      operations.push(params.operation_id as string);
+      throw new RPCError("Review photo status.", 409, superseded ? "capture_superseded" : null);
+    }
+    throw new Error("Unexpected method");
+  });
+  const view = render(<CaptureApp rpc={{ request, ready: vi.fn(), close: vi.fn() } as unknown as Pick<CaptureRPC, "request" | "ready" | "close">} />);
+  await within(view.container).findByText("0 of 9 required photos saved. This only saves evidence; submitting to a shop happens after review.");
+  fireEvent.click(within(view.container).getByRole("button", { name: "Open guided camera" }));
+  const file = new File(["sample"], "vin.jpg", { type: "image/jpeg" });
+  for (let attempt = 0; attempt < 2; attempt++) {
+    await expect(camera.save!("vin", "vin", file)).rejects.toMatchObject({ name: superseded ? "PhotoRejected" : "Error" });
+  }
+  expect(operations).toHaveLength(2);
+  if (superseded) expect(operations[1]).not.toBe(operations[0]);
+  else expect(operations[1]).toBe(operations[0]);
+  expect(request.mock.calls.filter(([method]) => method === "captureState")).toHaveLength(superseded ? 3 : 1);
 });

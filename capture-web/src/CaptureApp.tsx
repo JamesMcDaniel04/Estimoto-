@@ -98,7 +98,12 @@ export function CaptureApp({ rpc }: { rpc: CaptureHostAPI }) {
     let result: SaveResult;
     try { result = await rpc.request<SaveResult>("saveCapture", { capture_key: key, body_style: bodyStyle, operation_id: operation, photo }, 50_000); }
     catch (cause) {
-      if (cause instanceof RPCError && cause.status === 422) {
+      const superseded = cause instanceof RPCError && cause.status === 409 && cause.code === "capture_superseded";
+      if (cause instanceof RPCError && (cause.status === 422 || superseded)) {
+        // Only a definitive rejection or the host's verified active-photo
+        // conflict releases this operation. Ordinary 409s retain exact retry.
+        operationIds.delete(file);
+        if (superseded) await refresh().catch(() => undefined);
         const rejected = new Error(cause.message);
         rejected.name = "PhotoRejected";
         throw rejected;
@@ -112,6 +117,7 @@ export function CaptureApp({ rpc }: { rpc: CaptureHostAPI }) {
     const current = await refresh();
     const active = current.photos.find((row) => row.label === key);
     if (!active || active.id !== result.id || active.sha256 !== result.sha256) {
+      operationIds.delete(file);
       const conflict = new RPCError("A newer photo is saved for this step. Review it before taking another photo.", 409);
       conflict.name = "PhotoRejected";
       throw conflict;

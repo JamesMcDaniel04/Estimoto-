@@ -5,7 +5,8 @@ type Pending = { resolve: (value: unknown) => void; reject: (error: Error) => vo
 type CaptureWindow = Window & { CaptureHost?: { postMessage: (message: string) => void }; EstimotoPlusCapture?: { receive: (message: unknown) => void } };
 
 export class RPCError extends Error {
-  constructor(message: string, public readonly status: number | null = null) { super(message); }
+  constructor(message: string, public readonly status: number | null = null,
+    public readonly code: "capture_superseded" | null = null) { super(message); }
 }
 
 export class CaptureRPC {
@@ -43,7 +44,9 @@ export class CaptureRPC {
     if (row.error != null) {
       const detail = row.error && typeof row.error === "object" ? row.error as Record<string, unknown> : null;
       const message = typeof row.error === "string" ? row.error : typeof detail?.message === "string" ? detail.message : "Capture request failed. Try again.";
-      pending.reject(new RPCError(message, typeof detail?.status === "number" ? detail.status : null));
+      const status = typeof detail?.status === "number" ? detail.status : null;
+      const code = status === 409 && detail?.code === "capture_superseded" ? "capture_superseded" : null;
+      pending.reject(new RPCError(message, status, code));
     }
     else pending.resolve(row.result);
   };

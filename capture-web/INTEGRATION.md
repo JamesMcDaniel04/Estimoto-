@@ -4,7 +4,7 @@ The original Estimoto customer camera remains the source of truth for the contin
 
 The Plus capture site is a standalone Vite entry at `/capture/` on the Plus API's first-party HTTPS origin. It contains only the photo walk and VIN confirmation. It does not load the public intake funnel, payment form, CRM details or any access token. The Flutter host binds the active authenticated customer and estimate; the capture page cannot choose an estimate ID. A web iframe accepts replies only from its exact same-origin parent. Native replies arrive through `window.EstimotoPlusCapture.receive(JSON)` and outbound messages use `CaptureHost.postMessage(JSON)`.
 
-Outbound RPC is `{channel:"estimoto-plus-capture",id,method,params}` and the host returns `{channel,id,result}` or `{channel,id,error:{status,message}}`. The page starts with `{channel,type:"ready",version:1}`; the host can send `{channel,type:"pause"}` and `{channel,type:"resume"}`. `pause` unmounts and stops the camera. No VIN, photo bytes, account ID or credential appears in the URL, browser storage, or ready message. Methods:
+Outbound RPC is `{channel:"estimoto-plus-capture",id,method,params}` and the host returns `{channel,id,result}` or `{channel,id,error:{status,message,code?}}`. The page starts with `{channel,type:"ready",version:1}`; the host can send `{channel,type:"pause"}` and `{channel,type:"resume"}`. `pause` unmounts and stops the camera. URLs and ready messages contain no VIN, photo bytes, account ID or credential. The page receives no authentication credential. The Flutter host persists one pending photo per customer in private app files on native platforms or owner-scoped IndexedDB on web, before sending it; authentication is not stored in that record. Methods:
 
 | Method | Params | Server action |
 | --- | --- | --- |
@@ -14,9 +14,9 @@ Outbound RPC is `{channel:"estimoto-plus-capture",id,method,params}` and the hos
 | `recognizeVin` | `{photo_id}` | OCR of the current saved private VIN photo |
 | `confirmVin` | `{photo_id,photo_sha256,expected_vin,vin}` | Explicit optimistic compare-and-set of the saved vehicle VIN |
 | `askCaptureHelp` | `{capture_key,question}` | Text-only capture help |
-| `close` | `{}` | Return to the garage |
+| `close` | `{}` | Refresh the estimate and return to its review screen |
 
-Files are capped at 8 MB before base64 transfer, and the host and API must enforce the same bound. `saveCapture` HTTP 422 is definitive framing rejection, so the page offers a new frame. Timeout, 408, 409, 429 and 5xx retain the exact file and UUID for retry. The host must preserve the HTTP status in the structured error envelope and never echo private headers or body in errors.
+Files are capped at 8 MB before base64 transfer, and the host and API must enforce the same bound. `saveCapture` HTTP 422 is a definitive validation rejection, so the page offers a new frame. Timeout, 408, ordinary 409, 429 and 5xx retain the exact file and UUID for retry. The host can attach `code:"capture_superseded"` to a 409 only after comparing a successful receipt with the active photo ID and SHA. That proven conflict releases the old file/UUID and refreshes the guide; an unknown code or other status never receives this exception. The host must preserve the HTTP status in the structured error envelope and never echo private headers or body in errors.
 
 The required documentation sequence is odometer, **driver-door-jamb VIN**, engine bay, interior, tire tread, then front/driver/rear/passenger exterior views. All nine are documentary evidence; the VIN step never prices damage. The original public link uses the same requirement, while a persisted version-1 Plus machine receipt may finish its frozen legacy eight-photo intake. New Plus submissions use capture version 2. PDR uses a matching `hail_close_<panel>` and `hail_raking_<panel>` pair; the raking view supports dent assessment. A legacy `panel_<panel>` remains a valid assessable alternative, without adding a duplicate panel to a new pair. Collision close-ups use its 18-panel catalog.
 

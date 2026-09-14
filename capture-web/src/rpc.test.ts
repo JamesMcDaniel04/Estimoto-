@@ -48,3 +48,19 @@ it("encodes bounded image bytes and rejects oversized handoffs before host I/O",
   expect(encoded).toEqual({ base64: "AAH/", mime_type: "image/png" });
   await expect(encodedPhoto(new File([new Uint8Array(8 * 1024 * 1024 + 1)], "large.png", { type: "image/png" }))).rejects.toThrow("under 8 MB");
 });
+
+it.each([
+  [409, "capture_superseded", "capture_superseded"],
+  [409, "unknown_conflict", null],
+  [503, "capture_superseded", null],
+])("only preserves a verified superseded conflict code (%s/%s)", async (status, code, expected) => {
+  const posted: string[] = [];
+  const host = window as typeof window & { CaptureHost?: { postMessage: (value: string) => void }; EstimotoPlusCapture?: { receive: (value: unknown) => void } };
+  host.CaptureHost = { postMessage: (value) => posted.push(value) };
+  const bridge = new CaptureRPC(host);
+  const pending = bridge.request("saveCapture", { operation_id: "stable" });
+  const id = JSON.parse(posted[0]).id;
+  host.EstimotoPlusCapture!.receive({ channel: CHANNEL, id, error: { status, code, message: "Review photo status." } });
+  await expect(pending).rejects.toMatchObject({ status, code: expected });
+  bridge.close();
+});
