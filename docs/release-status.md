@@ -6,11 +6,11 @@ Estimoto + is deployed at https://estimoto-plus-api.fly.dev with dedicated custo
 
 | Surface | Verified state |
 | --- | --- |
-| Customer web/API | Live source `1a69205e80a4658a15e3fe31f402f0a2354bc7f1`; `/ready` 200, PostgreSQL schema `e21870f6a94b` |
-| Original Estimoto API | Live source `4f12933c241018f201f1f8f847f200619a5e03d3`; `/ready` 200; migration `0212_estimoto_plus_bridge` |
-| Staff dashboard | https://www.estimoto.io; asset source `906ccdf11f08f362dad41b89a854a579067bae51`; Plus inbox, opt-in listing and owner-only contributed insights |
-| Android customer app | Signed 0.1.0 (5), CarsXE/private photos and rounded/adaptive icon; public APK and AAB hashes verified; installed and launched in Android emulator |
-| iOS customer app | Separate App Store Connect app 6811678079; 0.1.0 (5) processed VALID, notes and both tester groups attached; first external review for build 2 pending |
+| Customer web/API | Live source `08c156de08b626da9de1ba10975f214a2a89d41b`; `/ready` 200, PostgreSQL schema `32ac7f618b90` |
+| Original Estimoto API | Live source `ca5241a82136de7a49fd98f772775fc245a1c304`; `/ready` 200; migration `0212_estimoto_plus_bridge` |
+| Staff dashboard | https://www.estimoto.io; asset source `82b52bcbbdb801e952ec144d056c80dbd17af51e`; Plus inbox, opt-in listing and owner-only contributed insights |
+| Android customer app | Signed 0.1.0 (6), 100-result local directory and shared 3D/VIN capture; permanent-link APK and AAB hashes verified; build-5 upgrade preserved synthetic login/draft in Android emulator |
+| iOS customer app | Separate App Store Connect app 6811678079; 0.1.0 (6) processed VALID, notes and both tester groups attached; first external review for build 2 pending |
 | Original Estimoto mobile | Estibot presets plus CRM-entitled texting in 1.1.12 (231), source `b3e4a5241d0be49377aa7700b133a10d22f0a831`; TestFlight VALID and external beta approved; Android served hashes verified |
 
 [Download latest Android](https://estimoto-plus-api.fly.dev/android/download) · [Mobile delivery details](mobile-release.md)
@@ -29,7 +29,7 @@ See [automotive knowledge architecture](automotive-knowledge.md) for exact graph
 
 ## Verification evidence
 
-The vehicle-photo backend suite passed **168 tests with zero skipped**, including actual original-source bridge contracts and isolated PostgreSQL; fresh SQLite/PostgreSQL migrations passed. Flutter passed **68 tests** and clean analysis, including narrow/large-text layouts, account/vehicle changes and interrupted capture destination isolation. The rounded icon passed native AAPT resource checks.
+Build 6 backend verification passed **271 tests with zero skipped**, including actual original-source bridge contracts and isolated PostgreSQL; Flutter passed **144 tests** plus focused final-capture checks and clean analysis. Guided-capture live smoke passed 72 checks across 44 HTTP requests. Android upgrade, explicit interrupted-photo recovery, VIN confirmation and photo-helper interaction were exercised in the emulator. iOS native and guided Photo Library pickers opened with the same synthetic fixture. The rounded icon passed native AAPT resource checks. Build 7 receipt/valuation checks are recorded separately when released.
 
 Real local sockets connected the customer API to the actual Estimoto receiver and PostgreSQL, exercising request replay, cancellation, staff status return and required photo packages. The reviewed amount fixture in that scenario was synthetic, not a generated production estimate. See [socket proof](launch/2026-09-13-socket-proof.md).
 
