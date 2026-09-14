@@ -348,6 +348,16 @@ def test_starred_public_duplicate_preserves_participating_handoff(clients):
     row = data['providers'][0]
     assert row['id'] == identifier and row['favorite'] and row['request_modes'] == ['shop_visit']
     assert row['specialty_evidence'][0]['basis'] == 'owner_declared'
+    assert row['favorite_references'] == [{'vehicle_id': vehicle, 'specialty': 'pdr',
+                                          'source': 'openstreetmap', 'source_id': 'node:1'}]
+    public_view = client.get('/v1/discovery', headers=h('alice')).json()
+    assert all(not p['favorite_references'] for p in public_view['providers'])
+    bob_vehicle = client.post('/v1/vehicles', headers=h('bob'), json={'year': 2020, 'make': 'Ford', 'model': 'F-150'}).json()['id']
+    other = client.get('/v1/discovery', headers=h('bob'), params={'vehicle_id': bob_vehicle, 'postal_code': '80204'}).json()
+    assert all(not p['favorite_references'] for p in other['providers'])
+    assert client.delete('/v1/discovery/favorites/pdr', headers=h('alice'), params={'vehicle_id': vehicle}).status_code == 200
+    removed = client.get('/v1/discovery', headers=h('alice'), params={'vehicle_id': vehicle, 'specialty': 'pdr'}).json()['providers'][0]
+    assert not removed['favorite'] and removed['favorite_references'] == []
 
 
 def test_shared_phone_different_address_keeps_distinct_shop_and_favorite(clients):
@@ -370,3 +380,4 @@ def test_shared_phone_different_address_keeps_distinct_shop_and_favorite(clients
     assert by_id['osm:node:1']['request_modes'] == []
     assert by_id[partner_id]['favorite'] is False
     assert by_id[partner_id]['request_modes'] == ['shop_visit']
+    assert by_id[partner_id]['favorite_references'] == []

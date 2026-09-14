@@ -137,6 +137,8 @@ def search(db, request, customer, postal, vehicle=None, specialty=None, mobile_o
         candidates.append(row)
     for row in candidates:
         row['favorite'] = (row['source'], row['source_id']) in favorite_refs
+        row['favorite_references'] = [favorite_view(f) for f in favorites
+                                     if (f.source, f.source_id) == (row['source'], row['source_id'])]
         makes = row.pop('listed_makes', [])
         if vehicle and vehicle.make.casefold().strip() in {m.casefold() for m in makes}:
             row['vehicle_match'] = {'status': 'listed_make', 'make': vehicle.make, 'basis': 'service:vehicle:brand'}
@@ -161,11 +163,14 @@ def search(db, request, customer, postal, vehicle=None, specialty=None, mobile_o
             position = seen[key]
             previous = unique[position]
             favorite = previous['favorite'] or row['favorite']
+            references = {(f['vehicle_id'], f['specialty'], f['source'], f['source_id']): f
+                          for f in (*previous['favorite_references'], *row['favorite_references'])}
             # A public duplicate must not hide the authenticated handoff for
             # the exact same business. Keep the original source on its fields.
             if row['source'] == 'estimoto' and (not specialty or specialty in row['specialties']):
                 unique[position] = row
             unique[position]['favorite'] = favorite
+            unique[position]['favorite_references'] = [references[key] for key in sorted(references)]
             continue
         seen[key] = len(unique)
         unique.append(row)
