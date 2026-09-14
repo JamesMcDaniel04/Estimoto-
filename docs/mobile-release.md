@@ -1,85 +1,94 @@
-# Mobile customer preview — build 8
+# Mobile customer preview — build 9
 
 Estimoto + uses bundle/package `io.estimoto.plus` and connects to
 https://estimoto-plus-api.fly.dev/. Explicit demo mode keeps fictional data local.
-Current release evidence is in [build 8](releases/2026-09-14-build8.json).
-Build 9 is being prepared; its distribution has not yet been verified.
+Current release evidence is in [build 9](releases/2026-09-14-build9.json).
 
-## Android 0.1.0 (8)
+## Android 0.1.0 (9)
 
 [Download the latest Plus APK](https://estimoto-plus-api.fly.dev/android/download) ·
 [Current build and hash](https://estimoto-plus-api.fly.dev/android/current) ·
-[Build-8 assets](https://github.com/JamesMcDaniel04/Estimoto-/releases/tag/v0.1.0-beta.8)
+[Build-9 assets](https://github.com/JamesMcDaniel04/Estimoto-/releases/tag/v0.1.0-beta.9)
 
-The permanent URL serves signed build 8 from
-`e5d0e4ad40ba93866e1905f55c6046d6b4824588`. This update includes reviewed shop
-profiles and real artwork, the revised E/plus/dot icon, calendar and navigation
-fixes, clearer email/Estibot copy and usable demo calling/valuation.
+The permanent URL serves signed build 9 from
+`9dc9e750f63b73cbbd920c27b5f6d14534e4c5e8`. Tapping a shop card opens the profile,
+which holds Call, Website, Google Maps/reviews and available request/save actions.
+See the [build-9 notes](releases/0.1.0-9-beta-notes.md).
 
 | Artifact | Bytes | SHA-256 |
 | --- | ---: | --- |
-| APK | 61,696,919 | `0ac943bab86c515a4d324795a2bd11a93a84f2261066664d6e1c672db1bc5818` |
-| AAB | 59,465,379 | `85687f8678236ffb3138660b740038e0524e82f6d985c224a58825467b722faa` |
+| APK | 62,533,943 | `2b09fb67d7db2120930711fd34056febcebb799498ba2d16c1536e2032ce93c2` |
+| AAB | 60,303,839 | `a097f13d2e19bec303f6f4770936dc8c54b66ca36621863c182b897acbfa6fea` |
 
 Signer SHA-256 remains
 `e6d106fccc6c0e77e04a46c64f8edffdafb11b502d4857e51606c725086581dd`.
-The exact public APK was downloaded, hash-checked and installed over build 7 on
-an emulator. Version 8, the new launcher/splash/welcome/home artwork and synthetic
-native sign-in were verified. The live directory loaded, displayed Bronco's
-Muffler's real logo and opened its mini profile. No shop was contacted or request
-created. These checks do not establish a physical-device install or real customer
-mailbox/code entry.
+The exact public APK was downloaded, hash-checked and installed over build 8 on
+an emulator. Version 9 and the new welcome logo were verified. Native demo QA
+opened a shop card and its profile, saved PDR in the dedicated-shop choice dialog,
+and verified “Your dedicated shop: PDR” on the returned list. No new Auth account
+or shop outreach was used. These checks do not prove a live customer's
+saved-shop outcome, real mailbox/code entry or a physical-device install.
 
-The synthetic QA account was globally signed out, then its Auth account, profile
-and rate rows were removed after confirming other customer-owned tables were
-empty. The old token was rejected with 401 on a write and subsequent GET. The real
-customer account was untouched. The native app displayed the ended-session
-screen, and signing out returned to the welcome screen.
-
-The requested fresh invite was sent **once** with the permanent download URL.
-Resend accepted it at 06:16:05 UTC and confirmed `delivered` on readback at
-06:16:26 UTC, September 14. The provider message ID, recipient details and send
-journal stay private. Delivery does not prove that the recipient opened the
-email or installed the APK.
+The fresh invite was sent once for build 8, accepted at 06:16:05 UTC and confirmed
+`delivered` by Resend readback at 06:16:26 UTC, September 14. Its permanent URL
+now serves build 9. No duplicate email was sent. Recipient details, the provider
+message ID and send journal stay private. Delivery does not prove that the
+recipient opened the email or installed the APK.
 
 Installation remains customer initiated, with no automatic updater. This is
 direct APK distribution; Google Play publication is separate.
 
-## iOS 0.1.0 (8)
+## iOS 0.1.0 (9)
 
 [App Store Connect](https://appstoreconnect.apple.com/apps/6811678079/testflight) ·
 [Customer Preview](https://testflight.apple.com/join/RZCXF6vx)
 
-IPA: **25,052,478 bytes**, SHA-256
-`069ace780f69f3bf830c564a40afd0c19fb026514e0c6b7ded96c45ff02403fd`.
-The artifact uses source `e5d0e4ad40ba93866e1905f55c6046d6b4824588`.
-App Store Connect build `2100d493-412e-4b71-b605-0109536de570` processed **VALID**;
-1,960-character What to Test notes and the Internal Testers/Customer Preview
-groups are attached. Read-only Apple API verification at 06:22:53 UTC on
-September 14 confirmed exact note matching, `IN_BETA_TESTING` internally and
-`READY_FOR_BETA_SUBMISSION` externally. Build 8 has no external review
-submission; the preserved build-2 submission remains `WAITING_FOR_REVIEW`.
+IPA: **25,894,533 bytes**, SHA-256
+`d6f975da327bcc93a8c88424c551247bc28a63869f60f1eba7b33730b4a11441`.
+The signed artifact uses source `9dc9e750f63b73cbbd920c27b5f6d14534e4c5e8`.
+Upload completed successfully at 06:41:54 UTC on September 14. Read-only Apple
+verification at 06:44:57 UTC confirmed build
+`dd9ff8ea-63b9-4f01-a6f3-b723eeca283d` **VALID**, with exact 632-character notes and
+Internal Testers/Customer Preview attached. Internal state is `IN_BETA_TESTING`;
+external state is `READY_FOR_BETA_SUBMISSION`. Build 9 has no review submission,
+and none was attempted; build 2 remains `WAITING_FOR_REVIEW`. The public link does
+not establish external build-9 installability. Physical iPhone
+sign-in/camera/receipt behavior remains unverified.
 
-External submission returned `ANOTHER_BUILD_IN_REVIEW`, preserving the existing
-build-2 review. An enabled public link and attached group do not establish external
-build-8 installability. Physical iPhone sign-in/camera/receipt behavior remains
-unverified. Original Estimoto build 232 has separate external approval; it does
-not approve the Plus app.
+## Browser branding and local validation
 
-## Forthcoming build 9: shop profiles and branding
+The hashed brand asset generated by `sync_app_icons.py` and referenced through
+`brand_assets.dart` is now deployed. The live JavaScript matches the local build,
+and the image SHA-256 is
+`fc3222881ab13091274c6571bf2adb2353da05200107b87c7eb288397237a5b3`.
+A returning browser displayed the new artwork without clearing its cache. Web demo
+QA opened a shop card, its profile and the saved PDR-shop choice. Both demo
+sessions were left at welcome and the owned QA browser tab was closed; the
+real-owner code tab and user preview were preserved.
 
-Build 9 makes a shop-card tap open the profile, where Call, Website, Google
-Maps/reviews and available request/save actions are grouped. Its Android update
-will use the same permanent URL already sent in the delivered invite; no duplicate
-email is planned. See the [build-9 notes](releases/0.1.0-9-beta-notes.md).
+Build 9 passed 209 Flutter tests with clean analysis and 19 capture-web tests plus
+the build. Backend files are unchanged from build 8. The full backend evidence
+remains 410 passed, zero skipped on `47f8eed`, with all three socket smokes; the
+publisher-only follow-up in `e5d0e4a` passed 16 focused tests. These are distinct
+runs, not a repeated build-9 backend gate.
 
-A returning browser retained old brand artwork while the server and signed
-Android/iOS build-8 artifacts contained the correct image. The forthcoming release
-also gives the brand asset a content-hashed filename generated by
-`sync_app_icons.py` and referenced through `brand_assets.dart`. Build-9 source,
-artifact hashes, publication and final browser-cache verification are outstanding.
-The build-8 artifact/source/hash and device evidence above remains historical
-proof for that exact release.
+## Historical build 8
+
+The [build-8 record](releases/2026-09-14-build8.json) preserves its exact
+`e5d0e4a` APK/AAB/IPA hashes and earlier live/device checks. Its public APK upgraded
+build 7, completed synthetic native sign-in, loaded the live directory, showed
+Bronco's Muffler's real logo and opened the mini profile. Synthetic QA cleanup
+removed only the exact new account/profile/rate rows after global sign-out and
+empty-table checks; the old token was rejected on write and GET. The native
+ended-session screen and sign-out back to welcome were verified. The real
+customer account was untouched. Build-9 checks do not repeat or relabel that
+signed-in evidence.
+
+Apple readback at 06:22:53 UTC confirmed build 8 VALID, exact 1,960-character
+notes, both groups and internal testing. Build 8 had no review submission and
+remained `READY_FOR_BETA_SUBMISSION` externally; the preserved build-2 submission
+was `WAITING_FOR_REVIEW`. Build-9 readback confirmed that review remains. Original Estimoto build
+232 has separate external approval, which does not approve Plus.
 
 ## Reproduce and publish
 
@@ -97,4 +106,4 @@ and compare its hash before any authorized invite. See the
 
 `build_beta.sh` produces a labeled demo. See [release status](release-status.md)
 for current provider/device limits and [build-7 evidence](releases/2026-09-13-build7.json)
-for historical receipt/emulator checks. Build-7 proof is not relabeled as build-8 QA.
+for historical receipt/emulator checks. Earlier proof is not relabeled as build-9 QA.

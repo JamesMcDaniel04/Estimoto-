@@ -1,38 +1,44 @@
-# Live customer preview — build 8, September 14, 2026
+# Live customer preview — build 9, September 14, 2026
 
-Estimoto + build 8 is published at https://estimoto-plus-api.fly.dev/ and the
-permanent Android download. Its artifact source is
-`e5d0e4ad40ba93866e1905f55c6046d6b4824588`. The current verified API/web deployment
-uses that same source and schema `a63e90b72d14`. Forthcoming build 9 combines
-shop-card taps that open the profile with the hashed brand asset for returning
-browsers. Build 9 has not yet been verified as distributed. Android/iOS build-8
-artwork is already correct; its delivery evidence remains recorded below.
+Estimoto + build 9 is published at https://estimoto-plus-api.fly.dev/ and the
+permanent Android download. The live API/web and signed mobile artifacts use
+`9dc9e750f63b73cbbd920c27b5f6d14534e4c5e8`, with schema `a63e90b72d14`.
+The exact public Android APK was installed over build 8 on an emulator. The iOS
+build-9 IPA is VALID and in internal testing; Plus external approval remains unverified.
 
 [Download latest Android](https://estimoto-plus-api.fly.dev/android/download) ·
-[Mobile delivery](mobile-release.md) · [Build-8 evidence](releases/2026-09-14-build8.json) ·
+[Mobile delivery](mobile-release.md) · [Build-9 evidence](releases/2026-09-14-build9.json) ·
 [Audit follow-up](qa/2026-09-13-audit-closure.md)
 
 ## Delivered surfaces
 
 | Surface | Verified state |
 | --- | --- |
-| Customer API/web | `/version` matched `e5d0e4a` before and after live checks; `/ready` 200, schema `a63e90b72d14`. Served shell/capture bytes matched the local build. The brand-cache follow-up is included in forthcoming build 9. |
-| Android customer app | Signed 0.1.0 (8); exact public APK hash checked and installed over build 7 on an emulator. Version, launcher/splash/welcome/home artwork, synthetic sign-in, live directory logo and mini profile verified. |
-| iOS customer app | App 6811678079, build 8 processed VALID; 1,960-character notes and both groups attached. Read-only Apple verification at 06:22:53 UTC confirmed exact notes/groups, internal testing and no build-8 review submission; the build-2 review is preserved. |
+| Customer API/web | `/version` matched `9dc9e75`; `/ready` is ready at schema `a63e90b72d14`. Served JavaScript matches the local build. The hashed brand image matches exactly and appeared in a returning browser without clearing its cache. |
+| Android customer app | Signed 0.1.0 (9); exact public APK hash checked and installed over build 8 on an emulator. Version 9, welcome artwork and demo card → profile → saved PDR choice verified. |
+| iOS customer app | Build 9 VALID, exact 632-character notes and both groups verified. Internal `IN_BETA_TESTING`; external `READY_FOR_BETA_SUBMISSION`. No build-9 review submission was attempted; build 2 remains `WAITING_FOR_REVIEW`. |
 | Repository | `main` and `origin/main` were fast-forwarded from the old `1a69205` history and contain artifact source `e5d0e4a`; no force-push. |
-| Hosted CI | Main run `34811930282`: all four jobs failed to start because of GitHub account billing. Local gate success does not establish hosted CI success. |
+| Hosted CI | Build-9 [run 34814184249](https://github.com/JamesMcDaniel04/Estimoto-plus/actions/runs/34814184249) failed with all four jobs at zero steps; annotation check `103881307863` confirms account billing prevented startup. No hosted CI pass is claimed. |
 | Original Estimoto mobile | Separate build 232, source `a0a2af9cfb8c88cb3b7eb9860a42554dcf57714f`, shipped with 38 exact-tab tests and external approval. Its approval does not approve Plus. |
 
-## Forthcoming build 9
+## What changed in build 9
 
-Tapping a shop card will open its profile. Call, Website, Google Maps/reviews,
-dedicated-shop saving and available request/contact actions will be in that
-profile. The same release includes a generated content-hashed brand asset to
-refresh older browser artwork. See the [build-9 notes](releases/0.1.0-9-beta-notes.md).
-Android build 9 will use the same permanent download URL; the delivered build-8
-invite already contains that URL, so no duplicate email is planned. Build-9
-source, artifact hashes and live/device verification will be recorded after
-publication.
+Tapping a shop card opens its profile. Call, Website, Google Maps/reviews,
+dedicated-shop saving and available request/contact actions are in the profile.
+The generated content-hashed brand asset refreshes older browser artwork. See the
+[build-9 notes](releases/0.1.0-9-beta-notes.md).
+
+The returning browser displayed the new logo without clearing its cache. Web demo
+QA opened a card, its profile and the saved PDR-shop choice; native Android demo
+QA saved PDR from the profile choice dialog and saw “Your dedicated shop: PDR”
+on the returned list. Both demo sessions were left at welcome and the owned QA
+browser tab was closed. The real-owner code tab and user preview were preserved.
+No new Auth account,
+shop outreach or live customer mutation was used for build-9 checks. These demo
+checks do not establish a live customer's saved-shop or request outcome.
+
+Android build 9 uses the same permanent URL already present in the delivered
+build-8 invite. No duplicate email was sent.
 
 ## What changed in build 8
 
@@ -77,21 +83,29 @@ calendar socket smokes**. All 34 previously gated backend cases ran using isolat
 PostgreSQL and actual original bridge source. The test cluster was stopped and
 removed. Source remained clean and unchanged during that run.
 
-The shipped `e5d0e4a` adds only the Android publisher's repository-rename redirect
+Build 8 (`e5d0e4a`) added only the Android publisher's repository-rename redirect
 fix and its regression. Its 16 focused tests passed; these overlap other tests
 and are not added to the full-suite total. The full gate was not rerun on that
 publisher-only follow-up. Exact SHAs, bounds and evidence hashes are in the
 [build-8 record](releases/2026-09-14-build8.json).
 
-Twenty live surface checks passed, including production docs 404s, security and
-revalidation headers, conditional shell 304, current capture bytes, invalid/missing
-authentication 401s and the disabled production dev-session route. Browser QA
-signed in a synthetic account and rendered all 27 shop images and a mini profile.
-An existing browser cache retained older brand artwork despite current server
-bytes, prompting the content-hash fix included in forthcoming build 9. Its final
-refresh verification remains outstanding. Native Android QA loaded the live directory, displayed Bronco's
-Muffler's real logo and opened its mini profile. No shop was contacted and no
-request was created; raw screenshots/logs stay private.
+Build 9 passed **209 Flutter tests with clean analysis** and **19 capture-web
+tests plus its build**. Its backend files are unchanged from build 8, so the full
+backend/socket gate remains the `47f8eed` evidence above; it was not rerun as a
+new build-9 gate.
+
+Build-8 live checks passed 20 surface checks, including production docs 404s,
+security/revalidation headers, shell 304, capture bytes, authentication 401s and
+the disabled production dev-session route. Synthetic browser QA rendered all 27
+shop images and a mini profile. Its native Android QA loaded the live directory,
+displayed Bronco's Muffler's real logo and opened its mini profile. No shop was
+contacted and no request was created. These historical signed-in checks remain
+build-8 evidence; build-9 browser/native checks above used demo mode.
+
+The build-9 live check at 06:39:10 UTC confirmed the deployed source, ready schema,
+JavaScript bytes and exact brand image digest. The returning-browser check then
+verified that the new artwork rendered without a cache clear. Raw logs and
+screenshots stay private.
 
 The build-8 synthetic QA account was globally signed out, then its Auth account,
 profile and rate rows were removed. Other customer-owned tables were confirmed
@@ -102,20 +116,17 @@ Android displayed the ended-session screen, then signing out returned to welcome
 A fresh requested Android invite was sent once. Resend accepted it at
 06:16:05 UTC and provider readback confirmed **delivered** at 06:16:26 UTC on
 September 14. It contains the permanent URL that served the verified build-8
-APK at delivery and will serve build 9 after publication. Recipient opening,
-installation on the user's device and normal sign-in
-code entry are not established by delivery. A normal sign-in code was requested
+APK at delivery and now serves build 9. Recipient opening, installation on the
+user's device and normal sign-in code entry are not established by delivery. A normal sign-in code was requested
 through the UI; real inbox/code-entry completion is still pending.
 
 ## Remaining checks
 
 - GitHub account billing must be resolved before hosted CI can run.
-- Plus external TestFlight access still awaits Apple's preserved build-2 review;
-  final readback confirmed build 8 remains `READY_FOR_BETA_SUBMISSION`.
+- Plus external TestFlight approval is unverified. Build-9 Apple readback at
+  06:44:57 UTC confirmed internal testing and preserved build 2 `WAITING_FOR_REVIEW`.
 - Real mailbox/code-entry completion and physical iOS/Android installation,
   camera, receipt and interrupted-picker behavior remain unverified.
-- Build-9 publication and final browser branding refresh remain outstanding;
-  build-8 synthetic cleanup and native ended-session/sign-out UI checks are complete.
 - The first real customer-to-shop handoff and actual shop acceptance remain
   unverified. No automated test is counted as a real shop send.
 - Google Calendar customer connection remains disabled pending verified provider
@@ -126,4 +137,6 @@ through the UI; real inbox/code-entry completion is still pending.
 
 The customer sharing target remains September 14 at 2 p.m. America/Denver.
 The [September 13 readiness snapshot](launch/2026-09-14-customer-launch.md) and
-[build-7 evidence](releases/2026-09-13-build7.json) retain earlier milestones.
+[build-7 evidence](releases/2026-09-13-build7.json) and
+[build-8 evidence](releases/2026-09-14-build8.json) retain earlier milestones,
+including their then-current follow-up states.

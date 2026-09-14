@@ -19,8 +19,11 @@ app icons, native launch images, the web favicon and web app icons. These are
 packaged derivatives of the selected design; the script does not edit the master.
 It also writes the content-hashed asset copy and its Dart constant. Native build 8
 already contains the correct image. The asset reference for returning browsers
-is included with the shop-profile changes in forthcoming build 9; distribution
-and final browser-cache verification remain outstanding. Final evidence belongs in
+shipped with the shop-profile changes in build 9. Its exact image SHA-256 is
+`fc3222881ab13091274c6571bf2adb2353da05200107b87c7eb288397237a5b3`.
+The new logo was verified on the exact public Android-9 APK installed on an
+emulator and in a returning browser without clearing its cache. This does not
+establish a physical customer-device check. Release evidence is in
 [release status](../../../docs/release-status.md).
 
 From the repository root on macOS:
