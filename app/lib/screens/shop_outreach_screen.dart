@@ -6,6 +6,9 @@ import '../state/plus_controller.dart';
 import '../widgets/common.dart';
 import '../widgets/workspace_widgets.dart';
 import 'garage_forms.dart';
+import '../services/calendar_time.dart';
+import '../widgets/calendar_slot_picker.dart';
+import '../widgets/calendar_booking_details.dart';
 
 String outreachStatusLabel(Json draft) {
   if (draft['delivery_status'] == 'local_preview') {
@@ -72,6 +75,7 @@ class _ShopOutreachComposerState extends WorkspaceState<ShopOutreachComposer> {
   final summary = TextEditingController(), note = TextEditingController();
   String? shopId, vehicleId;
   List<String> slots = [];
+  CalendarSelection? calendar;
   PendingWorkspaceWrite? pending;
   bool restoring = true;
   @override
@@ -181,9 +185,13 @@ class _ShopOutreachComposerState extends WorkspaceState<ShopOutreachComposer> {
             'service_summary': summary.text.trim(),
             'customer_message': note.text.trim(),
             'proposed_slots': List<String>.from(slots),
+            if (calendar != null) ...calendar!.requestFields,
           };
       try {
-        final result = await workspace.createDraft(body);
+        final result = await workspace.createDraft(
+          body,
+          reviewTimeZone: calendar?.timeZone,
+        );
         if (!mounted || !active) return;
         Navigator.of(context).pushReplacement(
           MaterialPageRoute<void>(
@@ -337,8 +345,10 @@ class _ShopOutreachComposerState extends WorkspaceState<ShopOutreachComposer> {
                   ),
                 ),
                 const SectionHeading('Preferred appointment times'),
-                const Text(
-                  'Times use your device’s local time zone. Each offer includes its UTC offset and will need the shop’s confirmation.',
+                Text(
+                  calendar != null || pending?.body['calendar_check'] == true
+                      ? '${calendar?.sample == true ? 'Sample times' : 'Calendar-checked offers'} • ${calendar?.duration ?? intOf(pending!.body, 'duration_minutes')} minutes per offer. The shop must confirm.'
+                      : 'Manual offers use your device’s local time zone, with a UTC offset. They have not been checked against Google Calendar.',
                 ),
                 const SizedBox(height: 12),
                 for (final slot in slots)
@@ -347,8 +357,20 @@ class _ShopOutreachComposerState extends WorkspaceState<ShopOutreachComposer> {
                     child: Row(
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
-                        Expanded(child: Text(localSlotLabel(slot))),
-                        if (!locked)
+                        Expanded(
+                          child: Text(
+                            calendar != null ||
+                                    pending?.body['calendar_check'] == true
+                                ? calendarSlotLabel(
+                                    slot,
+                                    calendar?.timeZone ??
+                                        pending?.reviewTimeZone ??
+                                        'Etc/UTC',
+                                  )
+                                : localSlotLabel(slot),
+                          ),
+                        ),
+                        if (!locked && calendar == null)
                           IconButton(
                             tooltip: 'Remove preferred time',
                             onPressed: () => setState(() {
@@ -359,12 +381,44 @@ class _ShopOutreachComposerState extends WorkspaceState<ShopOutreachComposer> {
                       ],
                     ),
                   ),
-                if (slots.length < 3 && !locked)
+                if (slots.length < 3 && !locked && calendar == null)
                   OutlinedButton.icon(
                     onPressed: addSlot,
                     icon: const Icon(Icons.add),
                     label: const Text('Add a preferred time'),
                   ),
+                if (!locked) ...[
+                  const SizedBox(height: 12),
+                  OutlinedButton.icon(
+                    key: const Key('choose-calendar-times'),
+                    onPressed: () async {
+                      final choice = await pickCalendarSlots(
+                        context,
+                        controller,
+                      );
+                      if (!active || choice == null) return;
+                      setState(() {
+                        calendar = choice;
+                        slots = choice.starts.toList();
+                        error = null;
+                      });
+                    },
+                    icon: const Icon(Icons.calendar_month_outlined),
+                    label: Text(
+                      calendar == null
+                          ? 'Find available times'
+                          : 'Choose different times',
+                    ),
+                  ),
+                  if (calendar != null)
+                    TextButton(
+                      onPressed: () => setState(() {
+                        calendar = null;
+                        slots = [];
+                      }),
+                      child: const Text('Offer times manually instead'),
+                    ),
+                ],
                 if (error != null) WorkspaceError(error!),
                 const SizedBox(height: 24),
                 BusyButton(
@@ -531,7 +585,12 @@ class _ShopOutreachReviewState extends WorkspaceState<ShopOutreachReview> {
                 textOf(value, 'confirmed_slot').isNotEmpty)
               ReviewBlock(
                 'Confirmed appointment',
-                localSlotLabel(textOf(value, 'confirmed_slot')),
+                value['calendar_check'] == true
+                    ? calendarSlotLabel(
+                        textOf(value, 'confirmed_slot'),
+                        textOf(value, 'calendar_time_zone'),
+                      )
+                    : localSlotLabel(textOf(value, 'confirmed_slot')),
               ),
             Card(
               child: Padding(
@@ -562,11 +621,22 @@ class _ShopOutreachReviewState extends WorkspaceState<ShopOutreachReview> {
                         textOf(value, 'vehicle_summary'),
                       ),
                     ReviewBlock(
-                      'Preferred times in your local time zone',
-                      stringRows(
-                        value,
-                        'proposed_slots',
-                      ).map(localSlotLabel).join('\n\n'),
+                      value['calendar_check'] == true ||
+                              value['calendar_sample'] == true
+                          ? 'Preferred times in your reviewed time zone'
+                          : 'Preferred times in your local time zone',
+                      stringRows(value, 'proposed_slots')
+                          .map(
+                            (s) =>
+                                value['calendar_check'] == true ||
+                                    value['calendar_sample'] == true
+                                ? calendarSlotLabel(
+                                    s,
+                                    textOf(value, 'calendar_time_zone'),
+                                  )
+                                : localSlotLabel(s),
+                          )
+                          .join('\n\n'),
                     ),
                     ReviewBlock('Subject', textOf(value, 'subject')),
                     ReviewBlock(
@@ -583,6 +653,11 @@ class _ShopOutreachReviewState extends WorkspaceState<ShopOutreachReview> {
               ),
             ),
             const SizedBox(height: 20),
+            CalendarBookingDetails(
+              controller: controller,
+              source: value,
+              sourceKind: 'outreach',
+            ),
             if (canAuthorize && expiredOffers && !hasPending)
               const Text(
                 'These preferred times are too near or have passed. Go back to My shops and prepare a new request with times more than one hour ahead.',

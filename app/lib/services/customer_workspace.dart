@@ -2,18 +2,28 @@ import 'dart:convert';
 import 'dart:math';
 import 'package:flutter_secure_storage/flutter_secure_storage.dart';
 import '../data/repository.dart';
+import '../data/pending_request_store.dart';
 import '../domain/models.dart';
 import '../state/plus_controller.dart';
 
 class PendingWorkspaceWrite {
-  PendingWorkspaceWrite({required Json body, required this.key})
-    : body = jsonDecode(jsonEncode(body)) as Json;
+  PendingWorkspaceWrite({
+    required Json body,
+    required this.key,
+    this.reviewTimeZone,
+  }) : body = freezeJson(body);
   final Json body;
   final String key;
-  Json toJson() => {'body': body, 'key': key};
+  final String? reviewTimeZone;
+  Json toJson() => {
+    'body': body,
+    'key': key,
+    if (reviewTimeZone != null) 'review_time_zone': reviewTimeZone,
+  };
   factory PendingWorkspaceWrite.fromJson(Json json) => PendingWorkspaceWrite(
     body: Map<String, dynamic>.from(json['body'] as Map),
     key: json['key'] as String,
+    reviewTimeZone: json['review_time_zone'] as String?,
   );
 }
 
@@ -97,9 +107,11 @@ class CustomerWorkspace {
   Future<Json> write(
     String operation,
     Json body,
-    Future<Json> Function(Json, String) send,
-  ) async {
+    Future<Json> Function(Json, String) send, {
+    String? reviewTimeZone,
+  }) async {
     check();
+    final frozenBody = freezeJson(body);
     final scope = _scope(operation);
     if (!_sending.add(scope)) {
       throw const PlusApiException('This request is already being saved.');
@@ -107,13 +119,17 @@ class CustomerWorkspace {
     try {
       var saved = await store.read(scope);
       check();
-      if (saved != null && _canonical(saved.body) != _canonical(body)) {
+      if (saved != null && _canonical(saved.body) != _canonical(frozenBody)) {
         throw const PlusApiException(
           'Finish retrying the saved request before changing its details.',
           409,
         );
       }
-      saved ??= PendingWorkspaceWrite(body: body, key: _uuid());
+      saved ??= PendingWorkspaceWrite(
+        body: frozenBody,
+        key: _uuid(),
+        reviewTimeZone: reviewTimeZone,
+      );
       await store.write(scope, saved);
       check();
       Json result;
@@ -137,8 +153,12 @@ class CustomerWorkspace {
     }
   }
 
-  Future<Json> createDraft(Json body) =>
-      write('outreach-draft', body, controller.repository.createShopOutreach);
+  Future<Json> createDraft(Json body, {String? reviewTimeZone}) => write(
+    'outreach-draft',
+    body,
+    controller.repository.createShopOutreach,
+    reviewTimeZone: reviewTimeZone,
+  );
   Future<Json> authorize(Json draft) => write(
     'outreach-authorize/${draft['id']}',
     {'share_contact': true, 'review_hash': draft['review_hash']},

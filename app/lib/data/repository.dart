@@ -53,5 +53,26 @@ abstract class PlusRepository {
   Future<Json> addKnowledgeRecord(Json body, String idempotencyKey);
   Future<void> deleteKnowledgeRecord(String id);
   Future<Json> saveKnowledgePreferences(Json body);
+  Future<Json> getCalendarStatus() async => {
+    'configured': false,
+    'connected': false,
+    'status': 'unavailable',
+    'generation': 0,
+    'selected_calendar_ids': <String>[],
+    'time_zone': 'Etc/UTC',
+    'sync_confirmed': false,
+    'attempt_id': null,
+    'sync_issues': <Json>[],
+  };
+  Future<Json> connectGoogleCalendar() => _calendarUnavailable();
+  Future<Json> reconcileGoogleCalendar(String attemptId) =>
+      _calendarUnavailable();
+  Future<Json> listGoogleCalendars() => _calendarUnavailable();
+  Future<Json> saveCalendarPreferences(Json body) => _calendarUnavailable();
+  Future<Json> findCalendarAvailability(Json body) => _calendarUnavailable();
+  Future<Json> disconnectGoogleCalendar() => _calendarUnavailable();
+  Future<Json> retryCalendarSync(Json body) => _calendarUnavailable();
+  Future<Json> _calendarUnavailable() =>
+      throw const PlusApiException('Google Calendar is unavailable.', 503);
   void close() {}
 }

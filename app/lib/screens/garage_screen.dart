@@ -1,3 +1,4 @@
+import 'calendar_screen.dart';
 import 'package:flutter/material.dart';
 import '../state/plus_controller.dart';
 import '../theme.dart';
@@ -298,6 +299,19 @@ class GarageScreen extends StatelessWidget {
                 subtitle: const Text('Saved contacts and scheduling requests'),
                 trailing: const Icon(Icons.chevron_right),
                 onTap: () => openMyShops(context, controller),
+              ),
+              const Divider(height: 1),
+              ListTile(
+                leading: const Icon(
+                  Icons.calendar_month_outlined,
+                  color: PlusColors.blue,
+                ),
+                title: const Text('Calendar'),
+                subtitle: const Text(
+                  'Availability and confirmed appointment copies',
+                ),
+                trailing: const Icon(Icons.chevron_right),
+                onTap: () => openCalendar(context, controller),
               ),
               const Divider(height: 1),
               ListTile(

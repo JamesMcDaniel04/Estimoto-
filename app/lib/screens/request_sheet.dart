@@ -2,6 +2,9 @@ import 'package:flutter/material.dart';
 import '../domain/models.dart';
 import '../state/plus_controller.dart';
 import '../widgets/common.dart';
+import '../widgets/workspace_widgets.dart';
+import '../widgets/calendar_slot_picker.dart';
+import '../services/calendar_time.dart';
 
 Future<void> requestProvider(
   BuildContext context,
@@ -36,13 +39,15 @@ class RequestSheet extends StatefulWidget {
   State<RequestSheet> createState() => _RequestSheetState();
 }
 
-class _RequestSheetState extends State<RequestSheet> {
+class _RequestSheetState extends WorkspaceState<RequestSheet> {
+  @override
+  PlusController get controller => widget.controller;
+  CalendarSelection? calendar;
   late final TextEditingController description;
   final timing = TextEditingController();
   final form = GlobalKey<FormState>();
   late String specialty;
-  bool share = false, busy = false;
-  String? error;
+  bool share = false;
   bool get locked => widget.controller.pendingRequest != null;
   @override
   void initState() {
@@ -69,6 +74,7 @@ class _RequestSheetState extends State<RequestSheet> {
   }
 
   Future<void> send() async {
+    if (!active || busy) return;
     if (!form.currentState!.validate()) return;
     if (!share) {
       setState(
@@ -104,16 +110,23 @@ class _RequestSheetState extends State<RequestSheet> {
           'description': description.text.trim(),
           'preferred_time': timing.text.trim(),
           'share_contact': true,
+          if (calendar != null) ...calendar!.requestFields,
         };
     setState(() {
       busy = true;
       error = null;
     });
     try {
-      await widget.controller.sendRequest(body, widget.provider);
+      await widget.controller.sendRequest(
+        body,
+        widget.provider,
+        reviewTimeZone: calendar?.timeZone,
+      );
+      if (!active) return;
       await widget.controller.refresh();
+      if (!active) return;
       widget.controller.selectTab(3);
-      if (mounted) {
+      if (mounted && active) {
         final messenger = ScaffoldMessenger.of(context);
         Navigator.pop(context);
         messenger.showSnackBar(
@@ -127,7 +140,7 @@ class _RequestSheetState extends State<RequestSheet> {
         );
       }
     } catch (e) {
-      if (mounted) {
+      if (active) {
         setState(() {
           error = PlusController.readableError(e);
           busy = false;
@@ -138,6 +151,7 @@ class _RequestSheetState extends State<RequestSheet> {
 
   @override
   Widget build(BuildContext context) {
+    if (!current) return unavailable;
     final p = widget.controller.snapshot!.profile;
     final canSend =
         widget.controller.isDemo ||
@@ -209,15 +223,78 @@ class _RequestSheetState extends State<RequestSheet> {
                   : null,
             ),
             const SizedBox(height: 8),
-            TextFormField(
-              controller: timing,
-              enabled: !busy && !locked,
-              maxLength: 200,
-              decoration: const InputDecoration(
-                labelText: 'Preferred timing',
-                hintText: 'For example, next week',
+            if (calendar != null ||
+                widget.controller.pendingRequest?.body['calendar_check'] ==
+                    true) ...[
+              ReviewBlock(
+                calendar?.sample == true
+                    ? 'Sample preferred times'
+                    : 'Calendar-checked preferred times',
+                calendar?.label ??
+                    (widget.controller.pendingRequest!.body['proposed_slots']
+                            as List)
+                        .map(
+                          (s) => calendarSlotLabel(
+                            s as String,
+                            widget.controller.pendingRequest!.reviewTimeZone ??
+                                'Etc/UTC',
+                          ),
+                        )
+                        .join('\n\n'),
               ),
-            ),
+              Text(
+                '${calendar?.duration ?? intOf(widget.controller.pendingRequest!.body, 'duration_minutes')} minutes reserved per offer. The provider must confirm.',
+              ),
+              if (!busy && !locked)
+                TextButton(
+                  onPressed: () => setState(() {
+                    calendar = null;
+                    timing.clear();
+                    share = false;
+                  }),
+                  child: const Text('Offer timing manually instead'),
+                ),
+            ] else
+              TextFormField(
+                controller: timing,
+                enabled: !busy && !locked,
+                maxLength: 200,
+                decoration: const InputDecoration(
+                  labelText: 'Preferred timing',
+                  hintText: 'For example, next week',
+                ),
+              ),
+            if (!locked) ...[
+              const SizedBox(height: 12),
+              OutlinedButton.icon(
+                key: const Key('choose-calendar-times'),
+                onPressed: busy
+                    ? null
+                    : () async {
+                        final choice = await pickCalendarSlots(
+                          context,
+                          controller,
+                        );
+                        if (!active || choice == null) return;
+                        setState(() {
+                          calendar = choice;
+                          timing.text = choice.preferredTime;
+                          share = false;
+                          error = null;
+                        });
+                      },
+                icon: const Icon(Icons.calendar_month_outlined),
+                label: Text(
+                  calendar == null
+                      ? 'Find available times'
+                      : 'Choose different times',
+                ),
+              ),
+              if (calendar == null)
+                const Text(
+                  'Manual timing has not been checked against Google Calendar.',
+                ),
+            ],
             const SizedBox(height: 12),
             Text(
               'Contact: ${p.name.isEmpty ? p.email : '${p.name} · ${p.email}'}${p.phone.isEmpty ? '' : '\n${p.phone}'}\nService ZIP: ${p.postalCode.isEmpty ? 'Add a ZIP code to your profile' : p.postalCode}',

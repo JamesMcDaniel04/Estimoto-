@@ -101,6 +101,7 @@ class PlusController extends ChangeNotifier {
   void invalidateSession() {
     _sessionActive = false;
     ++_refreshGeneration;
+    _notify();
   }
 
   void reportSessionError() {
@@ -109,17 +110,36 @@ class PlusController extends ChangeNotifier {
     _notify();
   }
 
-  Future<Json> sendRequest(Json body, ProviderProfile provider) async {
+  Future<Json> sendRequest(
+    Json body,
+    ProviderProfile provider, {
+    String? reviewTimeZone,
+  }) async {
+    final customerId = snapshot?.profile.id;
+    if (customerId == null || !isCurrentCustomer(customerId)) {
+      throw const PlusApiException('Please sign in again to continue.', 401);
+    }
+    void requireOwner() {
+      if (!isCurrentCustomer(customerId)) {
+        throw const PlusApiException(
+          'Your account changed. Please sign in again.',
+          401,
+        );
+      }
+    }
+
     if (_sendingRequest) {
       throw const PlusApiException('Your request is already being sent.');
     }
-    final customerId = snapshot!.profile.id;
+    final frozenBody = freezeJson(body);
     _sendingRequest = true;
     ++_refreshGeneration;
     loading = false;
     try {
       final saved = pendingRequest ?? await pendingStore.read(customerId);
-      if (saved != null && jsonEncode(saved.body) != jsonEncode(body)) {
+      requireOwner();
+      if (saved != null &&
+          canonicalJson(saved.body) != canonicalJson(frozenBody)) {
         pendingRequest = saved;
         throw const PlusApiException(
           'Confirm the outcome of your previous request before changing its details.',
@@ -128,28 +148,35 @@ class PlusController extends ChangeNotifier {
       final attempt =
           saved ??
           PendingRequest(
-            body: Map<String, dynamic>.from(body),
+            body: frozenBody,
             key: requestKey(),
             provider: provider,
+            reviewTimeZone: reviewTimeZone,
           );
       await pendingStore.write(customerId, attempt);
+      requireOwner();
       pendingRequest = attempt;
       _notify();
       final result = await repository.createRequest(attempt.body, attempt.key);
+      requireOwner();
       await pendingStore.clear(customerId);
+      requireOwner();
       pendingRequest = null;
       return result;
     } on PlusApiException catch (error) {
-      // These responses definitively reject creation. Uncertain delivery keeps its identity.
-      if ([400, 403, 404, 422].contains(error.statusCode) ||
-          (error.statusCode == 409 && error.code == 'request_not_created')) {
+      // Definitive rejection permits new choices; ambiguous outcomes retain exact replay.
+      if (isCurrentCustomer(customerId) &&
+          ([400, 403, 404, 422].contains(error.statusCode) ||
+              (error.statusCode == 409 &&
+                  error.code == 'request_not_created'))) {
         await pendingStore.clear(customerId);
+        requireOwner();
         pendingRequest = null;
       }
       rethrow;
     } finally {
       _sendingRequest = false;
-      _notify();
+      if (isCurrentCustomer(customerId)) _notify();
     }
   }
 

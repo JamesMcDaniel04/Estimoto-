@@ -7,6 +7,7 @@ import 'find_help_screen.dart';
 import 'request_sheet.dart';
 import 'my_shops_screen.dart';
 import 'history_screen.dart';
+import 'calendar_screen.dart';
 
 class EstibotScreen extends StatefulWidget {
   const EstibotScreen({super.key, required this.controller});
@@ -72,11 +73,24 @@ class _EstibotScreenState extends State<EstibotScreen> {
                       ),
                       TextButton.icon(
                         onPressed: () =>
+                            openCalendar(context, widget.controller),
+                        icon: const Icon(Icons.calendar_month_outlined),
+                        label: const Text('Calendar'),
+                      ),
+                      TextButton.icon(
+                        onPressed: () =>
                             openVehicleHistory(context, widget.controller),
                         icon: const Icon(Icons.history_outlined),
                         label: const Text('Service history'),
                       ),
                     ],
+                  ),
+                  const SizedBox(height: 12),
+                  OutlinedButton.icon(
+                    key: const Key('schedule-around-calendar'),
+                    onPressed: () => openMyShops(context, widget.controller),
+                    icon: const Icon(Icons.event_available_outlined),
+                    label: const Text('Schedule around my calendar'),
                   ),
                   const SizedBox(height: 20),
                   if (widget.controller.messages.isEmpty) ...[

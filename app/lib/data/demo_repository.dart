@@ -4,6 +4,8 @@ import 'package:flutter/services.dart';
 import '../domain/models.dart';
 import 'demo_seed.dart';
 import 'repository.dart';
+import '../services/calendar_time.dart';
+import 'package:timezone/timezone.dart' as tz;
 
 /// Isolated, fictional workspace. It never calls an external service.
 class DemoPlusRepository extends PlusRepository {
@@ -13,6 +15,117 @@ class DemoPlusRepository extends PlusRepository {
   final _outreach = <Json>[];
   final _history = <Json>[];
   final _vehicleImages = <String, VehiclePhoto>{};
+
+  Json _calendar = {
+    'configured': false,
+    'connected': true,
+    'status': 'connected',
+    'generation': 1,
+    'selected_calendar_ids': ['sample-personal'],
+    'time_zone': 'Etc/UTC',
+    'sync_confirmed': false,
+    'attempt_id': null,
+    'sync_issues': <Json>[],
+  };
+  @override
+  Future<Json> getCalendarStatus() async => _copy(_calendar);
+  @override
+  Future<Json> connectGoogleCalendar() async => throw const PlusApiException(
+    'Sample mode cannot connect Google Calendar.',
+  );
+  @override
+  Future<Json> reconcileGoogleCalendar(String attemptId) async =>
+      getCalendarStatus();
+  @override
+  Future<Json> listGoogleCalendars() async => {
+    'calendars': [
+      {
+        'id': 'sample-personal',
+        'summary': 'Sample personal calendar',
+        'primary': true,
+        'time_zone': _calendar['time_zone'],
+        'selected': true,
+      },
+      {
+        'id': 'sample-family',
+        'summary': 'Sample family calendar',
+        'primary': false,
+        'time_zone': _calendar['time_zone'],
+        'selected': false,
+      },
+    ],
+  };
+  @override
+  Future<Json> saveCalendarPreferences(Json body) async {
+    if (!validCalendarZone(textOf(body, 'time_zone')) ||
+        (body['selected_calendar_ids'] as List? ?? []).isEmpty) {
+      throw const PlusApiException(
+        'Choose a sample calendar and a valid IANA time zone.',
+        422,
+      );
+    }
+    _calendar = {
+      ..._calendar,
+      ..._copy(body),
+      'generation': (_calendar['generation'] as int) + 1,
+    };
+    return getCalendarStatus();
+  }
+
+  @override
+  Future<Json> findCalendarAvailability(Json body) async {
+    final start = calendarInstant(textOf(body, 'time_min'));
+    final end = calendarInstant(textOf(body, 'time_max'));
+    final duration = intOf(body, 'duration_minutes');
+    final location = calendarLocation(textOf(body, 'time_zone'));
+    final first = tz.TZDateTime.from(start, location);
+    final slots = <Json>[];
+    for (var day = 0; day < 14 && slots.length < 12; day++) {
+      final value = tz.TZDateTime(
+        location,
+        first.year,
+        first.month,
+        first.day + day,
+        intOf(body, 'day_start_hour'),
+      );
+      if (value.weekday > 5 ||
+          value.isBefore(start) ||
+          value.add(Duration(minutes: duration)).isAfter(end)) {
+        continue;
+      }
+      slots.add({
+        'start': value.toUtc().toIso8601String(),
+        'end': value.add(Duration(minutes: duration)).toUtc().toIso8601String(),
+      });
+    }
+    return {
+      'slots': slots,
+      'checked_at': DateTime.now().toUtc().toIso8601String(),
+      'generation': _calendar['generation'],
+      'time_zone': _calendar['time_zone'],
+      'duration_minutes': duration,
+    };
+  }
+
+  @override
+  Future<Json> disconnectGoogleCalendar() async {
+    _calendar = {
+      ..._calendar,
+      'connected': false,
+      'status': 'disconnected',
+      'sync_confirmed': false,
+      'generation': (_calendar['generation'] as int) + 1,
+    };
+    return {'disconnected': true};
+  }
+
+  @override
+  Future<Json> retryCalendarSync(Json body) async => {
+    ...body,
+    'calendar_sync_status': 'not_enabled',
+    'calendar_sync_message':
+        'Sample mode does not create Google Calendar events.',
+  };
 
   @override
   Future<VehiclePhoto?> getVehicleImage(String id) async {
@@ -135,6 +248,13 @@ class DemoPlusRepository extends PlusRepository {
       },
       'vehicle_summary': vehicle,
       'proposed_slots': body['proposed_slots'],
+      if (body.containsKey('calendar_check')) ...{
+        'calendar_check': false,
+        'calendar_sample': true,
+        'calendar_time_zone': _calendar['time_zone'],
+        'duration_minutes': body['duration_minutes'],
+        'calendar_sync_status': 'not_enabled',
+      },
       'review_hash': List.filled(64, 'd').join(),
       'status': 'draft',
       'delivery_status': 'draft',
@@ -331,6 +451,12 @@ class DemoPlusRepository extends PlusRepository {
     final now = DateTime.now().toIso8601String();
     final record = <String, dynamic>{
       ...body,
+      if (body.containsKey('calendar_check')) ...{
+        'calendar_check': false,
+        'calendar_sample': true,
+        'calendar_time_zone': _calendar['time_zone'],
+        'calendar_sync_status': 'not_enabled',
+      },
       'id': _id(),
       'status': 'requested',
       'delivery_status': 'local_preview',

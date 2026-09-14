@@ -4,6 +4,8 @@ import '../state/plus_controller.dart';
 import '../theme.dart';
 import '../widgets/common.dart';
 import 'request_sheet.dart';
+import '../services/calendar_time.dart';
+import '../widgets/calendar_booking_details.dart';
 
 class RepairsScreen extends StatelessWidget {
   const RepairsScreen({super.key, required this.controller});
@@ -136,9 +138,14 @@ class RepairsScreen extends StatelessWidget {
                         Padding(
                           padding: const EdgeInsets.only(top: 8),
                           child: Text(
-                            'Scheduled: ${appointmentText(textOf(request.json, 'scheduled_at'))}',
+                            'Scheduled: ${request.json['calendar_check'] == true ? calendarSlotLabel(textOf(request.json, 'scheduled_at'), textOf(request.json, 'calendar_time_zone')) : appointmentText(textOf(request.json, 'scheduled_at'))}',
                           ),
                         ),
+                      CalendarBookingDetails(
+                        controller: controller,
+                        source: request.json,
+                        sourceKind: 'request',
+                      ),
                       if (request.events.isNotEmpty)
                         ExpansionTile(
                           tilePadding: EdgeInsets.zero,

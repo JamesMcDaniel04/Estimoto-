@@ -5,6 +5,7 @@ import 'package:http/http.dart' as http;
 import 'package:http_parser/http_parser.dart';
 import '../domain/models.dart';
 import 'repository.dart';
+import '../services/calendar_errors.dart';
 
 class ApiPlusRepository extends PlusRepository {
   ApiPlusRepository({
@@ -119,10 +120,15 @@ class ApiPlusRepository extends PlusRepository {
         503:
             'This service is not connected yet. Your saved drafts are still available.',
       };
+      final calendarMessage = safeCalendarError(
+        response.statusCode,
+        response.body,
+      );
       throw PlusApiException(
         code == 'request_not_created'
             ? 'That provider is no longer available for this request. Choose another provider.'
-            : errors[response.statusCode] ??
+            : calendarMessage ??
+                  errors[response.statusCode] ??
                   'We could not complete that action. Please try again.',
         response.statusCode,
         code,
@@ -144,6 +150,34 @@ class ApiPlusRepository extends PlusRepository {
       );
     }
   }
+
+  @override
+  Future<Json> getCalendarStatus() =>
+      _send('GET', '/v1/calendar/google/status');
+  @override
+  Future<Json> connectGoogleCalendar() =>
+      _send('POST', '/v1/calendar/google/connect');
+  @override
+  Future<Json> reconcileGoogleCalendar(String attemptId) => _send(
+    'POST',
+    '/v1/calendar/google/reconcile',
+    body: {'attempt_id': attemptId},
+  );
+  @override
+  Future<Json> listGoogleCalendars() =>
+      _send('GET', '/v1/calendar/google/calendars');
+  @override
+  Future<Json> saveCalendarPreferences(Json body) =>
+      _send('PUT', '/v1/calendar/google/preferences', body: body);
+  @override
+  Future<Json> findCalendarAvailability(Json body) =>
+      _send('POST', '/v1/calendar/google/availability', body: body);
+  @override
+  Future<Json> disconnectGoogleCalendar() =>
+      _send('DELETE', '/v1/calendar/google/connection');
+  @override
+  Future<Json> retryCalendarSync(Json body) =>
+      _send('POST', '/v1/calendar/google/sync/retry', body: body);
 
   @override
   Future<PlusSnapshot> bootstrap() async =>
