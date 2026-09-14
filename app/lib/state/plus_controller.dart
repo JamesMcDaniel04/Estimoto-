@@ -103,6 +103,9 @@ class PlusController extends ChangeNotifier {
       }
       if (_disposed || generation != _refreshGeneration) return;
       snapshot = next;
+      // Knowledge is fetched separately from bootstrap. A successful refresh
+      // must also invalidate receipt details and costs changed on the server.
+      historyRevision++;
       pendingRequest = pending;
       _pendingEstimates
         ..clear()

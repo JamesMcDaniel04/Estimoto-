@@ -1,0 +1,7 @@
+Estimoto+ build 14: receipt tasks, parts and refreshed costs
+
+Repair PDFs and receipt photos show their listed service tasks and parts on the Repairs page, beneath Recorded costs. Each entry links to its private receipts. Item amounts are shown for reference and never counted a second time.
+
+The main Refresh button now reloads receipt details and costs, including older receipts that have been re-read and records changed on another device. Existing manual costs are preserved. Unclear text is marked for review, and the receipt stays saved even when details cannot be read.
+
+Please test uploading PDF and photo receipts, reviewing work on Repairs, opening the original receipt, and refreshing after an entry changes. Switching vehicles or accounts must keep each vehicle's private work separate.

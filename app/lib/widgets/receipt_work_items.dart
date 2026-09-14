@@ -22,7 +22,7 @@ class ReceiptWorkItems extends StatelessWidget {
           ),
         if (items.isEmpty)
           const Text(
-            'Work details have not been read from this receipt yet. Open it to read details or review the original.',
+            'No work details are available for this receipt yet. Open it to read details or review the original.',
           ),
         for (final item in items)
           Padding(
