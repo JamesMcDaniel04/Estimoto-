@@ -1,3 +1,10 @@
+# Current web/API release — September 14, 2026
+
+The approved CRUD closure is deployed from `a01ee14` and the service is healthy
+at schema `b7f2c9d4e1a0`. Recent main commits were preserved.
+[Final verification and distribution limits](qa/2026-09-14-crud-final-verification.md).
+Native downloads remain on the previous build 11; the evidence below is historical.
+
 # Live customer preview — build 11, September 14, 2026
 
 Estimoto + build 11 is live on web and the permanent Android download, from
