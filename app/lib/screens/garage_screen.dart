@@ -1,5 +1,6 @@
 import 'calendar_screen.dart';
 import 'package:flutter/material.dart';
+import '../domain/models.dart';
 import '../state/plus_controller.dart';
 import '../theme.dart';
 import '../widgets/common.dart';
@@ -16,6 +17,38 @@ class GarageScreen extends StatelessWidget {
   const GarageScreen({super.key, required this.controller, this.onExit});
   final PlusController controller;
   final VoidCallback? onExit;
+
+  Future<void> _complete(BuildContext context, ServiceReminder reminder) async {
+    final messenger = ScaffoldMessenger.of(context);
+    try {
+      await controller.repository.completeReminder(reminder.id);
+      await controller.refresh();
+      messenger.showSnackBar(
+        SnackBar(
+          content: const Text('Reminder completed'),
+          duration: const Duration(seconds: 6),
+          action: SnackBarAction(
+            label: 'Undo',
+            onPressed: () async {
+              try {
+                await controller.repository.reopenReminder(reminder.id);
+                await controller.refresh();
+              } catch (e) {
+                messenger.showSnackBar(
+                  SnackBar(content: Text(PlusController.readableError(e))),
+                );
+              }
+            },
+          ),
+        ),
+      );
+    } catch (e) {
+      messenger.showSnackBar(
+        SnackBar(content: Text(PlusController.readableError(e))),
+      );
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
     final data = controller.snapshot!;
@@ -181,6 +214,8 @@ class GarageScreen extends StatelessWidget {
               children: [
                 for (final reminder in reminders)
                   ListTile(
+                    onTap: () =>
+                        addReminder(context, controller, reminder: reminder),
                     contentPadding: const EdgeInsets.symmetric(
                       horizontal: 18,
                       vertical: 7,
@@ -211,11 +246,7 @@ class GarageScreen extends StatelessWidget {
                     trailing: IconButton(
                       tooltip: 'Mark reminder complete',
                       icon: const Icon(Icons.check_circle_outline),
-                      onPressed: () => runAction(context, controller, () async {
-                        await controller.repository.completeReminder(
-                          reminder.id,
-                        );
-                      }, success: 'Reminder completed'),
+                      onPressed: () => _complete(context, reminder),
                     ),
                   ),
               ],

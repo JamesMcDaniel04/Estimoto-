@@ -18,12 +18,15 @@ Future<void> editProfile(BuildContext context, PlusController controller) =>
       isScrollControlled: true,
       builder: (_) => ProfileForm(controller: controller),
     );
-Future<void> addReminder(BuildContext context, PlusController controller) =>
-    showModalBottomSheet<void>(
-      context: context,
-      isScrollControlled: true,
-      builder: (_) => _ReminderForm(controller: controller),
-    );
+Future<void> addReminder(
+  BuildContext context,
+  PlusController controller, {
+  ServiceReminder? reminder,
+}) => showModalBottomSheet<void>(
+  context: context,
+  isScrollControlled: true,
+  builder: (_) => _ReminderForm(controller: controller, reminder: reminder),
+);
 
 class _VehicleForm extends StatefulWidget {
   const _VehicleForm({required this.controller, this.vehicle});
@@ -354,8 +357,9 @@ class _ProfileFormState extends State<ProfileForm> {
 }
 
 class _ReminderForm extends StatefulWidget {
-  const _ReminderForm({required this.controller});
+  const _ReminderForm({required this.controller, this.reminder});
   final PlusController controller;
+  final ServiceReminder? reminder;
   @override
   State<_ReminderForm> createState() => _ReminderFormState();
 }
@@ -366,6 +370,52 @@ class _ReminderFormState extends State<_ReminderForm> {
   DateTime? date;
   String? error;
   bool busy = false;
+  bool get editing => widget.reminder != null;
+  @override
+  void initState() {
+    super.initState();
+    final r = widget.reminder;
+    if (r != null) {
+      title.text = r.title;
+      if (r.dueMileage != null) mileage.text = r.dueMileage.toString();
+      if (r.dueDate.isNotEmpty) date = DateTime.tryParse(r.dueDate);
+    }
+  }
+
+  Future<void> remove() async {
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: const Text('Delete this reminder?'),
+        content: const Text('You can add it again any time.'),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context, false),
+            child: const Text('Keep'),
+          ),
+          TextButton(
+            onPressed: () => Navigator.pop(context, true),
+            child: const Text('Delete'),
+          ),
+        ],
+      ),
+    );
+    if (confirmed != true || !mounted) return;
+    setState(() => busy = true);
+    try {
+      await widget.controller.repository.deleteReminder(widget.reminder!.id);
+      await widget.controller.refresh();
+      if (mounted) Navigator.pop(context);
+    } catch (e) {
+      if (mounted) {
+        setState(() {
+          error = PlusController.readableError(e);
+          busy = false;
+        });
+      }
+    }
+  }
+
   @override
   void dispose() {
     title.dispose();
@@ -381,7 +431,7 @@ class _ReminderFormState extends State<_ReminderForm> {
       setState(() => error = 'Add a title and a valid date or mileage.');
       return;
     }
-    if (widget.controller.selectedVehicle == null) {
+    if (!editing && widget.controller.selectedVehicle == null) {
       setState(() => error = 'Choose a vehicle first.');
       return;
     }
@@ -390,12 +440,21 @@ class _ReminderFormState extends State<_ReminderForm> {
       error = null;
     });
     try {
-      await widget.controller.repository.addReminder({
-        'vehicle_id': widget.controller.selectedVehicle!.id,
+      final body = <String, dynamic>{
+        'vehicle_id':
+            widget.reminder?.vehicleId ?? widget.controller.selectedVehicle!.id,
         'title': title.text.trim(),
         'due_date': date?.toIso8601String().substring(0, 10),
         'due_mileage': miles,
-      });
+      };
+      if (editing) {
+        await widget.controller.repository.updateReminder(
+          widget.reminder!.id,
+          body,
+        );
+      } else {
+        await widget.controller.repository.addReminder(body);
+      }
       await widget.controller.refresh();
       if (mounted) Navigator.pop(context);
     } catch (e) {
@@ -410,12 +469,14 @@ class _ReminderFormState extends State<_ReminderForm> {
 
   @override
   Widget build(BuildContext context) => FormSheet(
-    title: 'Add a reminder',
+    title: editing ? 'Edit reminder' : 'Add a reminder',
     child: Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        VehiclePicker(controller: widget.controller),
-        const SizedBox(height: 16),
+        if (!editing) ...[
+          VehiclePicker(controller: widget.controller),
+          const SizedBox(height: 16),
+        ],
         TextField(
           controller: title,
           maxLength: 120,
@@ -457,6 +518,13 @@ class _ReminderFormState extends State<_ReminderForm> {
             ),
           ),
         BusyButton(busy: busy, label: 'Save reminder', onPressed: save),
+        if (editing)
+          Center(
+            child: TextButton(
+              onPressed: busy ? null : remove,
+              child: const Text('Delete reminder'),
+            ),
+          ),
       ],
     ),
   );
