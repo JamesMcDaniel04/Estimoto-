@@ -1,3 +1,13 @@
+# Current release — build 12, September 14, 2026
+
+Web/API and signed native build 12 use `c66ecb4c8b2a47da572bd9659825dd14b6c2a79f`. `/ready` reports schema `d9e4b82013c7`; served JavaScript and public APK hashes match the release artifacts. [Verification](qa/2026-09-14-build12-verification.md) · [Artifacts and provider state](releases/2026-09-14-build12.json).
+
+Receipt PDF/photo totals populate empty Recorded costs, with existing-value protection and explicit replacement review. Dynamic vehicle, ZIP and name search controls are published to Android and internally to iOS. Backend 471 passed / 7 optional skips, Flutter 252 passed, analysis clean and capture-web 19 passed.
+
+Open delivery gates: Google Cloud account verification and Places activation (New York public search still fails); external Apple beta review; physical-device proof. These are not source/test closure claims.
+
+## Historical updates before build 12
+
 # Find Help update — September 14, 2026
 
 Web/API source `1e199ac` is deployed with dynamic vehicle matching, separate

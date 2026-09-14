@@ -1,0 +1,75 @@
+{
+  "date": "2026-09-14",
+  "product": "Estimoto +",
+  "version": "0.1.0+12",
+  "source_sha": "c66ecb4c8b2a47da572bd9659825dd14b6c2a79f",
+  "schema_revision": "d9e4b82013c7",
+  "web_sha256": "f0bf430ce19e7eea450a9e88273b1d069e838e99020a254818c8bf448ffa6583",
+  "artifacts": [
+    {
+      "kind": "APK",
+      "bytes": 62927303,
+      "sha256": "ba7de89b7c7f94d7e190bd57f1fb0f1d8f8595a28281157f5dfe0de8398bf4b5"
+    },
+    {
+      "kind": "AAB",
+      "bytes": 60610944,
+      "sha256": "2d3098227ad129aa5416e7aad0b9ea0a9a8fa9764d22c4df84e71b9a59956175"
+    },
+    {
+      "kind": "IPA",
+      "bytes": 25967532,
+      "sha256": "c4b82b24bdfb97d858ca13a4325da24287e3e99b3069a41f65d22d11bc1dfbd1"
+    }
+  ],
+  "android": {
+    "publication": "direct APK",
+    "url": "https://estimoto-plus-api.fly.dev/android/download",
+    "signer_sha256": "e6d106fccc6c0e77e04a46c64f8edffdafb11b502d4857e51606c725086581dd",
+    "actual_public_download_hash_verified": true,
+    "upgrade_from_build": 11,
+    "emulator_installed_version": 12,
+    "native_pdf_picker_recorded_cost_cents": 170348
+  },
+  "ios": {
+    "app_id": "6811678079",
+    "build_id": "5185d4d6-61c3-4ab1-8760-b48997e3ef73",
+    "processing": "VALID",
+    "internal": "IN_BETA_TESTING",
+    "external": "READY_FOR_BETA_SUBMISSION",
+    "notes_characters": 1080,
+    "both_groups_attached": true,
+    "review_attempt": "422 ENTITY_UNPROCESSABLE.ANOTHER_BUILD_IN_REVIEW"
+  },
+  "checks": {
+    "backend_passed": 471,
+    "backend_skipped": 7,
+    "app_passed": 252,
+    "analysis": "passed",
+    "capture_web_passed": 19,
+    "all_surface_build": "passed",
+    "live_version_ready_web_hash": "passed",
+    "live_pdf_cents": 170348,
+    "live_photo_ocr_cents": 10825,
+    "browser_manual_cost_replacement_review": "passed",
+    "native_pdf_upload_history_refresh": "passed",
+    "duplicate_upload_does_not_double_cost": "passed",
+    "private_bytes_and_anonymous_401": "passed",
+    "synthetic_account_files_rows_cleaned": true,
+    "removed_token_read_and_write_401": true
+  },
+  "discovery": {
+    "toyota_80229": "The ToyShop; selected Toyota match",
+    "audi_80229": "Bluewater Performance and EuroWerkz; selected Audi match",
+    "new_york_10001": "public provider unavailable; explicit partial-results state",
+    "google_places_implemented": true,
+    "google_places_activated": false,
+    "activation_blocker": "Google Cloud account verification pending"
+  },
+  "not_proven": [
+    "Google Places live five-city nationwide coverage",
+    "external iOS build12 distribution",
+    "physical device calling or installation",
+    "Google Play distribution"
+  ]
+}

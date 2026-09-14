@@ -1,4 +1,14 @@
-# Mobile customer preview — build 11
+# Mobile customer preview — build 12
+
+Package `io.estimoto.plus`, source `c66ecb4c8b2a47da572bd9659825dd14b6c2a79f`.
+[Download latest Android](https://estimoto-plus-api.fly.dev/android/download) · [Build-12 evidence](releases/2026-09-14-build12.json) · [Verification](qa/2026-09-14-build12-verification.md) · [Notes](releases/0.1.0-12-beta-notes.md)
+
+Receipt totals now populate empty Recorded costs from private PDF/photo parsing. Build 12 also publishes the dynamic vehicle/ZIP/name discovery controls and completed CRUD improvements. The exact public Android APK was hash-verified and upgraded over 11 on an emulator; native PDF selection, upload, parsed total and refreshed history passed.
+
+iOS 12 is VALID internally with exact notes and both groups. External submission remains blocked by another build in review. Google Places activation still needs Google Cloud account verification; nationwide live coverage remains unverified. Physical-device installation and Google Play publication are separate.
+
+## Historical build 11
+
 
 Package `io.estimoto.plus`, source `9c53dd85889938dd40a8195b89dc4a43bc98f4f9`.
 [Download latest Android](https://estimoto-plus-api.fly.dev/android/download) ·
