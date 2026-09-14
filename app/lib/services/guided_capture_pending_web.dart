@@ -62,8 +62,9 @@ class IndexedDbGuidedCapturePendingStore implements GuidedCapturePendingStore {
   Future<T> _transaction<T>(
     String ownerId,
     String mode,
-    T Function(web.IDBObjectStore, String?, String) action,
-  ) async {
+    T Function(web.IDBObjectStore, String?, String) action, {
+    bool discardWrongType = false,
+  }) async {
     final key = guidedCaptureStorageKey(ownerId);
     try {
       final db = await _open();
@@ -103,28 +104,57 @@ class IndexedDbGuidedCapturePendingStore implements GuidedCapturePendingStore {
 
       transaction.onabort = failed.toJS;
       transaction.onerror = failed.toJS;
+      void abort(Object error) {
+        failure = error is GuidedCapturePendingException
+            ? error
+            : const GuidedCapturePendingException(
+                GuidedCapturePendingFailure.storage,
+              );
+        transaction.abort();
+      }
+
+      void accept(JSAny? value, {required bool present}) {
+        try {
+          if (present && (value == null || !value.isA<JSString>())) {
+            if (!discardWrongType) {
+              throw const GuidedCapturePendingException(
+                GuidedCapturePendingFailure.corrupt,
+              );
+            }
+            // Only explicit current-owner recovery may remove this malformed
+            // value. Normal reads, writes and compare-clear still reject it.
+            store.delete(key.toJS);
+            result = true as T;
+          } else {
+            result = action(
+              store,
+              present ? (value as JSString).toDart : null,
+              key,
+            );
+          }
+          completedRead = true;
+        } catch (error) {
+          abort(error);
+        }
+      }
+
       final request = store.get(key.toJS);
       request.onsuccess = ((web.Event _) {
         try {
           final value = request.result;
-          if (value != null && !value.isA<JSString>()) {
-            throw const GuidedCapturePendingException(
-              GuidedCapturePendingFailure.corrupt,
-            );
+          if (value == null) {
+            // IndexedDB returns undefined both for a missing key and for a
+            // stored undefined/null value. Check key existence within this
+            // same transaction so corrupt nulls cannot masquerade as absence.
+            final existence = store.getKey(key.toJS);
+            existence.onsuccess = ((web.Event _) {
+              accept(value, present: existence.result != null);
+            }).toJS;
+          } else {
+            accept(value, present: true);
           }
-          result = action(
-            store,
-            value == null ? null : (value as JSString).toDart,
-            key,
-          );
-          completedRead = true;
         } catch (error) {
-          failure = error is GuidedCapturePendingException
-              ? error
-              : const GuidedCapturePendingException(
-                  GuidedCapturePendingFailure.storage,
-                );
-          transaction.abort();
+          abort(error);
         }
       }).toJS;
       // Success is reported only by transaction completion, never request.put.
@@ -193,5 +223,5 @@ class IndexedDbGuidedCapturePendingStore implements GuidedCapturePendingStore {
           return true;
         }
         return false;
-      });
+      }, discardWrongType: true);
 }
