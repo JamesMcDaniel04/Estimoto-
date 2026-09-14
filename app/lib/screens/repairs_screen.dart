@@ -4,6 +4,7 @@ import '../state/plus_controller.dart';
 import '../theme.dart';
 import '../widgets/common.dart';
 import 'request_sheet.dart';
+import '../widgets/history_cost_summary.dart';
 import '../services/calendar_time.dart';
 import '../widgets/calendar_booking_details.dart';
 
@@ -19,6 +20,7 @@ class RepairsScreen extends StatelessWidget {
           'Every step, in view.',
           'Follow your repairs and service requests.',
         ),
+        HistoryCostSummary(controller: controller),
         if (controller.pendingRequest != null)
           Padding(
             padding: const EdgeInsets.only(bottom: 18),

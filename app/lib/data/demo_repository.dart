@@ -5,6 +5,8 @@ import '../domain/models.dart';
 import 'demo_seed.dart';
 import 'repository.dart';
 import '../services/calendar_time.dart';
+import '../services/receipt_api.dart';
+import '../services/receipt_pending.dart';
 import 'package:timezone/timezone.dart' as tz;
 
 /// Isolated, fictional workspace. It never calls an external service.
@@ -14,6 +16,12 @@ class DemoPlusRepository extends PlusRepository {
   final _shops = <Json>[];
   final _outreach = <Json>[];
   final _history = <Json>[];
+  final _receiptBytes = <String, Uint8List>{};
+  @override
+  ReceiptApi openReceiptRecord(
+    String recordId, {
+    required bool Function() isCurrent,
+  }) => _DemoReceiptApi(this, recordId, isCurrent);
   final _vehicleImages = <String, VehiclePhoto>{};
 
   final _dedicated = <String, Json>{};
@@ -377,6 +385,34 @@ class DemoPlusRepository extends PlusRepository {
     return row;
   });
   @override
+  Future<Json> lookupVehicleValue(
+    String vehicleId,
+    Json body, {
+    required bool Function() isCurrent,
+  }) async {
+    if (!isCurrent()) {
+      throw const PlusApiException('Your account changed.', 401);
+    }
+    _find('vehicles', vehicleId);
+    return {
+      'vehicle_id': vehicleId,
+      'status': 'unavailable',
+      'provider': 'CarsXE',
+      'currency': 'USD',
+      ...body,
+      'buckets': <Json>[],
+      'history': {
+        'records_count': _history
+            .where((r) => r['vehicle_id'] == vehicleId)
+            .length,
+        'factors': <String>[],
+      },
+      'message':
+          'Live vehicle value estimates are unavailable in the demo. Your documented history is still available.',
+    };
+  }
+
+  @override
   Future<Json> getKnowledge() async => {
     'records': _history.reversed.map(_copy).toList(),
     'preferences': {'share_aggregate_insights': _shareInsights},
@@ -389,6 +425,8 @@ class DemoPlusRepository extends PlusRepository {
           ..._copy(body),
           'id': _id(),
           'source': 'customer_reported',
+          'currency': 'USD',
+          'receipts': <Json>[],
           'created_at': DateTime.now().toIso8601String(),
         };
         _history.add(record);
@@ -740,5 +778,67 @@ class DemoPlusRepository extends PlusRepository {
       'specialty': specialty,
       'videos': videos,
     });
+  }
+}
+
+class _DemoReceiptApi extends ReceiptApi {
+  _DemoReceiptApi(this.repository, this.recordId, this.isCurrent);
+  final DemoPlusRepository repository;
+  final String recordId;
+  final bool Function() isCurrent;
+  Json record() {
+    if (!isCurrent()) {
+      throw const PlusApiException('Sign in again to continue.', 401);
+    }
+    return repository._workspaceFind(repository._history, recordId);
+  }
+
+  @override
+  Future<Json> upload(ReceiptPending value) async {
+    final row = record();
+    return repository._once(
+      'receipt:${value.operationId}',
+      {
+        'record_id': recordId,
+        'sha256': value.sha256,
+        'filename': value.filename,
+      },
+      () {
+        final receipts = row['receipts'] as List;
+        if (receipts.length >= 10) {
+          throw const PlusApiException(
+            'This entry already has 10 receipts.',
+            422,
+          );
+        }
+        final id = repository._id();
+        final result = <String, dynamic>{
+          'id': id,
+          'filename': value.filename,
+          'content_type': value.mimeType,
+          'byte_size': value.bytes.length,
+          'created_at': DateTime.now().toIso8601String(),
+        };
+        receipts.add(result);
+        repository._receiptBytes[id] = Uint8List.fromList(value.bytes);
+        return result;
+      },
+    );
+  }
+
+  @override
+  Future<Uint8List> read(String id) async {
+    final row = record();
+    if (!rowsOf(row, 'receipts').any((r) => r['id'] == id)) {
+      throw const PlusApiException('Receipt unavailable.', 404);
+    }
+    return Uint8List.fromList(repository._receiptBytes[id]!);
+  }
+
+  @override
+  Future<void> delete(String id) async {
+    final row = record();
+    (row['receipts'] as List).removeWhere((r) => r['id'] == id);
+    repository._receiptBytes.remove(id);
   }
 }

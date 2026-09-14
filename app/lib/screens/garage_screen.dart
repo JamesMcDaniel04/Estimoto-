@@ -9,6 +9,7 @@ import 'garage_forms.dart';
 import 'estimate_forms.dart';
 import 'my_shops_screen.dart';
 import 'history_screen.dart';
+import 'vehicle_value_screen.dart';
 
 class GarageScreen extends StatelessWidget {
   const GarageScreen({super.key, required this.controller});
@@ -316,12 +317,27 @@ class GarageScreen extends StatelessWidget {
               const Divider(height: 1),
               ListTile(
                 leading: const Icon(
+                  Icons.price_check_outlined,
+                  color: PlusColors.blue,
+                ),
+                title: const Text('Vehicle value'),
+                subtitle: const Text(
+                  'Market estimates and your documented care',
+                ),
+                trailing: const Icon(Icons.chevron_right),
+                onTap: controller.selectedVehicle == null
+                    ? null
+                    : () => openVehicleValue(context, controller),
+              ),
+              const Divider(height: 1),
+              ListTile(
+                leading: const Icon(
                   Icons.history_outlined,
                   color: PlusColors.blue,
                 ),
-                title: const Text('Service history'),
+                title: const Text('Service history & receipts'),
                 subtitle: const Text(
-                  'Service, parts and the details you remember',
+                  'Past repairs, maintenance, modifications and costs',
                 ),
                 trailing: const Icon(Icons.chevron_right),
                 onTap: () => openVehicleHistory(context, controller),

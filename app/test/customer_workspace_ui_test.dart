@@ -334,6 +334,9 @@ void main() {
         'Local parts store',
       );
       expect(history['preferences'], {'share_aggregate_insights': false});
+      expect(find.text('Choose PDF'), findsOneWidget);
+      await tester.pageBack();
+      await tester.pumpAndSettle();
       await _tap(tester, find.byKey(const Key('insights-consent')));
       expect((await controller.repository.getKnowledge())['preferences'], {
         'share_aggregate_insights': true,

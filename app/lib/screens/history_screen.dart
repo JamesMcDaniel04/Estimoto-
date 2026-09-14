@@ -5,6 +5,9 @@ import '../state/plus_controller.dart';
 import '../widgets/common.dart';
 import '../widgets/workspace_widgets.dart';
 import 'garage_forms.dart';
+import 'history_receipts_screen.dart';
+import '../services/receipt_pending.dart';
+import '../services/receipt_upload.dart';
 
 void openVehicleHistory(BuildContext context, PlusController controller) {
   Navigator.of(context).push(
@@ -28,6 +31,7 @@ class _HistoryScreenState extends WorkspaceState<HistoryScreen> {
   bool loading = true, loaded = false, share = false, pendingRecord = false;
   bool? uncertainPreference;
   int generation = 0;
+  ReceiptPending? pendingReceipt;
   @override
   void initState() {
     super.initState();
@@ -45,6 +49,11 @@ class _HistoryScreenState extends WorkspaceState<HistoryScreen> {
       final values = await Future.wait<Object?>([
         controller.repository.getKnowledge(),
         workspace.pending('history-record'),
+        controller.isDemo
+            ? Future<ReceiptPending?>.value()
+            : createReceiptPendingStore()
+                  .read(workspace.customerId)
+                  .catchError((Object _) => null),
       ]);
       if (!active || run != generation) return;
       final data = values[0] as Json;
@@ -54,6 +63,7 @@ class _HistoryScreenState extends WorkspaceState<HistoryScreen> {
         share =
             (data['preferences'] as Map?)?['share_aggregate_insights'] == true;
         pendingRecord = values[1] != null;
+        pendingReceipt = values[2] as ReceiptPending?;
         uncertainPreference = null;
       });
     } catch (e) {
@@ -72,9 +82,21 @@ class _HistoryScreenState extends WorkspaceState<HistoryScreen> {
   }
 
   Future<void> add() async {
+    final saved = await Navigator.of(context).push<Json>(
+      MaterialPageRoute<Json>(
+        builder: (_) => HistoryEditor(controller: controller),
+      ),
+    );
+    if (active && saved != null) await openReceipts(textOf(saved, 'id'));
+    if (active) await load();
+  }
+
+  Future<void> openReceipts(String id) async {
+    if (!active) return;
     await Navigator.of(context).push(
       MaterialPageRoute<void>(
-        builder: (_) => HistoryEditor(controller: controller),
+        builder: (_) =>
+            HistoryReceiptsScreen(controller: controller, recordId: id),
       ),
     );
     if (active) await load();
@@ -120,7 +142,10 @@ class _HistoryScreenState extends WorkspaceState<HistoryScreen> {
     if (confirmed != true || !active) return;
     await perform(() async {
       await controller.repository.deleteKnowledgeRecord(record['id'] as String);
-      if (active) await load();
+      if (active) {
+        controller.historyChanged();
+        await load();
+      }
     });
   }
 
@@ -133,7 +158,7 @@ class _HistoryScreenState extends WorkspaceState<HistoryScreen> {
         .toList();
     return Scaffold(
       appBar: AppBar(
-        title: const Text('Service history'),
+        title: const Text('Service history & receipts'),
         actions: [
           IconButton(
             tooltip: 'Refresh service history',
@@ -146,7 +171,7 @@ class _HistoryScreenState extends WorkspaceState<HistoryScreen> {
         children: [
           const PageHeading(
             'The story of your car.',
-            'Keep track of service, parts and the shops you used. These are your own records, not verified service or purchase reports.',
+            'Save past repairs, maintenance and modifications with receipts, costs and parts details. These are your own records.',
           ),
           VehiclePicker(controller: controller),
           const SizedBox(height: 18),
@@ -171,6 +196,63 @@ class _HistoryScreenState extends WorkspaceState<HistoryScreen> {
               padding: EdgeInsets.all(24),
               child: Center(child: CircularProgressIndicator()),
             ),
+          if (pendingReceipt != null)
+            Card(
+              child: ListTile(
+                leading: const Icon(Icons.upload_file_outlined),
+                title: const Text('A receipt is waiting to finish'),
+                subtitle: const Text(
+                  'Review the original entry to retry its saved attachment.',
+                ),
+                trailing: const Icon(Icons.chevron_right),
+                onTap: busy
+                    ? null
+                    : () => openReceipts(pendingReceipt!.recordId),
+              ),
+            ),
+          if (visible.any((r) => r['cost_cents'] is int)) ...[
+            const SectionHeading('Documented costs'),
+            Card(
+              child: Padding(
+                padding: const EdgeInsets.all(20),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    for (final category in [
+                      'Repairs',
+                      'Maintenance',
+                      'Modifications',
+                      'Other',
+                    ])
+                      ReviewBlock(
+                        category,
+                        receiptCost(
+                          visible
+                              .where(
+                                (r) =>
+                                    historyCategory(
+                                      textOf(r, 'service_type'),
+                                    ) ==
+                                    category,
+                              )
+                              .fold<int>(
+                                0,
+                                (sum, r) =>
+                                    sum +
+                                    (r['cost_cents'] is int
+                                        ? r['cost_cents'] as int
+                                        : 0),
+                              ),
+                        ),
+                      ),
+                    const Text(
+                      'Your recorded spending in USD. Costs are not an estimate of resale value.',
+                    ),
+                  ],
+                ),
+              ),
+            ),
+          ],
           const SectionHeading('Your service records'),
           if (!loading && visible.isEmpty)
             const EmptyState(
@@ -222,7 +304,22 @@ class _HistoryScreenState extends WorkspaceState<HistoryScreen> {
                         ),
                       if (textOf(record, 'notes').isNotEmpty)
                         ReviewBlock('Your notes', textOf(record, 'notes')),
+                      if (record['cost_cents'] is int)
+                        ReviewBlock(
+                          'Recorded total (USD)',
+                          receiptCost(record['cost_cents'] as int),
+                        ),
                       const StatusPill('Added by you'),
+                      const SizedBox(height: 12),
+                      OutlinedButton.icon(
+                        onPressed: busy
+                            ? null
+                            : () => openReceipts(textOf(record, 'id')),
+                        icon: const Icon(Icons.receipt_long_outlined),
+                        label: Text(
+                          'Receipts (${rowsOf(record, 'receipts').length}) · View or add',
+                        ),
+                      ),
                     ],
                   ),
                 ),
@@ -296,6 +393,7 @@ class _HistoryEditorState extends WorkspaceState<HistoryEditor> {
     super.initState();
     for (final key in [
       'mileage',
+      'cost_cents',
       'shop_name',
       'parts_source',
       'parts_description',
@@ -318,7 +416,10 @@ class _HistoryEditorState extends WorkspaceState<HistoryEditor> {
           type = textOf(saved.body, 'service_type');
           date = DateTime.parse(textOf(saved.body, 'service_date'));
           for (final entry in fields.entries) {
-            entry.value.text = saved.body[entry.key]?.toString() ?? '';
+            entry.value.text =
+                entry.key == 'cost_cents' && saved.body[entry.key] is int
+                ? receiptCost(saved.body[entry.key] as int).substring(1)
+                : saved.body[entry.key]?.toString() ?? '';
           }
         }
         restoring = false;
@@ -369,11 +470,16 @@ class _HistoryEditorState extends WorkspaceState<HistoryEditor> {
             for (final entry in fields.entries)
               entry.key: entry.key == 'mileage'
                   ? int.tryParse(entry.value.text.trim())
+                  : entry.key == 'cost_cents'
+                  ? parseReceiptCost(entry.value.text)
                   : entry.value.text.trim(),
           };
       try {
-        await workspace.addHistory(body);
-        if (mounted && active) Navigator.pop(context);
+        final result = await workspace.addHistory(body);
+        if (mounted && active) {
+          controller.historyChanged();
+          Navigator.pop(context, result);
+        }
       } catch (_) {
         if (active) {
           final saved = await workspace.pending('history-record');
@@ -398,7 +504,7 @@ class _HistoryEditorState extends WorkspaceState<HistoryEditor> {
         children: [
           const PageHeading(
             'Remember the details.',
-            'Save work that has already happened. Leave anything you don’t know blank.',
+            'Save work that has already happened. Add receipt photos or PDFs after saving this entry. Leave unknown details blank.',
           ),
           if (pending != null)
             const Padding(
@@ -446,6 +552,8 @@ class _HistoryEditorState extends WorkspaceState<HistoryEditor> {
                       'brakes',
                       'battery',
                       'maintenance',
+                      'repair',
+                      'modification',
                       'diagnostics',
                       'collision',
                       'pdr',
@@ -486,10 +594,13 @@ class _HistoryEditorState extends WorkspaceState<HistoryEditor> {
                       maxLines: key == 'notes' ? 4 : 1,
                       keyboardType: key == 'mileage'
                           ? TextInputType.number
+                          : key == 'cost_cents'
+                          ? const TextInputType.numberWithOptions(decimal: true)
                           : TextInputType.text,
                       decoration: InputDecoration(
                         labelText: const {
                           'mileage': 'Mileage (optional)',
+                          'cost_cents': 'Total cost in USD (optional)',
                           'shop_name': 'Shop or DIY (optional)',
                           'parts_source':
                               'Where the parts came from (optional)',
@@ -498,13 +609,21 @@ class _HistoryEditorState extends WorkspaceState<HistoryEditor> {
                         }[key],
                         counterText: '',
                       ),
-                      validator: (value) =>
-                          key == 'mileage' &&
-                              value!.trim().isNotEmpty &&
-                              (int.tryParse(value.trim()) == null ||
-                                  int.parse(value.trim()) < 0)
-                          ? 'Enter mileage as a whole number.'
-                          : null,
+                      validator: (value) {
+                        if (key == 'cost_cents') {
+                          try {
+                            parseReceiptCost(value ?? '');
+                          } on FormatException {
+                            return 'Enter USD 0–1,000,000 with up to two decimal places.';
+                          }
+                        }
+                        return key == 'mileage' &&
+                                value!.trim().isNotEmpty &&
+                                (int.tryParse(value.trim()) == null ||
+                                    int.parse(value.trim()) < 0)
+                            ? 'Enter mileage as a whole number.'
+                            : null;
+                      },
                     ),
                   ),
                 if (error != null) WorkspaceError(error!),

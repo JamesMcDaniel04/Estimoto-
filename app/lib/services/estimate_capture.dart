@@ -28,6 +28,7 @@ class PendingEstimateCapture {
     targetKind: switch (data['target_kind']) {
       null || 'estimate' => 'estimate',
       'vehicle' => 'vehicle',
+      'receipt' => 'receipt',
       _ => throw const FormatException('Unknown photo destination'),
     },
     localPath: data['local_path'] as String?,

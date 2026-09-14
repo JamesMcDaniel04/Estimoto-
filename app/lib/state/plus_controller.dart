@@ -48,6 +48,12 @@ class PlusController extends ChangeNotifier {
   String? error;
   String? selectedVehicleId;
   int tab = 0;
+  int historyRevision = 0;
+  void historyChanged() {
+    historyRevision++;
+    _notify();
+  }
+
   String discipline = 'pdr';
   final List<ChatEntry> messages = [];
   bool _disposed = false;

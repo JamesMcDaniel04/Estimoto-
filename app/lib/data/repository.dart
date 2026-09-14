@@ -1,6 +1,7 @@
 import 'dart:typed_data';
 import '../domain/models.dart';
 import '../services/guided_capture_api.dart';
+import '../services/receipt_api.dart';
 
 class PlusApiException implements Exception {
   const PlusApiException(this.message, [this.statusCode, this.code]);
@@ -18,6 +19,20 @@ abstract class PlusRepository {
     required bool Function() isCurrent,
   }) => throw const PlusApiException(
     'The guided camera is unavailable in this preview.',
+  );
+  ReceiptApi openReceiptRecord(
+    String recordId, {
+    required bool Function() isCurrent,
+  }) => throw const PlusApiException(
+    'Receipt uploads are unavailable in this preview.',
+  );
+  Future<Json> lookupVehicleValue(
+    String vehicleId,
+    Json body, {
+    required bool Function() isCurrent,
+  }) => throw const PlusApiException(
+    'Vehicle value estimates are currently unavailable.',
+    503,
   );
   Future<PlusSnapshot> bootstrap();
   Future<Json> saveProfile(Json body);

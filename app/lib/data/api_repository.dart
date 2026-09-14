@@ -6,6 +6,8 @@ import 'package:http_parser/http_parser.dart';
 import '../domain/models.dart';
 import 'repository.dart';
 import '../services/calendar_errors.dart';
+import '../services/receipt_api.dart';
+import '../services/receipt_pending.dart';
 import '../services/guided_capture_api.dart';
 import '../services/guided_capture_pending.dart';
 
@@ -58,6 +60,12 @@ class ApiPlusRepository extends PlusRepository {
     return _ApiGuidedCapture(this, estimateId, isCurrent);
   }
 
+  @override
+  ReceiptApi openReceiptRecord(
+    String recordId, {
+    required bool Function() isCurrent,
+  }) => _ApiReceiptRecord(this, recordId, isCurrent);
+
   Future<Map<String, String>> _headers() async {
     final accessToken = await token();
     if (accessToken == null || accessToken.isEmpty) {
@@ -75,10 +83,22 @@ class ApiPlusRepository extends PlusRepository {
     Json? body,
     String? idempotencyKey,
     bool collection = false,
+    bool Function()? isCurrent,
     Duration timeout = const Duration(seconds: 20),
   }) async {
+    void check() {
+      if (isCurrent != null && !isCurrent()) {
+        throw const PlusApiException(
+          'Your vehicle or account changed. Reopen this page to continue.',
+          401,
+        );
+      }
+    }
+
+    check();
     final request = http.Request(method, baseUri.resolve(path));
     request.headers.addAll(await _headers());
+    check();
     if (body != null) {
       request.headers['Content-Type'] = 'application/json';
       request.body = jsonEncode(body);
@@ -91,6 +111,7 @@ class ApiPlusRepository extends PlusRepository {
       final response = await http.Response.fromStream(
         await _client.send(request).timeout(timeout),
       ).timeout(timeout);
+      check();
       return _decode(response, collection: collection);
     } on TimeoutException {
       throw const PlusApiException(
@@ -538,6 +559,18 @@ class ApiPlusRepository extends PlusRepository {
     idempotencyKey: idempotencyKey,
   );
   @override
+  Future<Json> lookupVehicleValue(
+    String vehicleId,
+    Json body, {
+    required bool Function() isCurrent,
+  }) => _send(
+    'POST',
+    '/v1/vehicles/${Uri.encodeComponent(vehicleId)}/valuation',
+    body: body,
+    isCurrent: isCurrent,
+    timeout: const Duration(seconds: 45),
+  );
+  @override
   Future<Json> getKnowledge() => _send('GET', '/v1/knowledge');
   @override
   Future<Json> addKnowledgeRecord(Json body, String idempotencyKey) => _send(
@@ -755,4 +788,120 @@ class _ApiGuidedCapture extends GuidedCaptureApi {
     '/help',
     body: {'capture_key': captureKey, 'question': question},
   );
+}
+
+class _ApiReceiptRecord extends ReceiptApi {
+  _ApiReceiptRecord(this.repository, this.recordId, this.isCurrent);
+  final ApiPlusRepository repository;
+  final String recordId;
+  final bool Function() isCurrent;
+  void check() {
+    if (!isCurrent()) {
+      throw const PlusApiException(
+        'Your account changed. Reopen your history to continue.',
+        401,
+      );
+    }
+  }
+
+  Future<http.Response> request(
+    String method, {
+    String? receiptId,
+    ReceiptPending? upload,
+  }) async {
+    check();
+    final headers = await repository._headers();
+    check();
+    final path =
+        '/v1/knowledge/records/${Uri.encodeComponent(recordId)}/receipts${receiptId == null ? '' : '/${Uri.encodeComponent(receiptId)}'}';
+    final uri = repository.baseUri.resolve(path);
+    final http.BaseRequest outgoing;
+    if (upload != null) {
+      if (upload.recordId != recordId) {
+        throw const PlusApiException(
+          'Open the original history entry for this receipt.',
+          409,
+        );
+      }
+      outgoing = http.MultipartRequest(method, uri)
+        ..files.add(
+          http.MultipartFile.fromBytes(
+            'file',
+            upload.bytes,
+            filename: upload.filename,
+            contentType: MediaType.parse(upload.mimeType),
+          ),
+        );
+      headers['Idempotency-Key'] = upload.operationId;
+    } else {
+      outgoing = http.Request(method, uri);
+    }
+    outgoing.headers.addAll(headers);
+    outgoing.followRedirects = false;
+    check();
+    try {
+      final response = await repository._client
+          .send(outgoing)
+          .timeout(const Duration(seconds: 60));
+      check();
+      final buffer = BytesBuilder(copy: false);
+      await for (final chunk in response.stream.timeout(
+        const Duration(seconds: 15),
+      )) {
+        check();
+        if (buffer.length + chunk.length > maxReceiptBytes) {
+          throw const PlusApiException(
+            'This receipt is too large to open.',
+            413,
+          );
+        }
+        buffer.add(chunk);
+      }
+      check();
+      final result = http.Response.bytes(
+        buffer.takeBytes(),
+        response.statusCode,
+        headers: response.headers,
+      );
+      if (result.statusCode >= 300) {
+        throw PlusApiException(switch (result.statusCode) {
+          401 => 'Your session ended. Sign in again to open your receipts.',
+          403 || 404 => 'This history entry or receipt is no longer available.',
+          409 =>
+            'This saved upload conflicts with an earlier file. Refresh your receipts before discarding it.',
+          410 =>
+            'This receipt was deleted. Discard the saved upload to choose another file.',
+          413 => 'Choose a receipt no larger than 10 MB.',
+          415 => 'Choose a readable JPEG, PNG, WebP or PDF receipt.',
+          422 =>
+            'This entry already has 10 receipts. Delete one before adding another.',
+          429 => 'Please wait a moment, then retry the same saved receipt.',
+          _ =>
+            'The receipt could not be saved or opened. Retry when your connection is available.',
+        }, result.statusCode);
+      }
+      return result;
+    } on TimeoutException {
+      throw const PlusApiException(
+        'The receipt connection timed out. Retry the same saved file.',
+        408,
+      );
+    } on http.ClientException {
+      throw const PlusApiException(
+        'The connection was interrupted. Retry the same saved receipt.',
+        503,
+      );
+    }
+  }
+
+  @override
+  Future<Json> upload(ReceiptPending value) async =>
+      repository._decode(await request('POST', upload: value));
+  @override
+  Future<Uint8List> read(String receiptId) async =>
+      (await request('GET', receiptId: receiptId)).bodyBytes;
+  @override
+  Future<void> delete(String receiptId) async {
+    await request('DELETE', receiptId: receiptId);
+  }
 }

@@ -143,6 +143,8 @@ String serviceName(String value) =>
       'brakes': 'Brakes',
       'battery': 'Battery',
       'maintenance': 'Maintenance',
+      'repair': 'Repair',
+      'modification': 'Modification',
       'diagnostics': 'Diagnostics',
       'collision': 'Collision repair',
       'pdr': 'Dent repair',
