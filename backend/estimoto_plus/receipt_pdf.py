@@ -80,7 +80,8 @@ def inert_object_graph(root):
 def main():
     resource.setrlimit(resource.RLIMIT_CPU, (3, 3))
     if sys.platform == "linux":
-        resource.setrlimit(resource.RLIMIT_AS, (512 * 1024 * 1024, 512 * 1024 * 1024))
+        # Two parser slots share the 1 GB service with raster decoding/API work.
+        resource.setrlimit(resource.RLIMIT_AS, (256 * 1024 * 1024, 256 * 1024 * 1024))
     from pypdf import PdfReader
     data = sys.stdin.buffer.read(10 * 1024 * 1024 + 1)
     if not data.startswith(b"%PDF-") or len(data) > 10 * 1024 * 1024:
