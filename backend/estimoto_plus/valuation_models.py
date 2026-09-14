@@ -1,0 +1,25 @@
+"""Private, bounded valuation cache; never store credentials or raw provider input."""
+from datetime import datetime
+from sqlalchemy import DateTime, ForeignKey, Integer, JSON, String
+from sqlalchemy.orm import Mapped, mapped_column
+from .models import Base
+
+
+class VehicleValuationCache(Base):
+    __tablename__ = 'vehicle_valuation_cache'
+    vehicle_id: Mapped[str] = mapped_column(ForeignKey('vehicles.id', ondelete='CASCADE'), primary_key=True)
+    customer_id: Mapped[str] = mapped_column(ForeignKey('customers.id', ondelete='CASCADE'), index=True)
+    input_hash: Mapped[str] = mapped_column(String(64))
+    payload: Mapped[dict | None] = mapped_column(JSON, nullable=True)
+    fetched_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+    retry_at: Mapped[datetime] = mapped_column(DateTime(timezone=True))
+    lease_token: Mapped[str | None] = mapped_column(String(36), nullable=True)
+    lease_until: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+
+
+class ValuationProviderState(Base):
+    __tablename__ = 'valuation_provider_state'
+    id: Mapped[int] = mapped_column(Integer, primary_key=True)
+    day_bucket: Mapped[int] = mapped_column(Integer, default=0)
+    count: Mapped[int] = mapped_column(Integer, default=0)
+    blocked_until: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)

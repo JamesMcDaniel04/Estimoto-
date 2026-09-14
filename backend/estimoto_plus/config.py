@@ -13,6 +13,8 @@ class Settings:
     nango_environment: str = field(default_factory=lambda: os.getenv("NANGO_ENVIRONMENT", "production"))
     nango_allowed_key_fingerprints: str = field(default_factory=lambda: os.getenv("NANGO_ALLOWED_KEY_FINGERPRINTS", ""))
     nango_calendar_integration_id: str = field(default_factory=lambda: os.getenv("NANGO_CALENDAR_INTEGRATION_ID", "estimoto-plus-google-calendar"))
+    valuation_enabled: bool = field(default_factory=lambda: os.getenv("VALUATION_ENABLED", "false").lower() == "true")
+    valuation_daily_requests: int = field(default_factory=lambda: int(os.getenv("VALUATION_DAILY_REQUESTS", "20")))
     carsxe_api_key: str = field(default_factory=lambda: os.getenv("CARSXE_API_KEY", ""), repr=False)
     database_url: str = field(default_factory=lambda: os.getenv("DATABASE_URL", ""))
     environment: str = field(default_factory=lambda: os.getenv("ENVIRONMENT", "production"))
