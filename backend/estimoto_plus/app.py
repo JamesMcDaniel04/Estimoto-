@@ -37,6 +37,11 @@ from .vehicle_valuation import router as valuation_router
 from .shop_media_catalog import router as shop_media_router
 
 
+# Readiness fails closed until the database carries exactly this migration.
+# tests/test_readiness.py keeps it equal to the Alembic head.
+EXPECTED_SCHEMA_REVISION = "b7f2c9d4e1a0"
+
+
 def create_app(settings: Settings | None = None, *, auth_verifier=None, auth_client=None, bridge_transport=None):
     settings = settings or Settings()
     if not settings.database_url:
@@ -195,7 +200,7 @@ def create_app(settings: Settings | None = None, *, auth_verifier=None, auth_cli
                 revision = connection.scalar(sql_text("SELECT version_num FROM alembic_version"))
                 connection.execute(sql_text("SELECT 1"))
             photo_path = Path(settings.photo_dir)
-            if revision != "a63e90b72d14" or not photo_path.is_dir() or not os.access(photo_path, os.W_OK):
+            if revision != EXPECTED_SCHEMA_REVISION or not photo_path.is_dir() or not os.access(photo_path, os.W_OK):
                 raise RuntimeError("not ready")
             if settings.environment == "production" and not (os.path.ismount(photo_path) or os.path.ismount(photo_path.parent)):
                 raise RuntimeError("not ready")
