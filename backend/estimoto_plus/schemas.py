@@ -85,6 +85,19 @@ class ReminderCreate(Strict):
         return self
 
 
+class ReminderUpdate(Strict):
+    vehicle_id: str | None = Field(default=None, max_length=36)
+    title: str | None = Field(default=None, min_length=1, max_length=200)
+    due_date: Date | None = None
+    due_mileage: int | None = Field(default=None, ge=0, le=5_000_000)
+
+
+class EstimateUpdate(Strict):
+    description: str | None = Field(default=None, min_length=1, max_length=2000)
+    claim_number: str | None = Field(default=None, max_length=100)
+    date_of_loss: Date | None = None
+
+
 class RequestCreate(Strict, CalendarChecked):
     service_mode: Literal['shop_visit', 'mobile'] | None = None
     vehicle_id: str = Field(max_length=36)

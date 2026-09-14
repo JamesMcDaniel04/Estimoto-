@@ -20,7 +20,7 @@ from .graph import history_question, retrieve_history, history_answer
 from .graph_models import KnowledgeRecord
 from .models import Customer, Estimate, EstimateOutbox, Outbox, Photo, Provider, RateBucket, Reminder, Repair, RequestEvent, RequestRejection, ServiceRequest, Vehicle, now, uid
 from .postal import canonical_zip
-from .schemas import AssistantInput, EstimateCreate, EstimateSubmit, ProfileWrite, ReminderCreate, RequestCreate, VehicleCreate, VehicleUpdate
+from .schemas import AssistantInput, EstimateCreate, EstimateSubmit, ProfileWrite, ReminderCreate, ReminderUpdate, EstimateUpdate, RequestCreate, VehicleCreate, VehicleUpdate
 from .workflow import bridge_details, creation_payload, payload_hash, queue_cancellation
 
 from .calendar_scheduling import check_slots, legacy_payload, sync_view, preferred_times, lock_customer
@@ -489,6 +489,36 @@ def create_reminder(body: ReminderCreate, c: Customer = Depends(current_customer
 def complete_reminder(reminder_id: str, c: Customer = Depends(current_customer), db: Session = Depends(db_session)):
     r = owned(db, Reminder, reminder_id, c)
     r.completed = True
+    db.commit()
+    return reminder_view(r)
+
+
+@router.put("/reminders/{reminder_id}")
+def update_reminder(reminder_id: str, body: ReminderUpdate, c: Customer = Depends(current_customer), db: Session = Depends(db_session)):
+    r = owned(db, Reminder, reminder_id, c)
+    changes = body.model_dump(exclude_unset=True)
+    if "vehicle_id" in changes:
+        owned(db, Vehicle, changes["vehicle_id"], c)
+    if "due_date" in changes:
+        changes["due_date"] = iso(changes["due_date"])
+    if changes.get("due_date", r.due_date) is None and changes.get("due_mileage", r.due_mileage) is None:
+        raise HTTPException(422, "A date or mileage is required.")
+    for k, val in changes.items():
+        setattr(r, k, val)
+    db.commit()
+    return reminder_view(r)
+
+
+@router.delete("/reminders/{reminder_id}", status_code=204)
+def delete_reminder(reminder_id: str, c: Customer = Depends(current_customer), db: Session = Depends(db_session)):
+    db.delete(owned(db, Reminder, reminder_id, c))
+    db.commit()
+
+
+@router.post("/reminders/{reminder_id}/reopen")
+def reopen_reminder(reminder_id: str, c: Customer = Depends(current_customer), db: Session = Depends(db_session)):
+    r = owned(db, Reminder, reminder_id, c)
+    r.completed = False
     db.commit()
     return reminder_view(r)
 

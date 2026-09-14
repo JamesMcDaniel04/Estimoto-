@@ -430,3 +430,25 @@ def test_assistant_model_calls_use_persistent_customer_quota(clients, monkeypatc
     other = client.post("/v1/assistant", headers=h("bob"), json={"message": "What is a cabin air filter?"})
     assert other.json()["answer_source"] == "AI guidance"
     assert len(calls) == 31
+
+
+def test_reminder_update_delete_and_reopen(clients):
+    client, _ = clients
+    vid = create_vehicle(client)
+    made = client.post("/v1/reminders", json={"vehicle_id": vid, "title": "Oil", "due_mileage": 1000}, headers=h("alice"))
+    assert made.status_code == 201
+    rid = made.json()["id"]
+    updated = client.put(f"/v1/reminders/{rid}", json={"title": "Oil and filter", "due_date": "2027-01-15"}, headers=h("alice"))
+    assert updated.status_code == 200
+    assert updated.json()["title"] == "Oil and filter" and updated.json()["due_date"] == "2027-01-15"
+    assert updated.json()["due_mileage"] == 1000
+    # The date-or-mileage rule holds on the merged result.
+    assert client.put(f"/v1/reminders/{rid}", json={"due_date": None, "due_mileage": None}, headers=h("alice")).status_code == 422
+    assert client.post(f"/v1/reminders/{rid}/complete", headers=h("alice")).json()["completed"] is True
+    assert client.post(f"/v1/reminders/{rid}/reopen", headers=h("alice")).json()["completed"] is False
+    assert client.put(f"/v1/reminders/{rid}", json={"title": "x"}, headers=h("bob")).status_code == 404
+    assert client.delete(f"/v1/reminders/{rid}", headers=h("bob")).status_code == 404
+    assert client.post(f"/v1/reminders/{rid}/reopen", headers=h("bob")).status_code == 404
+    assert client.delete(f"/v1/reminders/{rid}", headers=h("alice")).status_code == 204
+    assert client.delete(f"/v1/reminders/{rid}", headers=h("alice")).status_code == 404
+    assert all(r["id"] != rid for r in client.get("/v1/bootstrap", headers=h("alice")).json()["reminders"])
