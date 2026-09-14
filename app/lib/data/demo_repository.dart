@@ -5,6 +5,7 @@ import 'package:flutter/services.dart';
 import '../domain/models.dart';
 import 'demo_seed.dart';
 import 'repository.dart';
+import 'pending_request_store.dart';
 import '../services/calendar_time.dart';
 import '../services/guided_capture_api.dart';
 import '../services/receipt_api.dart';
@@ -332,6 +333,7 @@ class DemoPlusRepository extends PlusRepository {
     _vehicleImages.remove(id);
   }
 
+  final _discardedOutreach = <String>{};
   final _workspaceKeys = <String, (String, Json)>{};
   bool _shareInsights = false;
   Json _copy(Json value) => jsonDecode(jsonEncode(value)) as Json;
@@ -341,13 +343,20 @@ class DemoPlusRepository extends PlusRepository {
   Json _once(String key, Json body, Json Function() create) {
     final previous = _workspaceKeys[key];
     if (previous != null) {
-      if (previous.$1 != jsonEncode(body)) {
+      if (key.startsWith('draft:') &&
+          _discardedOutreach.contains(previous.$2['id'])) {
+        throw const PlusApiException(
+          'This scheduling draft was discarded.',
+          410,
+        );
+      }
+      if (previous.$1 != jsonEncode(freezeJson(body))) {
         throw const PlusApiException('The saved request details changed.', 409);
       }
       return _copy(previous.$2);
     }
     final result = create();
-    _workspaceKeys[key] = (jsonEncode(body), result);
+    _workspaceKeys[key] = (jsonEncode(freezeJson(body)), result);
     return _copy(result);
   }
 
@@ -441,6 +450,7 @@ class DemoPlusRepository extends PlusRepository {
         409,
       );
     }
+    _discardedOutreach.add(id);
     _outreach.removeWhere((r) => r['id'] == id);
   }
 
@@ -681,7 +691,7 @@ class DemoPlusRepository extends PlusRepository {
   );
   @override
   Future<Json> createRequest(Json body, String idempotencyKey) async {
-    final fingerprint = jsonEncode(body);
+    final fingerprint = jsonEncode(freezeJson(body));
     final existing = _requestsByKey[idempotencyKey];
     if (existing != null) {
       if (existing.$1 != fingerprint) {

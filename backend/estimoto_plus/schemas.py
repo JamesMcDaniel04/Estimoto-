@@ -86,6 +86,13 @@ class ReminderCreate(Strict):
 
 
 class ReminderUpdate(Strict):
+    @field_validator('vehicle_id', 'title')
+    @classmethod
+    def nonempty(cls, value):
+        if value is None or not value.strip():
+            raise ValueError('This field cannot be empty')
+        return value.strip()
+
     vehicle_id: str | None = Field(default=None, max_length=36)
     title: str | None = Field(default=None, min_length=1, max_length=200)
     due_date: Date | None = None
@@ -93,6 +100,13 @@ class ReminderUpdate(Strict):
 
 
 class EstimateUpdate(Strict):
+    @field_validator('description', 'claim_number')
+    @classmethod
+    def not_null(cls, value, info):
+        if value is None or (info.field_name == 'description' and not value.strip()):
+            raise ValueError('This field cannot be empty')
+        return value.strip()
+
     description: str | None = Field(default=None, min_length=1, max_length=2000)
     claim_number: str | None = Field(default=None, max_length=100)
     date_of_loss: Date | None = None

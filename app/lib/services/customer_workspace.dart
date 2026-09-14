@@ -99,10 +99,41 @@ class CustomerWorkspace {
   String _scope(String operation) => '$customerId/$operation';
   String scopeFor(String operation) => _scope(operation);
 
-  /// Drops an interrupted write so a fresh request can be prepared.
+  /// Reconcile an uncertain draft before discarding it; retain recovery data
+  /// if the server cannot confirm the outcome.
   Future<void> discardPending(String operation) async {
     check();
-    await store.clear(_scope(operation));
+    if (operation != 'outreach-draft') {
+      throw const PlusApiException(
+        'Recover this operation before discarding it.',
+      );
+    }
+    final scope = _scope(operation);
+    if (!_sending.add(scope)) {
+      throw const PlusApiException(
+        'This request is still saving. Try again shortly.',
+      );
+    }
+    try {
+      final pending = await store.read(scope);
+      check();
+      if (pending != null) {
+        try {
+          final draft = await controller.repository.createShopOutreach(
+            pending.body,
+            pending.key,
+          );
+          check();
+          await controller.repository.deleteShopOutreach(draft['id'] as String);
+        } on PlusApiException catch (error) {
+          if (![400, 403, 404, 410, 422].contains(error.statusCode)) rethrow;
+        }
+      }
+      await store.clear(scope);
+      check();
+    } finally {
+      _sending.remove(scope);
+    }
   }
 
   Future<PendingWorkspaceWrite?> pending(String operation) async {
@@ -148,7 +179,7 @@ class CustomerWorkspace {
         );
       } on PlusApiException catch (error) {
         // These are definite rejections. An uncertain outcome keeps replay identity.
-        if ([400, 403, 404, 422].contains(error.statusCode)) {
+        if ([400, 403, 404, 410, 422].contains(error.statusCode)) {
           await store.clear(scope);
         }
         rethrow;

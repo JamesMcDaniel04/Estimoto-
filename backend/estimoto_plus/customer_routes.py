@@ -104,6 +104,11 @@ def owned(db, model, identifier, customer):
 
 
 def editable_estimate(db, estimate_id, customer):
+    # Use the same lock order as submission and guided capture.
+    db.execute(update(Customer).where(Customer.id == customer.id).values(id=Customer.id))
+    db.execute(update(Estimate).where(Estimate.id == estimate_id, Estimate.customer_id == customer.id)
+               .values(updated_at=Estimate.updated_at))
+    db.expire_all()
     e = owned(db, Estimate, estimate_id, customer)
     if e.delivery_status != "draft" or e.status != "draft" or e.processing_state != "not_started":
         raise HTTPException(409, {"detail": "This estimate has been shared and can no longer be changed.", "code": "estimate_locked"})

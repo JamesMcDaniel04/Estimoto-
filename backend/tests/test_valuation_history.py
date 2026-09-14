@@ -36,3 +36,23 @@ def test_valuation_history_is_capped_at_fifty(api):
         db.commit()
     assert value(c, vid).status_code == 200
     assert len(c.get(f'/v1/vehicles/{vid}/valuations', headers=h()).json()['valuations']) == 50
+
+
+def test_readiness_accepts_migrated_schema(api):
+    from pathlib import Path
+    from alembic.config import Config
+    from alembic.script import ScriptDirectory
+    from sqlalchemy import text
+    c, _ = api
+    backend = Path(__file__).resolve().parents[1]
+    cfg = Config(str(backend / 'alembic.ini'))
+    cfg.set_main_option('script_location', str(backend / 'alembic'))
+    head = ScriptDirectory.from_config(cfg).get_current_head()
+    with c.app.state.engine.begin() as db:
+        db.execute(text('CREATE TABLE IF NOT EXISTS alembic_version (version_num VARCHAR(32) NOT NULL)'))
+        db.execute(text('DELETE FROM alembic_version'))
+        db.execute(text('INSERT INTO alembic_version(version_num) VALUES (:head)'), {'head': head})
+    Path(c.app.state.settings.photo_dir).mkdir(parents=True, exist_ok=True)
+    response = c.get('/ready')
+    assert response.status_code == 200, response.text
+    assert response.json()['schema_revision'] == head

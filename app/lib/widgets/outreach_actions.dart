@@ -74,7 +74,7 @@ Future<bool> confirmDiscardDeviceDraft(BuildContext context) async =>
       builder: (context) => AlertDialog(
         title: const Text('Discard the saved draft?'),
         content: const Text(
-          'Its details are removed from this device. Nothing was sent to the shop.',
+          'We will recover and discard the unsent draft, then remove its details from this device. If recovery fails, you can retry.',
         ),
         actions: [
           TextButton(

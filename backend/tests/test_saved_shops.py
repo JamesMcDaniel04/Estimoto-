@@ -339,3 +339,15 @@ def test_sent_request_withdrawn_kills_shop_link(shops):
     assert client.get(f"/v1/shop-outreach/{reviewed['id']}", headers=auth()).json()["status"] == "withdrawn"
     # A withdrawn request is terminal: no further withdraw, no discard.
     assert client.delete(f"/v1/shop-outreach/{reviewed['id']}", headers=auth()).status_code == 409
+
+
+def test_discarded_draft_creation_replay_cannot_resurrect(shops):
+    client, app, sent = shops
+    shop = create_shop(client)
+    slots = [slot()]
+    created = draft(client, shop['id'], slots).json()
+    assert client.delete(f"/v1/shop-outreach/{created['id']}", headers=auth()).status_code == 204
+    replay = draft(client, shop['id'], slots)
+    assert replay.status_code == 410
+    assert client.get('/v1/shop-outreach', headers=auth()).json() == []
+    assert sent == []

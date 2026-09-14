@@ -204,3 +204,10 @@ def test_history_record_update_keeps_receipts_and_reprojects_graph(clients):
     assert client.put(f"/v1/knowledge/records/{rid}", headers=h("bob"), json={"shop_name": "x"}).status_code == 404
     assert client.put(f"/v1/knowledge/records/{rid}", headers=h("alice"), json={"service_date": "2099-01-01"}).status_code == 422
     assert client.put(f"/v1/knowledge/records/{rid}", headers=h("alice"), json={"vehicle_id": "other"}).status_code == 422
+
+
+@pytest.mark.parametrize('field', ['service_type', 'service_date', 'shop_name', 'parts_source', 'parts_description', 'notes'])
+def test_history_required_storage_fields_reject_null(clients, field):
+    client, _ = clients
+    rid = add(client, create_vehicle(client)).json()['id']
+    assert client.put(f'/v1/knowledge/records/{rid}', headers=h('alice'), json={field: None}).status_code == 422

@@ -51,6 +51,13 @@ class RecordInput(BaseModel):
 
 
 class RecordUpdate(BaseModel):
+    @field_validator('service_type', 'service_date', 'shop_name', 'parts_source', 'parts_description', 'notes', mode='before')
+    @classmethod
+    def not_null(cls, value):
+        if value is None:
+            raise ValueError('This field cannot be null')
+        return value
+
     model_config = ConfigDict(extra="forbid", str_strip_whitespace=True)
     service_type: ServiceType | None = None
     service_date: str | None = None

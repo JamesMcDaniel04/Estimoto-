@@ -495,3 +495,19 @@ def test_shared_estimate_is_locked(clients):
         assert response.status_code == 409
         assert response.json()["detail"] == "This estimate has been shared and can no longer be changed."
         assert response.json()["code"] == "estimate_locked"
+
+
+@pytest.mark.parametrize('body', [{'title': None}, {'vehicle_id': None}, {'title': '   '}])
+def test_reminder_invalid_partial_edits_are_validation_errors(clients, body):
+    client, _ = clients
+    vid = create_vehicle(client)
+    rid = client.post('/v1/reminders', headers=h('alice'), json={'vehicle_id': vid, 'title': 'Oil', 'due_mileage': 100}).json()['id']
+    assert client.put(f'/v1/reminders/{rid}', headers=h('alice'), json=body).status_code == 422
+
+
+@pytest.mark.parametrize('body', [{'description': None}, {'claim_number': None}, {'description': '   '}])
+def test_estimate_invalid_partial_edits_are_validation_errors(clients, body):
+    client, _ = clients
+    vid = create_vehicle(client)
+    eid = client.post('/v1/estimates', headers=h('alice'), json={'vehicle_id': vid, 'discipline': 'pdr', 'description': 'Dent'}).json()['id']
+    assert client.put(f'/v1/estimates/{eid}', headers=h('alice'), json=body).status_code == 422

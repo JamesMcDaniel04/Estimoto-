@@ -112,7 +112,7 @@ def _owned_shop(db, shop_id, customer_id):
 
 def _owned_outreach(db, outreach_id, customer_id):
     outreach = db.get(ShopOutreach, outreach_id)
-    if not outreach or outreach.customer_id != customer_id:
+    if not outreach or outreach.customer_id != customer_id or outreach.status == "discarded":
         raise HTTPException(404, "Outreach not found.")
     return outreach
 
@@ -233,7 +233,7 @@ def delete_shop(shop_id: str, c: Customer = Depends(current_customer), db: Sessi
 
 @router.get("/shop-outreach")
 def list_outreach(c: Customer = Depends(current_customer), db: Session = Depends(db_session)):
-    rows = db.scalars(select(ShopOutreach).where(ShopOutreach.customer_id == c.id)
+    rows = db.scalars(select(ShopOutreach).where(ShopOutreach.customer_id == c.id, ShopOutreach.status != "discarded")
                       .order_by(ShopOutreach.created_at.desc(), ShopOutreach.id.desc()).limit(100)).all()
     return [_outreach_view(row) for row in rows]
 
@@ -254,7 +254,9 @@ def discard_outreach(outreach_id: str, c: Customer = Depends(current_customer), 
     if outreach.status not in DISCARDABLE:
         raise HTTPException(409, "This request was already sent and can only be withdrawn.")
     db.execute(delete(ShopOutbox).where(ShopOutbox.outreach_id == outreach.id))
-    db.delete(outreach)
+    # Preserve the creation key so delayed retries cannot resurrect a draft.
+    outreach.status = "discarded"
+    outreach.updated_at = now()
     db.commit()
 
 
@@ -285,6 +287,8 @@ def create_outreach(body: OutreachDraftWrite, request: Request, idempotency_key:
     existing = db.scalar(select(ShopOutreach).where(ShopOutreach.customer_id == c.id,
                                                     ShopOutreach.creation_key == idempotency_key))
     if existing:
+        if existing.status == "discarded":
+            raise HTTPException(410, "This scheduling draft was discarded.")
         if existing.creation_hash != creation_hash:
             raise HTTPException(409, "This draft key was used for different details.")
         return _outreach_view(existing)

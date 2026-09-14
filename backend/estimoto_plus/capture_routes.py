@@ -280,6 +280,8 @@ def save_photo(estimate_id, request, c, db, data, mime, values, *, verify_framin
     lock_customer(db, c.id)
     db.expire_all()
     receipt = db.get(CaptureReceipt, operation_id)
+    if receipt is None:
+        raise HTTPException(404, 'This estimate or capture was removed.')
     if receipt.claim_token != claim:
         raise HTTPException(409, 'This photo is being recovered. Retry the same photo shortly.')
     e = draft(db, estimate_id, c)

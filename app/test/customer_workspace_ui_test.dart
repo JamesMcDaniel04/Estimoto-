@@ -521,9 +521,21 @@ void main() {
   testWidgets('an interrupted device draft can be discarded', (tester) async {
     final controller = await _controller();
     final workspace = CustomerWorkspace.forController(controller);
+    final shop = await controller.repository.saveMyShop({
+      'name': 'Test shop',
+      'email': 'shop@example.test',
+    });
+    final body = <String, dynamic>{
+      'shop_id': shop['id'],
+      'service_summary': 'Oil',
+      'proposed_slots': [
+        offsetTimestamp(DateTime.now().add(const Duration(days: 2))),
+      ],
+    };
+    await controller.repository.createShopOutreach(body, 'k');
     await workspace.store.write(
       workspace.scopeFor('outreach-draft'),
-      PendingWorkspaceWrite(body: const {'x': 1}, key: 'k'),
+      PendingWorkspaceWrite(body: body, key: 'k'),
     );
     await _mount(tester, MyShopsScreen(controller: controller));
     expect(find.text('Recover scheduling draft'), findsOneWidget);
@@ -532,6 +544,7 @@ void main() {
     await _tap(tester, find.widgetWithText(TextButton, 'Discard'));
     expect(find.text('Recover scheduling draft'), findsNothing);
     expect(await workspace.pending('outreach-draft'), isNull);
+    expect(await controller.repository.listShopOutreach(), isEmpty);
   });
 
   testWidgets('a history record can be edited and keeps its receipts', (
