@@ -1,0 +1,39 @@
+{
+  "backend_source": "532a7ef",
+  "migration_head": "a63e90b72d14",
+  "full_suite": {"passed": 313, "skipped_original_contract_cases": 7, "failed": 0},
+  "original_contract_followup": {
+    "original_source": "ca5241a82136de7a49fd98f772775fc245a1c304",
+    "passed": 12,
+    "skipped": 0,
+    "covers_all_seven_previously_gated_cases": true
+  },
+  "receipt_knowledge_pdf_focused": {"passed": 37, "skipped": 0},
+  "valuation_focused": {"passed": 20, "skipped": 0},
+  "database_proof": {
+    "postgresql": "isolated local schemas and disposable databases",
+    "fresh_migration_and_round_trip": true,
+    "receipt_and_valuation_rls_enabled": true,
+    "restricted_role_direct_access_denied": true,
+    "same_upload_parallel_replay": true,
+    "lost_commit_acknowledgement": true,
+    "valuation_lease_and_vehicle_change": true
+  },
+  "original_live_logo": {
+    "source": "ca5241a82136de7a49fd98f772775fc245a1c304",
+    "shop": "Demolition Dent",
+    "http_status": 200,
+    "content_type": "image/jpeg",
+    "bytes": 137102,
+    "sha256": "c0d7fdb224cfda37c13ab44c8f2e024e5a89a0ee5e7b4358fcddc131e5448b61",
+    "no_private_url_in_catalog": true
+  },
+  "carsxe_capability_probe": {
+    "public_documentation_sample_only": true,
+    "calls": 1,
+    "http_status": 200,
+    "retail_and_wholesale_buckets": true,
+    "customer_data_used": false
+  },
+  "limits": "These checks precede the Plus build-7 deployment and customer UI smoke. They do not establish physical-device receipt capture or external TestFlight availability."
+}
