@@ -26,6 +26,7 @@ const SPECS: Record<string, Spec> = {
 };
 const normalBody = (body: string) => Object.hasOwn(SPECS, body) ? body : "sedan";
 const v = (x: number, y: number, z: number) => new THREE.Vector3(x, y, z);
+const vinDoorJambPoint = (spec: Spec) => v(spec.glassFront + .21, spec.belt - .31, spec.width * .45);
 
 function surface(fn: (u: number, v: number) => THREE.Vector3, nu = 20, nv = 12) {
   const positions: number[] = [], indices: number[] = [];
@@ -55,7 +56,9 @@ function buildVehicle(spec: Spec) {
   const light = new THREE.MeshStandardMaterial({ color: 0xf2faff, emissive: 0xdaedff, emissiveIntensity: 1.15, roughness: .16, metalness: .25 });
   const tailLight = new THREE.MeshStandardMaterial({ color: 0xa70d22, emissive: 0xd90920, emissiveIntensity: .55, roughness: .23 });
   const highlightMaterial = new THREE.MeshBasicMaterial({ color: 0x06aeda, transparent: true, opacity: .13, depthWrite: false, side: THREE.DoubleSide, polygonOffset: true, polygonOffsetFactor: -2 });
-  materials.push(paint, glass, rubber, trim, chrome, brake, seatMaterial, light, tailLight, highlightMaterial);
+  const vinOutline = new THREE.MeshBasicMaterial({ color: 0x009f91, depthTest: false, depthWrite: false });
+  const vinPaper = new THREE.MeshBasicMaterial({ color: 0xf5ffff, depthTest: false, depthWrite: false });
+  materials.push(paint, glass, rubber, trim, chrome, brake, seatMaterial, light, tailLight, highlightMaterial, vinOutline, vinPaper);
   const highlights = new Map<string, THREE.Object3D[]>();
   function mesh(geometry: THREE.BufferGeometry, material: THREE.Material, parent: THREE.Object3D = group) {
     const object = new THREE.Mesh(geometry, material); object.castShadow = true; object.receiveShadow = false; parent.add(object); return object;
@@ -139,10 +142,15 @@ function buildVehicle(spec: Spec) {
   rounded(.16, .025, .025, .01, chrome, v(doorLength * .38, -.13, -.06), doorLining);
   // An unnumbered marker shows where a real door-jamb VIN label lives. It is
   // geometry only: no actual or invented VIN is rendered into the guide.
-  const vinMarker = new THREE.Group(); group.add(vinMarker);
-  rounded(.19, .085, .009, .006, chrome, v(doorStart + .11, spec.belt - .31, width * .9), vinMarker);
-  for (let row = 0; row < 3; row++) rounded(.12, .006, .011, .003, trim,
-    v(doorStart + .11, spec.belt - .29 - row * .018, width * .91), vinMarker);
+  const vinMarker = new THREE.Group(); vinMarker.position.copy(vinDoorJambPoint(spec)); group.add(vinMarker);
+  rounded(.48, .26, .014, .012, vinOutline, v(0, 0, .018), vinMarker);
+  rounded(.38, .17, .018, .008, vinPaper, v(0, 0, .035), vinMarker);
+  for (let row = 0; row < 3; row++) rounded(.28, .009, .021, .003, vinOutline,
+    v(0, .043 - row * .041, .049), vinMarker);
+  // A short pointer marks the representative jamb area even on a small screen.
+  line([v(-.34, .31, .04), v(-.22, .14, .04)], vinOutline, .017, vinMarker);
+  rounded(.075, .075, .022, .011, vinOutline, v(-.35, .32, .04), vinMarker);
+  vinMarker.traverse(object => { if (object instanceof THREE.Mesh) object.renderOrder = 10; });
   for (const side of [-1, 1]) {
     for (const axle of [spec.frontAxle, spec.rearAxle]) {
       const points = Array.from({length:49}, (_, i) => {
@@ -414,7 +422,11 @@ function viewFor(spec: Spec, target: string): View {
   else if (target === "engine_bay") { position = v(-spec.length * .77, spec.height * 2.2, spec.width * 1.09); look.set((spec.glassFront - spec.length / 2) / 2, spec.belt, 0); fov = 38; }
   else if (target === "interior") { position = v(spec.glassFront + 1.25, spec.belt + .50, spec.width * 1.55); look.set(spec.glassFront + .48, spec.belt - .08, 0); fov = 44; }
   else if (target === "odometer") { position = v(spec.glassFront + 1.12, Math.min(spec.belt + .42, spec.height - .07), spec.width * .44); look.set(spec.glassFront + .36, spec.belt + .095, spec.width * .215); fov = 49; }
-  else if (target === "vin") { position = v(spec.glassFront + 1.38, spec.belt + .22, spec.width * 1.35); look.set(spec.glassFront + .13, spec.belt - .31, spec.width * .88); fov = 42; }
+  else if (target === "vin") {
+    const marker = vinDoorJambPoint(spec);
+    position = marker.clone().add(v(.58, .28, 1.26));
+    look.copy(marker); fov = 36;
+  }
   else if (target === "tire_tread") { position = v(spec.frontAxle - .92, spec.radius + .76, spec.width * .5 + 1.05); look.set(spec.frontAxle, spec.radius + .08, spec.width * .46); fov = 39; }
   else if (target.startsWith("panel_")) {
     const panel = target.slice(6), close = spec.length * .84;
@@ -427,6 +439,12 @@ function viewFor(spec: Spec, target: string): View {
     }
   }
   return { position, look, fov };
+}
+
+/** The VIN camera and unnumbered label share one representative door-jamb point. */
+export function vinCameraView(body: string) {
+  const spec = SPECS[normalBody(body)];
+  return { marker: vinDoorJambPoint(spec), view: viewFor(spec, "vin") };
 }
 
 export function createVehicleScene(container: HTMLElement, options: { body: string; target: string; onError?: () => void }): VehicleScene {
