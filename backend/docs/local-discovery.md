@@ -225,3 +225,7 @@ The secondary Overpass endpoint is used only when the primary has no usable
 cache/result. Both share the `gate:osm` database lock, daily request/byte budget,
 response bounds and five-minute failure backoff. A fresh secondary cache serves
 repeat queries directly. No endpoint accepts a customer-supplied fetch URL.
+
+Map queries use a bounding box enclosing the search circle, followed by exact
+30-mile distance filtering. This avoids the costly provider-side around filter
+in dense cities without widening displayed coverage.

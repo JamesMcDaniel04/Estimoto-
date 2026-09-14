@@ -107,3 +107,21 @@ def test_secondary_endpoint_cannot_bypass_daily_budget(clients):
     assert c.get('/v1/discovery',headers=h('alice')).json()['status']=='unavailable'
     assert calls.count('overpass-api.de')==1
     assert 'overpass.private.coffee' not in calls
+
+
+def test_map_query_uses_bounding_box_but_keeps_thirty_mile_radius():
+    import httpx, math
+    from urllib.parse import parse_qs
+    from estimoto_plus.discovery_provider import fetch_listings
+    from test_discovery import DirectoryStub
+    queries=[]
+    def transport(request):
+        queries.append(parse_qs(request.content.decode())['data'][0])
+        return httpx.Response(200,json={'elements':[
+            DirectoryStub.shop(1,'Inside',lat=0,lon=math.degrees(29.999/3958.7613)),
+            DirectoryStub.shop(2,'Outside',lat=0,lon=math.degrees(30.001/3958.7613)),
+        ]})
+    result=fetch_listings([0,0],httpx.MockTransport(transport))
+    assert [r['name'] for r in result['listings']]==['Inside']
+    assert '(around:' not in queries[0]
+    assert '["shop"~"^(car_repair|tyres)$"](' in queries[0]

@@ -159,7 +159,17 @@ def fetch_listings(point, transport, *, limit=3 * 1024 * 1024, meter=None, endpo
     if endpoint not in (PRIMARY_ENDPOINT, SECONDARY_ENDPOINT):
         raise DirectoryUnavailable()
     lat, lon = coordinates({'lat': point[0], 'lon': point[1]})
-    query = f'[out:json][timeout:20];nwr(around:{RADIUS_METERS},{lat:.6f},{lon:.6f})["shop"~"^(car_repair|tyres)$"];out center tags;'
+    # Bounding boxes use the provider spatial index; the exact circular
+    # distance remains enforced below. Pad rounding outward at the boundary.
+    angular = RADIUS_MILES / 3958.7613
+    delta_lat = math.degrees(angular) + 0.00001
+    south, north = max(-90, lat - delta_lat), min(90, lat + delta_lat)
+    if south == -90 or north == 90:
+        west, east = -180, 180
+    else:
+        delta_lon = math.degrees(math.asin(min(1, math.sin(angular) / math.cos(math.radians(lat))))) + 0.00001
+        west, east = (lon - delta_lon + 180) % 360 - 180, (lon + delta_lon + 180) % 360 - 180
+    query = f'[out:json][timeout:20];nwr["shop"~"^(car_repair|tyres)$"]({south:.6f},{west:.6f},{north:.6f},{east:.6f});out center tags;'
     meter = meter if meter is not None else {'body_bytes': 0}
     data = read_public('POST', endpoint, transport, form={'data': query}, limit=limit, meter=meter)
     elements = data.get('elements')
