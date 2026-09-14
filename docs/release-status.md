@@ -1,4 +1,24 @@
-# Current release — build 14, September 14, 2026
+# Current web and Android release — build 15, September 14, 2026
+
+Settings includes Nango (Google Calendar) and Gmail icons under Connections. Both
+are explicitly **Not configured**, as requested. Gmail is described only for
+car-service appointments, estimates and receipts. This update adds no Gmail
+backend, authorization flow or mailbox access.
+
+Source `af950bd002f4ad0ea2189116a3865e80b803a617` is deployed on web and the permanent
+Android link. Seven Settings tests, Flutter analysis, 19 capture-web tests and
+web/APK/AAB builds passed. The served web bundle and public APK hashes match;
+the exact public APK installed over build 14, and both icons were verified in
+Settings on a 320x640 Android emulator. Schema remains `d9e4b82013c7`.
+
+[Build-15 evidence](releases/2026-09-14-build15.json) ·
+[Phone screenshot](qa/build15/settings.png) ·
+[Download latest Android](https://estimoto-plus-api.fly.dev/android/download)
+
+iOS remains on build 14. GitHub Actions did not execute because of the existing
+account billing lock; the checks above ran locally. No new invite email was sent.
+
+# Historical release — build 14, September 14, 2026
 
 Web/API and native build 14 use `2390c5ed418a6c2d5db6e98b1424354848ce9176`; schema `d9e4b82013c7`. [Verification](qa/2026-09-14-build14-verification.md) · [Artifacts and provider state](releases/2026-09-14-build14.json).
 

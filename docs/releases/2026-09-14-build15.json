@@ -1,0 +1,45 @@
+{
+  "version": "0.1.0",
+  "ready": {
+    "status": "ready",
+    "schema_revision": "d9e4b82013c7"
+  },
+  "main_js_sha256": "eee1a9765e2d987cbb5fd2792c88e4a321a52e802f0ba8e586a28ae0963f5ddc",
+  "build_number": 15,
+  "scope": "Nango and Gmail icons in Settings; configuration deferred by the user.",
+  "android": {
+    "asset_url": "https://github.com/JamesMcDaniel04/Estimoto-/releases/download/v0.1.0-beta.15/estimoto-plus-0.1.0-15.apk",
+    "byte_size": 62927527,
+    "certificate_sha256": "e6d106fccc6c0e77e04a46c64f8edffdafb11b502d4857e51606c725086581dd",
+    "package": "io.estimoto.plus",
+    "sha256": "8f86141b73509cb5170a35c7338464943b6a350b13751869ef25af70fc080fe9",
+    "version_code": 15,
+    "version_name": "0.1.0",
+    "download_url": "/android/download"
+  },
+  "aab": {
+    "byte_size": 60626099,
+    "sha256": "96662ca33e226c9a6fef3f171b1da15512e1a62cff6b1545a9e7875b3e2461e4"
+  },
+  "validation": {
+    "flutter_analyze": "No issues",
+    "settings_tests_passed": 7,
+    "capture_web_tests_passed": 19,
+    "web_build": "passed",
+    "android_apk_aab_builds": "passed",
+    "live_settings": "Nango and Gmail visible; both Not configured; build 15 and source af950bd visible",
+    "backend": "No code or schema changes relative to deployed build 14",
+    "android_install": "Exact public APK installed over build 14; Settings icons verified in demo on a 320x640 Android emulator.",
+    "physical_device": "Not exercised in this update.",
+    "gmail_or_calendar_configuration": "Deferred by user; no Gmail API routes, schema, mailbox reads, or provider settings changed."
+  },
+  "ios": {
+    "last_released_build": 14,
+    "new_build_produced": false
+  },
+  "ci": {
+    "run_id": 34892444345,
+    "executed_steps": 0,
+    "reason": "The job was not started because your account is locked due to a billing issue."
+  }
+}

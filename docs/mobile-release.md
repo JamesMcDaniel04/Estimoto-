@@ -1,4 +1,19 @@
-# Mobile customer preview — build 14
+# Android customer preview — build 15
+
+[Download latest Android](https://estimoto-plus-api.fly.dev/android/download) ·
+[Build-15 evidence](releases/2026-09-14-build15.json) ·
+[Notes](releases/0.1.0-15-beta-notes.md)
+
+Settings now shows Nango and Gmail icons, each marked Not configured. Gmail's
+label is limited to car-service appointments, estimates and receipts. Web and
+Android use `af950bd002f4ad0ea2189116a3865e80b803a617`. The exact public APK was
+installed over build 14 and the icons verified on an Android emulator.
+
+iOS remains on build 14; no build-15 IPA was produced in this update. No Google
+account connection or mailbox access was configured. Physical-device proof is
+separate from this emulator check.
+
+# Historical mobile customer preview — build 14
 
 Package `io.estimoto.plus`, source `2390c5ed418a6c2d5db6e98b1424354848ce9176`.
 [Download latest Android](https://estimoto-plus-api.fly.dev/android/download) · [Build-14 evidence](releases/2026-09-14-build14.json) · [Verification](qa/2026-09-14-build14-verification.md) · [Notes](testflight-build14.txt)
