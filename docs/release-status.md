@@ -1,4 +1,25 @@
-# Current web release — capture layout and VIN guide, September 14, 2026
+# Current web release — larger capture panels and connected 3D car, September 14, 2026
+
+The capture page at `/capture/` now vendors original Estimoto
+`1eb1cc8d77edd3a30955e8a4b374b3ada9fbc340`. The camera header collapses to one
+row above the step strip, the 3D guide and live camera keep at least 18.5% and
+47% of the viewport, and the controls scroll into reach on short screens. The
+procedural car keeps its hood and driver door on their hinges and carries a
+sloping nose. The page no longer requests a cover viewport, which had added a
+blank safe-area band under the native app bar, and the Plus-only short-portrait
+re-layout for the old camera structure is removed.
+
+Source `36a637dd275fd11361e590193484320c38dde77d` is deployed on web; `/version`
+reports it and `/ready` reports schema `d9e4b82013c7`. The first deploy attempt
+failed in the Fly release step because the release machine could not resolve
+the database hostname; the retry with the same image completed. Capture source
+digests verified, 19 capture-web tests and the capture and web builds passed,
+and the served `/capture/` index, JavaScript and CSS hashes match the built
+artifacts. Native installs load `/capture/` from the API origin, so no native
+build was produced. GitHub Actions did not run because of the existing account
+billing lock; the checks above ran locally.
+
+# Historical web release — capture layout and VIN guide, September 14, 2026
 
 The customer capture page at `/capture/` now vendors original Estimoto
 `5cfb2a9348db7c37dfaf5b42d8631b73a58ac691`. The guided camera splits the leftover
