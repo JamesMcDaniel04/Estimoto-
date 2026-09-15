@@ -203,6 +203,17 @@ class _PlusLauncherState extends State<PlusLauncher> {
     if (mounted && controller != null) _clearController();
   }
 
+  /// The server already removed the account; local sign-out must not be
+  /// blocked by a sign-out call the deleted identity can no longer make.
+  Future<void> _accountDeleted() async {
+    if (widget.auth != null) {
+      try {
+        await widget.auth!.signOut();
+      } catch (_) {}
+    }
+    if (mounted && controller != null) _clearController();
+  }
+
   @override
   void dispose() {
     authSubscription?.cancel();
@@ -217,6 +228,7 @@ class _PlusLauncherState extends State<PlusLauncher> {
         key: ObjectKey(controller),
         controller: controller!,
         onExit: _exit,
+        onAccountDeleted: _accountDeleted,
       );
     }
     return MaterialApp(

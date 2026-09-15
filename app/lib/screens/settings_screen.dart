@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import '../build_info.dart';
+import '../links.dart';
 import '../theme.dart';
 import '../domain/models.dart';
 import '../services/reminder_notifications.dart';
@@ -16,17 +17,30 @@ import 'garage_forms.dart';
 /// reuse [ProfileForm] so validation lives in one widget. Signing out
 /// always asks first; the exit itself belongs to the caller.
 class SettingsScreen extends StatelessWidget {
-  const SettingsScreen({super.key, required this.controller, this.onExit});
+  const SettingsScreen({
+    super.key,
+    required this.controller,
+    this.onExit,
+    this.onAccountDeleted,
+  });
   final PlusController controller;
   final VoidCallback? onExit;
+
+  /// Runs after the server confirms deletion; it must end the local session.
+  final Future<void> Function()? onAccountDeleted;
 
   static Future<void> open(
     BuildContext context,
     PlusController controller, {
     VoidCallback? onExit,
+    Future<void> Function()? onAccountDeleted,
   }) => Navigator.of(context).push(
     MaterialPageRoute(
-      builder: (_) => SettingsScreen(controller: controller, onExit: onExit),
+      builder: (_) => SettingsScreen(
+        controller: controller,
+        onExit: onExit,
+        onAccountDeleted: onAccountDeleted,
+      ),
     ),
   );
 
@@ -131,12 +145,49 @@ class SettingsScreen extends StatelessWidget {
                 ),
               ],
               const SectionHeading('About'),
+              Card(
+                child: Column(
+                  children: [
+                    for (final (label, url, icon) in [
+                      (
+                        'Privacy policy',
+                        PlusLinks.privacy,
+                        Icons.shield_outlined,
+                      ),
+                      ('Terms of use', PlusLinks.terms, Icons.gavel_outlined),
+                      ('Support', PlusLinks.support, Icons.help_outline),
+                    ]) ...[
+                      ListTile(
+                        leading: Icon(icon, color: theme.colorScheme.primary),
+                        title: Text(label),
+                        trailing: const Icon(Icons.open_in_new, size: 18),
+                        onTap: () => openExternal(context, url),
+                      ),
+                      if (label != 'Support')
+                        const Divider(indent: 16, endIndent: 16),
+                    ],
+                  ],
+                ),
+              ),
+              const SizedBox(height: 16),
               Text(PlusBuildInfo.label, style: theme.textTheme.bodyMedium),
               if (PlusBuildInfo.sourceSha.isNotEmpty)
                 Text(
                   'Source ${PlusBuildInfo.sourceSha.substring(0, 7)}',
                   style: theme.textTheme.bodySmall,
                 ),
+              if (!demo) ...[
+                const SectionHeading('Delete account'),
+                Text(
+                  'Deleting your account removes your vehicles, estimates and photos, requests, reminders, service history, receipts and any Google connections from Estimoto +. Shops you already shared a request with keep their own copy. This cannot be undone.',
+                  style: theme.textTheme.bodySmall,
+                ),
+                const SizedBox(height: 12),
+                DeleteAccountButton(
+                  controller: controller,
+                  onAccountDeleted: onAccountDeleted,
+                ),
+              ],
             ],
           ),
         ),
@@ -544,4 +595,78 @@ class _GmailConnectionTileState extends State<GmailConnectionTile> {
       trailing: const Icon(Icons.chevron_right),
     );
   }
+}
+
+/// A two-step, irreversible account deletion.
+class DeleteAccountButton extends StatefulWidget {
+  const DeleteAccountButton({
+    super.key,
+    required this.controller,
+    this.onAccountDeleted,
+  });
+  final PlusController controller;
+  final Future<void> Function()? onAccountDeleted;
+  @override
+  State<DeleteAccountButton> createState() => _DeleteAccountButtonState();
+}
+
+class _DeleteAccountButtonState extends State<DeleteAccountButton> {
+  bool busy = false;
+
+  Future<void> confirm() async {
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: const Text('Delete your account?'),
+        content: const Text(
+          'Everything saved in Estimoto + is permanently removed and you are signed out. If you only want a break, sign out instead.',
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context, false),
+            child: const Text('Keep my account'),
+          ),
+          FilledButton(
+            key: const Key('settings-delete-account-confirm'),
+            style: FilledButton.styleFrom(
+              backgroundColor: Theme.of(context).colorScheme.error,
+            ),
+            onPressed: () => Navigator.pop(context, true),
+            child: const Text('Delete permanently'),
+          ),
+        ],
+      ),
+    );
+    if (confirmed != true || !mounted) return;
+    setState(() => busy = true);
+    try {
+      await widget.controller.repository.deleteAccount();
+      if (!mounted) return;
+      showMessage(context, 'Your account has been deleted.');
+      await widget.onAccountDeleted?.call();
+    } catch (e) {
+      if (mounted) showMessage(context, PlusController.readableError(e));
+    } finally {
+      if (mounted) setState(() => busy = false);
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) => SizedBox(
+    width: double.infinity,
+    child: OutlinedButton.icon(
+      key: const Key('settings-delete-account'),
+      onPressed: busy ? null : confirm,
+      style: OutlinedButton.styleFrom(
+        foregroundColor: Theme.of(context).colorScheme.error,
+      ),
+      icon: busy
+          ? const SizedBox.square(
+              dimension: 18,
+              child: CircularProgressIndicator(strokeWidth: 2),
+            )
+          : const Icon(Icons.delete_forever_outlined, size: 19),
+      label: Text(busy ? 'Deleting…' : 'Delete my account'),
+    ),
+  );
 }

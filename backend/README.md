@@ -36,6 +36,8 @@ Approved official shop logos/photos are stored as bounded PNG assets and served 
 
 `POST /v1/vehicles/{id}/valuation` is an explicit customer-initiated CarsXE lookup using saved VIN/mileage plus selected state/condition. It returns bounded retail/wholesale figures when the provider supplies a valid matching result. Private service history and receipt spending are displayed separately and never sent to CarsXE or added to market value. The Flutter demo uses clearly labeled fixed fictional values and a synthetic VIN without contacting a provider. The production feature is controlled by `VALUATION_ENABLED` and server-side CarsXE configuration.
 
+`DELETE /v1/account` removes every row and private file the signed-in customer owns and, when `SUPABASE_SERVICE_ROLE_KEY` is configured on the server, deletes the Supabase identity as well; the response reports `identity_deleted` as true, false or null when not configured. Demo accounts cannot be deleted. The key must never reach a client build.
+
 Estibot care topics can link real YouTube videos when `YOUTUBE_ENABLED` and a server-side `YOUTUBE_API_KEY` are set; see [YouTube retrieval](docs/youtube.md). A read-only Gmail connection through Nango, controlled by `GMAIL_ENABLED`, lets customers file estimates, receipts and appointment mail into service history; see [Gmail](docs/gmail.md).
 
 ## Estimoto bridge contract

@@ -295,6 +295,9 @@ class ApiPlusRepository extends PlusRepository {
   @override
   Future<Json> disconnectGmail() =>
       _send('DELETE', '/v1/mail/gmail/connection');
+  @override
+  Future<Json> deleteAccount() =>
+      _send('DELETE', '/v1/account', timeout: const Duration(seconds: 60));
 
   @override
   Future<PlusSnapshot> bootstrap() async =>

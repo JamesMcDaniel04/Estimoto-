@@ -5,11 +5,11 @@
 class PlusBuildInfo {
   static const versionName = String.fromEnvironment(
     'PLUS_VERSION_NAME',
-    defaultValue: '0.1.0',
+    defaultValue: '1.0.0',
   );
   static const buildNumber = String.fromEnvironment(
     'PLUS_BUILD_NUMBER',
-    defaultValue: '15',
+    defaultValue: '16',
   );
   static const sourceSha = String.fromEnvironment('SOURCE_SHA');
   static String get label => 'Version $versionName ($buildNumber)';

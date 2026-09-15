@@ -168,5 +168,11 @@ abstract class PlusRepository {
   Future<Json> disconnectGmail() => _gmailUnavailable();
   Future<Json> _gmailUnavailable() =>
       throw const PlusApiException('Gmail is unavailable.', 503);
+
+  /// Removes the account and everything it owns. The caller signs out after.
+  Future<Json> deleteAccount() => throw const PlusApiException(
+    'Account deletion is unavailable right now. Try again later.',
+    503,
+  );
   void close() {}
 }

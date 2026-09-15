@@ -30,6 +30,7 @@ from .vehicle_images import router as vehicle_images_router
 from .android_download import router as android_download_router
 from .calendar_routes import router as calendar_router
 from .gmail_routes import router as gmail_router, retry_gmail_revocations
+from .account_routes import router as account_router
 from .calendar_sync import sync_calendar_batch
 from .capture_routes import router as capture_router
 from .discovery import router as discovery_router
@@ -188,6 +189,7 @@ def create_app(settings: Settings | None = None, *, auth_verifier=None, auth_cli
     app.include_router(android_download_router)
     app.include_router(calendar_router)
     app.include_router(gmail_router)
+    app.include_router(account_router)
     app.include_router(capture_router)
     app.include_router(discovery_router)
     app.include_router(receipts_router)

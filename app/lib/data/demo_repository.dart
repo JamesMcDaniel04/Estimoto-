@@ -212,6 +212,11 @@ class DemoPlusRepository extends PlusRepository {
   @override
   Future<Json> getCalendarStatus() async => _copy(_calendar);
   @override
+  Future<Json> deleteAccount() async => throw const PlusApiException(
+    'Sample mode has no account to delete. Leave the demo instead.',
+    403,
+  );
+  @override
   Future<Json> connectGoogleCalendar() async => throw const PlusApiException(
     'Sample mode cannot connect Google Calendar.',
   );

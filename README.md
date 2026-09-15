@@ -75,4 +75,4 @@ Demolition Dent is connected for PDR and collision in its saved ZIP 80221. PDR L
 
 Physical-device capture, actual shop scheduling delivery and Apple external beta approval remain separate launch checks. Reminder alerts are scheduled on the phone itself; server push is not used. CARFAX, automated phone/SMS booking and Google Play publication are not connected. Customer-reported records are not verified repair invoices. See the [automotive knowledge architecture](docs/automotive-knowledge.md) for the current graph, source attribution and optional aggregate sharing.
 
-[Product design](docs/superpowers/specs/2026-09-13-estimoto-plus-design.md) · [Implementation plan](docs/superpowers/plans/2026-09-13-estimoto-plus-foundation.md)
+[Store submission checklist](docs/launch/store-submission.md) · [Product design](docs/superpowers/specs/2026-09-13-estimoto-plus-design.md) · [Implementation plan](docs/superpowers/plans/2026-09-13-estimoto-plus-foundation.md)
