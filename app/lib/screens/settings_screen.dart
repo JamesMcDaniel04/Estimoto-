@@ -1,7 +1,10 @@
 import 'package:flutter/material.dart';
 import '../build_info.dart';
+import '../domain/models.dart';
 import '../state/plus_controller.dart';
 import '../widgets/common.dart';
+import '../widgets/workspace_widgets.dart';
+import 'calendar_screen.dart';
 import 'garage_forms.dart';
 
 /// Account, profile, session and version in one place.
@@ -86,15 +89,9 @@ class SettingsScreen extends StatelessWidget {
                   padding: const EdgeInsets.symmetric(vertical: 8),
                   child: Column(
                     children: [
-                      ListTile(
-                        leading: Icon(
-                          Icons.hub_outlined,
-                          color: theme.colorScheme.primary,
-                        ),
-                        title: const Text('Nango'),
-                        subtitle: const Text(
-                          'Google Calendar · Not configured',
-                        ),
+                      CalendarConnectionTile(
+                        key: ValueKey('calendar-${snapshot.profile.id}'),
+                        controller: controller,
                       ),
                       const Divider(indent: 16, endIndent: 16),
                       const ListTile(
@@ -144,4 +141,138 @@ class SettingsScreen extends StatelessWidget {
       );
     },
   );
+}
+
+/// Live Google Calendar connection state, read from the customer API.
+///
+/// The tile never shows a connection it has not confirmed: while the status
+/// is loading or failed it says so, and every state opens the Calendar screen
+/// where connecting, choosing calendars and disconnecting live.
+class CalendarConnectionTile extends StatefulWidget {
+  const CalendarConnectionTile({super.key, required this.controller});
+  final PlusController controller;
+  @override
+  State<CalendarConnectionTile> createState() => _CalendarConnectionTileState();
+}
+
+class _CalendarConnectionTileState extends State<CalendarConnectionTile> {
+  Json? status;
+  bool loading = true, failed = false;
+  int run = 0;
+
+  @override
+  void initState() {
+    super.initState();
+    load();
+  }
+
+  Future<void> load() async {
+    final current = ++run;
+    setState(() {
+      loading = true;
+      failed = false;
+    });
+    try {
+      final value = await widget.controller.repository.getCalendarStatus();
+      if (!mounted || current != run) return;
+      setState(() => status = value);
+    } catch (_) {
+      if (!mounted || current != run) return;
+      setState(() => failed = true);
+    } finally {
+      if (mounted && current == run) setState(() => loading = false);
+    }
+  }
+
+  Future<void> open() async {
+    await openCalendar(context, widget.controller);
+    if (mounted) load();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    final demo = widget.controller.isDemo;
+    final state = textOf(status ?? {}, 'status');
+    final connected = status?['connected'] == true;
+    final calendars = stringRows(status ?? {}, 'selected_calendar_ids').length;
+    final issues = rowsOf(status ?? {}, 'sync_issues').length;
+    final (String label, Color color, IconData icon) = switch (true) {
+      _ when loading => (
+        'Checking…',
+        theme.colorScheme.onSurfaceVariant,
+        Icons.sync,
+      ),
+      _ when failed => (
+        'Status unavailable · tap to retry',
+        theme.colorScheme.error,
+        Icons.error_outline,
+      ),
+      _ when demo => (
+        'Sample calendar · fictional availability only',
+        theme.colorScheme.onSurfaceVariant,
+        Icons.science_outlined,
+      ),
+      _ when connected && issues > 0 => (
+        'Connected · $issues ${issues == 1 ? 'appointment needs' : 'appointments need'} attention',
+        const Color(0xFFB26A00),
+        Icons.warning_amber_outlined,
+      ),
+      _ when connected => (
+        'Connected · $calendars ${calendars == 1 ? 'calendar' : 'calendars'} marking you busy',
+        const Color(0xFF08796D),
+        Icons.check_circle_outline,
+      ),
+      _ when state == 'connecting' => (
+        'Finish Google consent, then return here',
+        theme.colorScheme.onSurfaceVariant,
+        Icons.hourglass_top,
+      ),
+      _ when state == 'reconnect_required' => (
+        'Google access needs renewing',
+        const Color(0xFFB26A00),
+        Icons.link_off,
+      ),
+      _ when state == 'disconnecting' || state == 'disconnect_uncertain' => (
+        'Disconnection not yet confirmed',
+        const Color(0xFFB26A00),
+        Icons.link_off,
+      ),
+      _ when status?['configured'] == true => (
+        'Not connected · tap to connect',
+        theme.colorScheme.onSurfaceVariant,
+        Icons.link,
+      ),
+      _ => (
+        'Not available yet · offer times manually',
+        theme.colorScheme.onSurfaceVariant,
+        Icons.link_off,
+      ),
+    };
+    return ListTile(
+      key: const Key('settings-calendar-connection'),
+      onTap: failed ? load : open,
+      leading: Icon(
+        Icons.calendar_month_outlined,
+        color: theme.colorScheme.primary,
+      ),
+      title: const Text('Google Calendar'),
+      subtitle: Padding(
+        padding: const EdgeInsets.only(top: 2),
+        child: Row(
+          children: [
+            Icon(icon, size: 16, color: color),
+            const SizedBox(width: 6),
+            Expanded(
+              child: Text(
+                label,
+                style: theme.textTheme.bodySmall?.copyWith(color: color),
+              ),
+            ),
+          ],
+        ),
+      ),
+      trailing: const Icon(Icons.chevron_right),
+    );
+  }
 }

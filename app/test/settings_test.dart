@@ -5,6 +5,8 @@ import 'package:estimoto_plus/app.dart';
 import 'package:estimoto_plus/build_info.dart';
 import 'package:estimoto_plus/data/demo_repository.dart';
 import 'package:estimoto_plus/domain/models.dart';
+import 'package:estimoto_plus/data/repository.dart';
+import 'package:estimoto_plus/screens/calendar_screen.dart';
 import 'package:estimoto_plus/screens/settings_screen.dart';
 import 'package:estimoto_plus/state/plus_controller.dart';
 import 'package:estimoto_plus/theme.dart';
@@ -50,6 +52,7 @@ Future<void> _tap(WidgetTester tester, Finder finder) async {
 }
 
 void main() {
+  calendarConnectionTests();
   testWidgets('settings opens from the account menu with the email read-only', (
     tester,
   ) async {
@@ -147,5 +150,134 @@ void main() {
     ).firstMatch(File('pubspec.yaml').readAsStringSync())!;
     expect(PlusBuildInfo.versionName, version.group(1));
     expect(PlusBuildInfo.buildNumber, version.group(2));
+  });
+}
+
+class _CalendarRepository extends DemoPlusRepository {
+  _CalendarRepository(this.status);
+  Json? status;
+  @override
+  bool get isDemo => false;
+  @override
+  Future<PlusSnapshot> bootstrap() async {
+    final demo = await super.bootstrap();
+    return PlusSnapshot.fromJson({
+      'profile': demo.profile.json,
+      'vehicles': demo.vehicles.map((v) => v.json).toList(),
+      'capabilities': {'demo': false},
+    });
+  }
+
+  @override
+  Future<Json> getCalendarStatus() async {
+    final value = status;
+    if (value == null) throw const PlusApiException('Calendar is down.', 503);
+    return value;
+  }
+}
+
+Json _status({
+  bool configured = true,
+  bool connected = false,
+  String state = 'disconnected',
+  List<String> calendars = const [],
+  List<Json> issues = const [],
+}) => {
+  'configured': configured,
+  'connected': connected,
+  'status': state,
+  'generation': 1,
+  'selected_calendar_ids': calendars,
+  'time_zone': 'America/Denver',
+  'sync_confirmed': connected,
+  'attempt_id': null,
+  'sync_issues': issues,
+};
+
+void calendarConnectionTests() {
+  Future<PlusController> live(_CalendarRepository repository) async {
+    final controller = PlusController(repository);
+    await controller.refresh();
+    return controller;
+  }
+
+  testWidgets('the demo session labels its sample calendar', (tester) async {
+    final controller = await _controller(_Repository());
+    await _mountScreen(tester, controller);
+    expect(find.text('Google Calendar'), findsOneWidget);
+    expect(find.textContaining('Sample calendar'), findsOneWidget);
+    expect(find.text('Not configured'), findsNothing);
+    await _tap(tester, find.byKey(const Key('settings-calendar-connection')));
+    expect(find.byType(CalendarScreen), findsOneWidget);
+  });
+
+  testWidgets('a connected account shows its calendar count', (tester) async {
+    final controller = await live(
+      _CalendarRepository(
+        _status(
+          connected: true,
+          state: 'connected',
+          calendars: ['work', 'home'],
+        ),
+      ),
+    );
+    await _mountScreen(tester, controller);
+    expect(
+      find.text('Connected · 2 calendars marking you busy'),
+      findsOneWidget,
+    );
+  });
+
+  testWidgets('sync issues are surfaced on the connection tile', (
+    tester,
+  ) async {
+    final controller = await live(
+      _CalendarRepository(
+        _status(
+          connected: true,
+          state: 'connected',
+          calendars: ['work'],
+          issues: [
+            {'source_kind': 'request', 'source_id': 'r1', 'status': 'conflict'},
+          ],
+        ),
+      ),
+    );
+    await _mountScreen(tester, controller);
+    expect(
+      find.text('Connected · 1 appointment needs attention'),
+      findsOneWidget,
+    );
+  });
+
+  testWidgets('an unconfigured server is honest about availability', (
+    tester,
+  ) async {
+    final controller = await live(
+      _CalendarRepository(_status(configured: false, state: 'unavailable')),
+    );
+    await _mountScreen(tester, controller);
+    expect(find.textContaining('Not available yet'), findsOneWidget);
+  });
+
+  testWidgets('a configured but disconnected account invites connecting', (
+    tester,
+  ) async {
+    final controller = await live(_CalendarRepository(_status()));
+    await _mountScreen(tester, controller);
+    expect(find.text('Not connected · tap to connect'), findsOneWidget);
+  });
+
+  testWidgets('a failed status check can be retried from the tile', (
+    tester,
+  ) async {
+    final repository = _CalendarRepository(null);
+    final controller = await live(repository);
+    await _mountScreen(tester, controller);
+    expect(find.textContaining('Status unavailable'), findsOneWidget);
+    repository.status = _status(state: 'reconnect_required');
+    await _tap(tester, find.byKey(const Key('settings-calendar-connection')));
+    expect(find.text('Google access needs renewing'), findsOneWidget);
+    expect(find.byType(CalendarScreen), findsNothing);
   });
 }
