@@ -78,12 +78,17 @@ function buildVehicle(spec: Spec) {
     highlights.set(part, [...highlights.get(part) ?? [], object]); return object;
   }
   const half = spec.length / 2, width = spec.width / 2, wheelY = spec.radius + .04;
-  const bodyWidth = (x: number) => width * (1 - .12 * Math.pow(Math.abs(x / half), 6));
+  // The nose sits lower than the cowl and the plan narrows toward it, so the
+  // hood reads as a sloping panel rather than one blunt loaf end.
+  const frontDrop = (x: number) => .15 * Math.pow(Math.max(0, -x / half), 2.5);
+  const planW = (x: number) => width * (1 - .09 * Math.pow(Math.max(0, -x / half), 3));
+  const loftScale = (x: number) => Math.max(0, 1 - (Math.abs(x) / half) ** 10) ** .1;
+  const bodyWidth = (x: number) => planW(x) * (1 - .12 * Math.pow(Math.abs(x / half), 6));
   const sideProfile = (x: number, y: number) => {
     const t = (topY(x) - y) / (topY(x) - .23);
     return bodyWidth(x) * (.86 + .14 * Math.sin(Math.min(1, Math.max(0, t)) ** .65 * Math.PI * .8));
   };
-  const topY = (x: number) => spec.belt - .13 * Math.pow(Math.max(0, -x / half), 5) + (spec.rearHeight - spec.belt) * Math.max(0, x / half);
+  const topY = (x: number) => spec.belt - frontDrop(x) - .04 * Math.pow(Math.max(0, -x / half), 5) + (spec.rearHeight - spec.belt) * Math.max(0, x / half);
   const archY = (x: number) => {
     let y = spec.radius > .4 ? .36 : .23;
     for (const axle of [spec.frontAxle, spec.rearAxle]) {
@@ -94,12 +99,33 @@ function buildVehicle(spec: Spec) {
   };
   // One smooth body loft, including the nose and tail. Rounded cross-sections
   // share normals across the shoulder and fascia rather than meeting as sheets.
-  const hingeX = spec.glassFront - .03, hood = new THREE.Group(); hood.position.set(hingeX, spec.belt, 0); group.add(hood);
+  // The hood pivots on a line just under its own rear edge, so nothing swings away from the cowl.
+  const hingeX = spec.glassFront - .03, hingeY = topY(hingeX) - .035, hood = new THREE.Group(); hood.position.set(hingeX, hingeY, 0); group.add(hood);
   const bottom = spec.radius > .4 ? .33 : .24;
   const midBody = (spec.belt + bottom) / 2, bodyH = (spec.belt - bottom) / 2;
-  const bodyX = (y: number, z: number) => half * Math.pow(Math.max(0, 1 - Math.pow(Math.pow(Math.abs((y - midBody) / bodyH), 4) + Math.pow(Math.abs(z / width), 4), 2.5)), .1);
+  // Whether a point lies inside the lofted body; the upper half carries the nose drop.
+  const insideLoft = (x: number, y: number, z: number) => {
+    const scale = loftScale(x); if (scale <= 0) return false;
+    const u = Math.abs(y - midBody) / Math.max(1e-6, bodyH * scale - (y > midBody ? frontDrop(x) : 0));
+    const w = Math.abs(z) / (planW(x) * scale);
+    return u ** 4 + w ** 4 <= 1;
+  };
+  // How far toward `end` the skin reaches at a given height and offset.
+  const bodyX = (y: number, z: number, end: number) => {
+    if (!insideLoft(0, y, z)) return 0;
+    let lo = 0, hi = half;
+    for (let i = 0; i < 36; i++) { const mid = (lo + hi) / 2; if (insideLoft(end * mid, y, z)) lo = mid; else hi = mid; }
+    return lo;
+  };
+  // Half-width of the lofted section at a given station and height.
+  const sectionZ = (x: number, y: number) => {
+    const scale = loftScale(x); if (scale <= 0) return 0;
+    const u = Math.abs(y - midBody) / Math.max(1e-6, bodyH * scale - (y > midBody ? frontDrop(x) : 0));
+    return planW(x) * scale * Math.pow(Math.max(0, 1 - u ** 4), .25);
+  };
   const doorStart = spec.glassFront + .10, doorEnd = driverDoorEnd(spec);
-  const driverDoor = new THREE.Group(); driverDoor.position.set(doorStart, spec.belt, width * .91); group.add(driverDoor);
+  // The door hinge sits on the skin line at the front edge, so the open door stays attached.
+  const driverDoor = new THREE.Group(); driverDoor.position.set(doorStart, spec.belt, sectionZ(doorStart, spec.belt - .34) - .012); group.add(driverDoor);
   // Parts are authored in vehicle coordinates so the closed door matches the
   // surrounding skin exactly, then moved onto its front hinge.
   function onDoor<T extends THREE.Object3D>(object: T, moves: boolean) {
@@ -111,11 +137,12 @@ function buildVehicle(spec: Spec) {
   for (let i = 0; i <= nx; i++) {
     const theta = Math.PI * i / nx;
     const x = -half * Math.cos(theta);
-    const scale = Math.max(0, 1 - (Math.abs(x) / half) ** 10) ** .1;
+    const scale = loftScale(x);
     for (let j = 0; j <= nr; j++) {
-      const angle = j / nr * Math.PI * 2;
-      positions.push(x, midBody + bodyH * scale * Math.sign(Math.cos(angle)) * Math.abs(Math.cos(angle)) ** .5,
-        width * scale * Math.sign(Math.sin(angle)) * Math.abs(Math.sin(angle)) ** .5);
+      const angle = j / nr * Math.PI * 2, c = Math.cos(angle), sn = Math.sin(angle);
+      const up = Math.max(0, c) ** .5;
+      positions.push(x, midBody + bodyH * scale * Math.sign(c) * Math.abs(c) ** .5 - frontDrop(x) * up,
+        planW(x) * scale * Math.sign(sn) * Math.abs(sn) ** .5);
     }
   }
   for (let i = 0; i < nx; i++) for (let j = 0; j < nr; j++) {
@@ -126,16 +153,18 @@ function buildVehicle(spec: Spec) {
     const z = (positions[a * 3 + 2] + positions[(b + 1) * 3 + 2]) / 2;
     const inWheel = Math.abs(z) > width * .63 && [spec.frontAxle, spec.rearAxle].some(axle => (x - axle) ** 2 + (y - wheelY) ** 2 < (spec.radius + .055) ** 2);
     if (inWheel) continue;
-    const isTop = y > spec.belt - .14 && Math.abs(z) < width * .82;
+    const isTop = y > topY(x) - .14 && Math.abs(z) < width * .82;
     if (isTop && x > hingeX && x < spec.glassRear) continue;
     if (isTop && x >= spec.glassRear && spec.bed) continue;
-    const isDriverDoor = z > width * .65 && x > doorStart && x < doorEnd && y > .35;
-    (isTop && x < hingeX ? hoodIndices : isDriverDoor ? doorIndices : bodyIndices).push(...ids);
+    // The hood is a shallow lid on top of the fenders; the door is the side skin below the shoulder.
+    const isHood = x < hingeX && y > topY(x) - .07 && Math.abs(z) < width * .80;
+    const isDriverDoor = z > width * .72 && x > doorStart && x < doorEnd && y > .35;
+    (isHood ? hoodIndices : isDriverDoor ? doorIndices : bodyIndices).push(...ids);
   }
   const bodyGeometry = new THREE.BufferGeometry(); bodyGeometry.setAttribute("position", new THREE.Float32BufferAttribute(positions, 3));
   // Compute normals before separating moving panels so closed joins stay smooth.
   bodyGeometry.setIndex([...bodyIndices, ...hoodIndices, ...doorIndices]); bodyGeometry.computeVertexNormals();
-  const hoodGeometry = bodyGeometry.clone(); hoodGeometry.setIndex(hoodIndices); hoodGeometry.translate(-hingeX, -spec.belt, 0);
+  const hoodGeometry = bodyGeometry.clone(); hoodGeometry.setIndex(hoodIndices); hoodGeometry.translate(-hingeX, -hingeY, 0);
   const doorGeometry = bodyGeometry.clone(); doorGeometry.setIndex(doorIndices);
   bodyGeometry.setIndex(bodyIndices); mesh(bodyGeometry, paint); mesh(hoodGeometry, paint, hood); focus("hood", hoodGeometry, hood);
   onDoor(mesh(doorGeometry, paint), true);
@@ -161,9 +190,7 @@ function buildVehicle(spec: Spec) {
     for (const axle of [spec.frontAxle, spec.rearAxle]) {
       const points = Array.from({length:49}, (_, i) => {
         const a = Math.PI * i / 48, x = axle + (spec.radius + .064) * Math.cos(a), y = wheelY + (spec.radius + .064) * Math.sin(a);
-        const sx = Math.pow(Math.max(0, 1 - (Math.abs(x) / half) ** 10), .1);
-        const z = width * Math.pow(Math.max(0, sx ** 4 - Math.abs((y - midBody) / bodyH) ** 4), .25);
-        return v(x, y, side * z);
+        return v(x, y, side * sectionZ(x, y));
       });
       line(points, spec.radius > .4 ? trim : paint, spec.radius > .4 ? .026 : .019);
     }
@@ -185,8 +212,9 @@ function buildVehicle(spec: Spec) {
   rounded(spec.glassRear - spec.glassFront, .1, spec.width * .8, .03, trim, v((spec.glassFront + spec.glassRear) / 2, spec.belt - .62, 0), interior);
 
   const skinY = (x: number, z: number) => {
-    const scale = Math.max(0, 1 - (Math.abs(x) / half) ** 10) ** .1;
-    return midBody + bodyH * Math.max(0, scale ** 4 - (Math.abs(z) / width) ** 4) ** .25;
+    const scale = loftScale(x);
+    const f = Math.max(0, scale ** 4 - (Math.abs(z) / planW(x)) ** 4) ** .25;
+    return midBody + bodyH * f - frontDrop(x) * f / Math.max(scale, 1e-6);
   };
   // Blend the cabin sill into the curved body; no floating glass or open seams.
   for (const side of [-1, 1]) {
@@ -284,7 +312,7 @@ function buildVehicle(spec: Spec) {
   for (const end of [-1, 1]) {
     const lower = spec.radius > .4 ? .37 : .25;
     const upper = topY(end * (half - .045)), mid = (upper + lower) / 2;
-    const fasciaX = (z: number, y: number) => end * bodyX(y, z);
+    const fasciaX = (z: number, y: number) => end * bodyX(y, z, end);
     const fascia = surface((u, t) => {
       const y = THREE.MathUtils.lerp(lower, upper, u);
       const z = (t * 2 - 1) * sideProfile(end * (half - .045), y);
@@ -516,9 +544,9 @@ function initializeVehicleScene(renderer: THREE.WebGLRenderer, container: HTMLEl
     currentOrbit.phi = THREE.MathUtils.lerp(currentOrbit.phi, goalOrbit.phi, t);
     currentOrbit.radius = THREE.MathUtils.lerp(currentOrbit.radius, goalOrbit.radius, t);
     look.lerp(goal.look, t); camera.position.setFromSpherical(currentOrbit).add(look); camera.lookAt(look);
-    const hoodAngle = target === "engine_bay" ? -1.08 : 0;
+    const hoodAngle = target === "engine_bay" ? -.98 : 0;
     vehicle.hood.rotation.z += (hoodAngle - vehicle.hood.rotation.z) * t;
-    const doorAngle = inside() ? -1.5 : 0;
+    const doorAngle = inside() ? -1.3 : 0;
     vehicle.driverDoor.rotation.y += (doorAngle - vehicle.driverDoor.rotation.y) * t;
     transition = entering || Math.abs(displayedFov - goal.fov) > .01 || Math.abs(doorAngle - vehicle.driverDoor.rotation.y) > .001 || camera.position.distanceToSquared(goal.position) > .000008 || look.distanceToSquared(goal.look) > .000008 || Math.abs(hoodAngle - vehicle.hood.rotation.z) > .001;
     render();
@@ -539,8 +567,8 @@ function initializeVehicleScene(renderer: THREE.WebGLRenderer, container: HTMLEl
   const initialBounds = container.getBoundingClientRect();
   width = Math.max(1, Math.round(initialBounds.width)); height = Math.max(1, Math.round(initialBounds.height));
   renderer.setSize(width, height, false); applyAspect();
-  vehicle.hood.rotation.z = target === "engine_bay" ? -1.08 : 0;
-  vehicle.driverDoor.rotation.y = inside() && reduced.matches ? -1.5 : 0;
+  vehicle.hood.rotation.z = target === "engine_bay" ? -.98 : 0;
+  vehicle.driverDoor.rotation.y = inside() && reduced.matches ? -1.3 : 0;
   try { renderer.render(scene, camera); }
   catch (error) {
     freeVehicle(vehicle); floor.geometry.dispose(); floorMaterial.dispose(); environment.dispose(); key.shadow.dispose();
