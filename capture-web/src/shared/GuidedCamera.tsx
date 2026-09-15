@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useRef, useState, type ReactNode } from "react";
 import { createPortal } from "react-dom";
-import { Camera, Check, X } from "lucide-react";
+import { Camera, Check, Upload, X } from "lucide-react";
 import { BODY_STYLES, bodyLabel, bodyStyleFor, VehicleGuide } from "./VehicleGuide";
 import { HAIL_AREAS, type PhotoStep } from "./template";
 
@@ -81,6 +81,7 @@ export default function GuidedCamera({ steps, uploaded, body, onBodyChange, chec
   const closeButton = useRef<HTMLButtonElement>(null);
   const content = useRef<HTMLDivElement>(null);
   const manualInput = useRef<HTMLInputElement>(null);
+  const stripInputs = useRef<Record<string, HTMLInputElement | null>>({});
   const step = steps[index];
   const style = bodyStyleFor(body);
   const pauseAutomatic = () => {
@@ -95,11 +96,23 @@ export default function GuidedCamera({ steps, uploaded, body, onBodyChange, chec
   const required = steps.filter((item) => !item.optional);
   const requiredSaved = required.filter((item) => saved[item.key]).length;
   useEffect(() => { content.current?.scrollTo?.({ top: 0, behavior: "instant" }); }, [index, needsDamagePanel]);
+  const nextUnsaved = useCallback((done: Record<string, boolean>, from: number, skip: Record<string, boolean>) => {
+    const open = (item: PhotoStep) => !done[item.key] && !skip[item.key];
+    const after = steps.findIndex((item, candidate) => candidate > from && open(item));
+    return after >= 0 ? after : steps.findIndex((item, candidate) => candidate !== from && open(item));
+  }, [steps]);
+  const goTo = (at: number) => {
+    if (at === index || inflight.current || pending.current || complete || !steps[at]) return;
+    autoGeneration.current += 1;
+    abort.current?.abort();
+    setIndex(at);
+    setInstruction("");
+  };
   const skipOptional = () => {
     if (!step?.optional || inflight.current || pending.current) return;
     const nextSkipped = { ...skipped, [step.key]: true };
     setSkipped(nextSkipped);
-    const next = steps.findIndex((item, candidate) => candidate > index && !saved[item.key] && !nextSkipped[item.key]);
+    const next = nextUnsaved(saved, index, nextSkipped);
     if (next >= 0) setIndex(next);
     setInstruction("");
   };
@@ -181,10 +194,10 @@ export default function GuidedCamera({ steps, uploaded, body, onBodyChange, chec
     const nextSaved = { ...saved, [step.key]: true };
     setSaved(nextSaved);
     setCapturedThisWalk(true);
-    const next = steps.findIndex((item, candidate) => candidate > index && !nextSaved[item.key] && !skipped[item.key]);
+    const next = nextUnsaved(nextSaved, index, skipped);
     if (next >= 0) { setIndex(next); setInstruction(`Photo saved. Move to ${steps[next].label.toLowerCase()}.`); }
     else { setInstruction("Required photos saved. Review them before submitting your estimate."); }
-  }, [step, onCapture, saved, steps, index, skipped]);
+  }, [step, onCapture, saved, steps, index, skipped, nextUnsaved]);
 
   const capture = useCallback(async (auto: boolean) => {
     if (inflight.current || !loaded || paused || document.hidden || !media.current || complete || !video.current || !step) return;
@@ -234,12 +247,15 @@ export default function GuidedCamera({ steps, uploaded, body, onBodyChange, chec
     }
   }, [loaded, paused, complete, step, style, checkFrame, saveFrame]);
 
+  const acceptable = (file: File) => {
+    if (["image/jpeg", "image/png", "image/webp"].includes(file.type) && file.size <= 8 * 1024 * 1024) return true;
+    setInstruction("Choose a JPEG, PNG or WebP photo smaller than 8 MB.");
+    return false;
+  };
+
   const uploadManually = async (file: File | null) => {
     if (!file || inflight.current || complete || !step || (pending.current && pending.current !== file)) return;
-    if (!(["image/jpeg", "image/png", "image/webp"].includes(file.type)) || file.size > 8 * 1024 * 1024) {
-      setInstruction("Choose a JPEG, PNG or WebP photo smaller than 8 MB.");
-      return;
-    }
+    if (!acceptable(file)) return;
     inflight.current = true;
     setBusy(true);
     try {
@@ -265,6 +281,33 @@ export default function GuidedCamera({ steps, uploaded, body, onBodyChange, chec
     }
   };
 
+  // A photo chosen from the step strip saves to that view without moving the
+  // customer off the view they are framing; a failure is reported inline and
+  // never enters the current view's retry state.
+  const uploadFor = async (at: number, file: File | null) => {
+    const target = steps[at];
+    if (!file || !target?.panel || inflight.current || pending.current || complete) return;
+    if (at === index) { await uploadManually(file); return; }
+    if (!acceptable(file)) return;
+    inflight.current = true;
+    setBusy(true);
+    setInstruction(`Saving ${target.label.toLowerCase()}…`);
+    try {
+      const ok = await onCapture(target.key, target.panel, file);
+      if (!alive.current) return;
+      if (!ok) { setInstruction(`${target.label} has not been confirmed saved. Choose it again to retry.`); return; }
+      setSaved((previous) => ({ ...previous, [target.key]: true }));
+      setCapturedThisWalk(true);
+      setInstruction(`${target.label} saved.`);
+    } catch (error) {
+      if (!alive.current) return;
+      setInstruction(error instanceof Error ? error.message : `${target.label} could not be saved. Try again.`);
+    } finally {
+      inflight.current = false;
+      if (alive.current) setBusy(false);
+    }
+  };
+
   useEffect(() => {
     if (!automatic || !loaded || paused || complete) return;
     const timer = window.setInterval(() => void capture(true), AUTO_CAPTURE_INTERVAL_MS);
@@ -273,6 +316,7 @@ export default function GuidedCamera({ steps, uploaded, body, onBodyChange, chec
 
   useEffect(() => { if (complete && capturedThisWalk && !needsDamagePanel) onComplete?.(); }, [complete, capturedThisWalk, needsDamagePanel, onComplete]);
 
+  const stripLocked = busy || retry || complete;
   return createPortal(
     <div role="dialog" aria-modal="true" aria-label="Guided vehicle camera" className="customer-camera fixed inset-0 z-[100] text-slate-900" onKeyDown={(event) => {
       if (event.key === "Escape") close();
@@ -288,45 +332,62 @@ export default function GuidedCamera({ steps, uploaded, body, onBodyChange, chec
           <div className="journey-brand"><strong className="journey-wordmark" aria-label={brandName}>{brandName.toLowerCase()}</strong><span>Customer photos</span><button ref={closeButton} type="button" onClick={close} aria-label="Close camera" className="camera-close"><X /></button></div>
           <div className="camera-progress"><p>{complete ? needsDamagePanel ? "Damage close-up" : "Capture complete" : `Photo ${index + 1} of ${steps.length}`}</p><p>{required.length ? `${requiredSaved} of ${required.length} saved` : `${steps.filter(item => saved[item.key]).length} saved · optional`}</p></div>
           <div role="progressbar" aria-label="Photos saved" aria-valuenow={requiredSaved} aria-valuemin={0} aria-valuemax={Math.max(1, required.length)} className="camera-progress-track"><span style={{ width: `${required.length ? requiredSaved / required.length * 100 : 0}%` }} /></div>
+          <ul className="camera-step-strip" aria-label="Photo views">
+            {steps.map((item, at) => {
+              const done = !!saved[item.key];
+              const current = at === index && !complete;
+              return <li key={item.key} className={`camera-step-chip${current ? " is-current" : ""}${done ? " is-saved" : ""}`}>
+                <button type="button" aria-label={`Go to ${item.label}`} aria-current={current ? "step" : undefined} data-saved={done ? "true" : "false"} disabled={stripLocked} onClick={() => goTo(at)}>
+                  <span className="camera-step-chip-mark" aria-hidden="true">{done ? <Check /> : at + 1}</span>
+                  <span className="camera-step-chip-label">{item.label}</span>
+                </button>
+                <input ref={(node) => { stripInputs.current[item.key] = node; }} className="sr-only" type="file" accept={photoAccept} aria-label={`Upload photo for ${item.label}`} disabled={stripLocked} onChange={(event) => { const file = event.currentTarget.files?.[0] ?? null; event.currentTarget.value = ""; void uploadFor(at, file); }} />
+                <button type="button" aria-label={`Upload ${item.label}`} title={`Upload a photo for ${item.label}`} disabled={stripLocked} onClick={() => stripInputs.current[item.key]?.click()}><Upload /></button>
+              </li>;
+            })}
+          </ul>
         </header>
-        <div ref={content} className="camera-content">
-        <div className="camera-step-copy" key={step?.key}>
-        <h2>{complete ? needsDamagePanel ? "One close-up of the damage" : "Photos saved" : step?.label === "Front of car" ? "Front of your vehicle" : step?.label === "Back of car" ? "Rear of your vehicle" : step?.label === "Driver side of car" ? "Driver side of your vehicle" : step?.label === "Passenger side of car" ? "Passenger side of your vehicle" : step?.label}</h2>
-        {step?.optional && !complete && <p className="mt-1 px-5 text-sm font-semibold text-slate-500">Optional · skip if unavailable</p>}
-        <p className="camera-step-hint">{complete ? needsDamagePanel ? "Choose a damaged panel for assessment. Your camera stays open." : "Your required photos are saved. Review your estimate before submitting." : step?.hint}</p>
+        <div ref={content} className="camera-side">
+          <div className="camera-step-copy" key={step?.key}>
+            <h2>{complete ? needsDamagePanel ? "One close-up of the damage" : "Photos saved" : step?.label === "Front of car" ? "Front of your vehicle" : step?.label === "Back of car" ? "Rear of your vehicle" : step?.label === "Driver side of car" ? "Driver side of your vehicle" : step?.label === "Passenger side of car" ? "Passenger side of your vehicle" : step?.label}</h2>
+            {step?.optional && !complete && <p className="camera-step-optional">Optional · skip if unavailable</p>}
+            <p className="camera-step-hint">{complete ? needsDamagePanel ? "Choose a damaged panel for assessment. Your camera stays open." : "Your required photos are saved. Review your estimate before submitting." : step?.hint}</p>
+            {complete && needsDamagePanel && <label className="camera-damage-panel">Where are the dents?
+              <select aria-label="Damaged panel for dent detection" className="mt-2 block w-full rounded-xl border border-slate-300 bg-white p-3 text-base" value="" onChange={(event) => onDamagePanel?.(event.target.value)}>
+                <option value="">Choose a damaged panel</option>{HAIL_AREAS.map((area) => <option key={area.key} value={area.key}>{area.label}</option>)}
+              </select>
+            </label>}
+            {cameraError && <p role="alert" className="mt-2 rounded-xl bg-amber-50 p-3 text-sm text-amber-900">{cameraError}</p>}
+            {paused && <button type="button" className="mt-2 rounded-xl bg-brand p-3 font-semibold text-white" onClick={() => { setPaused(false); setCameraError(null); setCameraRun((value) => value + 1); }}>Resume camera</button>}
+            {error && <p role="alert" className="mt-2 rounded-xl bg-amber-50 p-3 text-sm text-amber-900">{error}</p>}
+          </div>
+          <VehicleGuide className="capture-vehicle-guide" body={style ?? "sedan"} target={step?.key ?? "front"} />
+          <div className="capture-actions">
+            <div className="capture-settings-row"><label className="camera-body-select"><span className="sr-only">Vehicle body</span>
+                <select aria-label="Guide body style" disabled={savingFrame || retry} value={style ?? ""} onFocus={pauseAutomatic} onPointerDown={pauseAutomatic} onChange={(event) => { if (!pending.current) { pauseAutomatic(); onBodyChange(event.target.value); } }}>
+                  {!style && <option value="">Sedan (default)</option>}{BODY_STYLES.map((item) => <option key={item} value={item}>{bodyLabel(item)}</option>)}
+                </select>
+              </label>
+              <label className="camera-auto-toggle"><input type="checkbox" checked={automatic} disabled={savingFrame || retry} onChange={(event) => { if (!event.target.checked) pauseAutomatic(); else { setInstruction("Take your time positioning the camera. Auto-capture will check focus before saving."); setAutomatic(true); } }} />Auto-capture</label></div>
+            {!complete && <div className="capture-buttons">
+              <input ref={manualInput} className="sr-only" type="file" accept={photoAccept} aria-label="Upload photo for current view" disabled={busy || retry} onChange={(event) => { const file = event.currentTarget.files?.[0] ?? null; event.currentTarget.value = ""; void uploadManually(file); }} />
+              <button type="button" aria-label="Upload a photo instead" disabled={busy || retry} className="capture-upload" onClick={() => manualInput.current?.click()}><Upload />Upload photo</button>
+              {!cameraError && <button type="button" disabled={!loaded || busy || paused} onClick={() => void capture(false)} className="capture-shutter"><Camera className="h-5 w-5" />{busy ? "Checking / saving…" : retry ? "Retry saving photo" : "Take photo now"}</button>}
+            </div>}
+            {!complete && retry && (cameraError || !loaded) && <button type="button" disabled={busy || paused} className="mt-2 w-full rounded-full bg-brand p-3 text-sm font-semibold text-white disabled:opacity-50" onClick={() => void uploadManually(pending.current)}>Retry saving photo</button>}
+            {!complete && step?.optional && <button type="button" disabled={busy || retry} onClick={skipOptional} className="mt-2 w-full rounded-full border border-slate-300 p-2.5 text-sm font-semibold text-brand disabled:opacity-50">Skip optional photo</button>}
+            {complete && !needsDamagePanel && <button type="button" disabled={completing} onClick={onComplete ?? close} className="flex w-full items-center justify-center gap-2 rounded-full bg-brand p-4 text-base font-semibold text-white"><Check />{completing ? "Preparing your estimate…" : onComplete ? "Continue to estimate" : "Done"}</button>}
+            <div className="capture-meta">
+              <p className="capture-footnote">{complete ? "Photo capture is complete. Review before submitting." : "Driver side is the side with the steering wheel."}</p>
+              {renderAssist && <div className="capture-footer-tools">{renderAssist({ capture_key: step?.key ?? "front", body_style: style ?? "" }, paused || !loaded || !!cameraError)}</div>}
+            </div>
+          </div>
         </div>
-        <VehicleGuide className="capture-vehicle-guide" body={style ?? "sedan"} target={step?.key ?? "front"} />
-        {complete && needsDamagePanel && <label className="m-5 text-lg font-semibold">Where are the dents?
-          <select aria-label="Damaged panel for dent detection" className="mt-3 block w-full rounded-xl border border-slate-300 bg-white p-4 text-base" value="" onChange={(event) => onDamagePanel?.(event.target.value)}>
-            <option value="">Choose a damaged panel</option>{HAIL_AREAS.map((area) => <option key={area.key} value={area.key}>{area.label}</option>)}
-          </select>
-        </label>}
         <div className="capture-viewfinder">
           <video ref={video} autoPlay playsInline muted aria-label="Live camera" onLoadedData={() => setLoaded(true)} className="capture-live-video" />
           <p aria-live="polite" className="capture-coaching">{instruction || "Keep the whole view in frame. Step back if an edge is cut off, then hold steady."}</p>
           <div aria-hidden="true" className="pointer-events-none absolute inset-[9%] rounded-xl border-2 border-dashed border-white/60" />
           {!loaded && !cameraError && !paused && <p className="absolute inset-0 grid place-items-center bg-black/70 text-white">Opening camera…</p>}
-        </div>
-        {cameraError && <p role="alert" className="rounded-xl bg-amber-50 p-3 text-sm text-amber-900">{cameraError}</p>}
-        {paused && <button type="button" className="rounded-xl bg-brand p-3 font-semibold text-white" onClick={() => { setPaused(false); setCameraError(null); setCameraRun((value) => value + 1); }}>Resume camera</button>}
-        {error && <p role="alert" className="mx-5 rounded-xl bg-amber-50 p-4 text-base text-amber-900">{error}</p>}
-        </div>
-        <div className="capture-actions">
-        <div className="capture-settings-row"><label className="camera-body-select"><span className="sr-only">Vehicle body</span>
-            <select aria-label="Guide body style" disabled={savingFrame || retry} value={style ?? ""} onFocus={pauseAutomatic} onPointerDown={pauseAutomatic} onChange={(event) => { if (!pending.current) { pauseAutomatic(); onBodyChange(event.target.value); } }}>
-              {!style && <option value="">Sedan (default)</option>}{BODY_STYLES.map((item) => <option key={item} value={item}>{bodyLabel(item)}</option>)}
-            </select>
-          </label>
-          <label className="camera-auto-toggle"><input type="checkbox" checked={automatic} disabled={savingFrame || retry} onChange={(event) => { if (!event.target.checked) pauseAutomatic(); else { setInstruction("Take your time positioning the camera. Auto-capture will check focus before saving."); setAutomatic(true); } }} />Auto-capture</label></div>
-        {!complete && !cameraError && <>
-          <button type="button" disabled={!loaded || busy || paused} onClick={() => void capture(false)} className="capture-shutter"><Camera className="h-5 w-5" />{busy ? "Checking / saving…" : retry ? "Retry saving photo" : "Take photo now"}</button>
-        </>}
-        {!complete && <><input ref={manualInput} className="sr-only" type="file" accept={photoAccept} aria-label="Upload photo for current view" disabled={busy || retry} onChange={(event) => { const file = event.currentTarget.files?.[0] ?? null; event.currentTarget.value = ""; void uploadManually(file); }} /><button type="button" disabled={busy || retry} className="mt-2 rounded-full border border-slate-300 p-3 text-sm font-semibold text-brand disabled:opacity-50" onClick={() => manualInput.current?.click()}>Upload a photo instead</button></>}
-        {!complete && retry && (cameraError || !loaded) && <button type="button" disabled={busy || paused} className="mt-2 rounded-full bg-brand p-3 text-sm font-semibold text-white disabled:opacity-50" onClick={() => void uploadManually(pending.current)}>Retry saving photo</button>}
-        {!complete && step?.optional && <button type="button" disabled={busy || retry} onClick={skipOptional} className="mt-2 rounded-full border border-slate-300 p-3 text-sm font-semibold text-brand disabled:opacity-50">Skip optional photo</button>}
-        {complete && !needsDamagePanel && <button type="button" disabled={completing} onClick={onComplete ?? close} className="flex w-full items-center justify-center gap-2 rounded-full bg-brand p-4 text-base font-semibold text-white"><Check />{completing ? "Preparing your estimate…" : onComplete ? "Continue to estimate" : "Done"}</button>}
-        <p className="capture-footnote">{complete ? "Photo capture is complete. Review before submitting." : "Driver side is the side with the steering wheel."}</p>
-        {renderAssist && <div className="capture-footer-tools">{renderAssist({ capture_key: step?.key ?? "front", body_style: style ?? "" }, paused || !loaded || !!cameraError)}</div>}
         </div>
       </div>
     </div>, document.body,

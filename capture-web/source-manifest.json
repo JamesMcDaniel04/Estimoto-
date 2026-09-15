@@ -2,35 +2,35 @@
   "files": [
     {
       "source": "dashboard/src/pages/intake/GuidedCamera.tsx",
-      "source_sha256": "cbe5d980584236d8de408e4faf334282c0fb5f6e5849bd9382a7e3bc0e8bd63a",
+      "source_sha256": "5be2dd00e772824c3fdbf011973246e875f023a86c3bdba3ba4ae4717222dbd4",
       "target": "src/shared/GuidedCamera.tsx",
-      "target_sha256": "cbe5d980584236d8de408e4faf334282c0fb5f6e5849bd9382a7e3bc0e8bd63a"
+      "target_sha256": "5be2dd00e772824c3fdbf011973246e875f023a86c3bdba3ba4ae4717222dbd4"
     },
     {
       "source": "dashboard/src/pages/intake/VehicleGuide.tsx",
-      "source_sha256": "41f37e5d736de815db66aa5d57fecd99eda8bafdb8009703274b82edf56e859b",
+      "source_sha256": "f52ac1b9a908f09acf6813852f956b1500dfbef7d5f41cd36cdb65ad039a5b60",
       "target": "src/shared/VehicleGuide.tsx",
-      "target_sha256": "41f37e5d736de815db66aa5d57fecd99eda8bafdb8009703274b82edf56e859b"
+      "target_sha256": "f52ac1b9a908f09acf6813852f956b1500dfbef7d5f41cd36cdb65ad039a5b60"
     },
     {
       "source": "dashboard/src/pages/intake/vehicleScene.ts",
-      "source_sha256": "7f988470a8d35c03ad061cacd0e9248ab5d205242d1d56ff48e86471acdaa330",
+      "source_sha256": "8f048b5c1dbbfc8075d19737fa5b827061c4a78bcc3f8895f18a214784be3322",
       "target": "src/shared/vehicleScene.ts",
-      "target_sha256": "7f988470a8d35c03ad061cacd0e9248ab5d205242d1d56ff48e86471acdaa330"
+      "target_sha256": "8f048b5c1dbbfc8075d19737fa5b827061c4a78bcc3f8895f18a214784be3322"
     },
     {
       "source": "dashboard/src/pages/intake/template.ts",
-      "source_sha256": "8bdb8af4234757a4377117f11c6be688ad2c06974f26c735d0e7c4227b9243cc",
+      "source_sha256": "ea0323b6c6cc0a74601dd940dc6edb797148192cf9b0cd672cb52db80127165e",
       "target": "src/shared/template.ts",
-      "target_sha256": "8bdb8af4234757a4377117f11c6be688ad2c06974f26c735d0e7c4227b9243cc"
+      "target_sha256": "ea0323b6c6cc0a74601dd940dc6edb797148192cf9b0cd672cb52db80127165e"
     },
     {
       "source": "dashboard/src/index.css",
-      "source_sha256": "545c8a333555fa98916475085f3c97c621c63f9239595d984e428b1b1a5b88b6",
+      "source_sha256": "0d8f9c484c3ca71954ac984485759c94582916d5daad4a58dec8864f7736ffb2",
       "target": "src/shared/camera.css",
-      "target_sha256": "9f9091e9f390d16b46d04cf22bee749fd2cdd837ad1a03b2979a3a3573cf8e91"
+      "target_sha256": "ec4c34676206295ede6371d0c51001dce1e4d4ed0826c6022f4a813518b332c3"
     }
   ],
-  "source_commit": "cd9392bca70a7ff2e4af566e795e41cf310af21f",
+  "source_commit": "5cfb2a9348db7c37dfaf5b42d8631b73a58ac691",
   "source_repository": "Estimoto"
 }

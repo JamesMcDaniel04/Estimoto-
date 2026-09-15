@@ -89,7 +89,7 @@ export const OPTIONAL_ROOF_STEP: PhotoStep = { key: "roof", panel: "vehicle_roof
 /** Required documentation for collision and PDR is evidence, never damage pricing. */
 export const COLLISION_DOCUMENT_STEPS: PhotoStep[] = [
   { key: "odometer", panel: "odometer", label: "Odometer photo", hint: "With the vehicle parked, open the driver’s door. Move closer to the mileage display behind the steering wheel." },
-  { key: "vin", panel: "vin", label: "VIN at driver’s door jamb", hint: "Open the driver’s door and photograph the VIN label on the door jamb. Keep all 17 characters sharp and in frame; confirm any suggested reading yourself." },
+  { key: "vin", panel: "vin", label: "VIN at driver’s door jamb", hint: "Open the driver’s door. The VIN label is on the door jamb beside the driver’s seat, where the door latches. Keep all 17 characters sharp and in frame; confirm any suggested reading yourself." },
   { key: "engine_bay", panel: "engine_bay", label: "Engine bay", hint: "Open the hood. Step back and raise the camera until the whole engine compartment is visible." },
   { key: "interior", panel: "interior", label: "Interior", hint: "Open the driver’s door. Hold the camera outside the doorway and include the front seats and dashboard." },
   { key: "tire_tread", panel: "tire_tread", label: "Tire tread", hint: "With the vehicle parked, move close to a tire and aim at the tread grooves, not the sidewall." },

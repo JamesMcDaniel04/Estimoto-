@@ -23,5 +23,5 @@ it.each([undefined, "image/*"])("offers the configured photo picker without weak
   const photo = new File(["photo"], "photo.jpg", { type: "image/jpeg" });
   fireEvent.change(picker, { target: { files: [photo] } });
   await waitFor(() => expect(save).toHaveBeenCalledWith("odometer", "odometer", photo));
-  await screen.findByText("VIN at driver’s door jamb");
+  await screen.findByRole("heading", { name: "VIN at driver’s door jamb" }); // the step strip also names the view
 });

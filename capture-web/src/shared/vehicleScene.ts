@@ -26,7 +26,11 @@ const SPECS: Record<string, Spec> = {
 };
 const normalBody = (body: string) => Object.hasOwn(SPECS, body) ? body : "sedan";
 const v = (x: number, y: number, z: number) => new THREE.Vector3(x, y, z);
-const vinDoorJambPoint = (spec: Spec) => v(spec.glassFront + .21, spec.belt - .31, spec.width * .45);
+// The driver door opening runs from just behind the windshield base to the
+// B-pillar; the certification/VIN label lives on that rear pillar beside the
+// driver's seat, where the door latches, not up by the dashboard.
+const driverDoorEnd = (spec: Spec) => spec.doors === 2 ? .70 : .22;
+const vinDoorJambPoint = (spec: Spec) => v(driverDoorEnd(spec) + .05, spec.belt - .31, spec.width * .41);
 
 function surface(fn: (u: number, v: number) => THREE.Vector3, nu = 20, nv = 12) {
   const positions: number[] = [], indices: number[] = [];
@@ -94,7 +98,7 @@ function buildVehicle(spec: Spec) {
   const bottom = spec.radius > .4 ? .33 : .24;
   const midBody = (spec.belt + bottom) / 2, bodyH = (spec.belt - bottom) / 2;
   const bodyX = (y: number, z: number) => half * Math.pow(Math.max(0, 1 - Math.pow(Math.pow(Math.abs((y - midBody) / bodyH), 4) + Math.pow(Math.abs(z / width), 4), 2.5)), .1);
-  const doorStart = spec.glassFront + .10, doorEnd = spec.doors === 2 ? .70 : .22;
+  const doorStart = spec.glassFront + .10, doorEnd = driverDoorEnd(spec);
   const driverDoor = new THREE.Group(); driverDoor.position.set(doorStart, spec.belt, width * .91); group.add(driverDoor);
   // Parts are authored in vehicle coordinates so the closed door matches the
   // surrounding skin exactly, then moved onto its front hinge.
@@ -143,6 +147,8 @@ function buildVehicle(spec: Spec) {
   // An unnumbered marker shows where a real door-jamb VIN label lives. It is
   // geometry only: no actual or invented VIN is rendered into the guide.
   const vinMarker = new THREE.Group(); vinMarker.position.copy(vinDoorJambPoint(spec)); group.add(vinMarker);
+  // Face the label forward and outward, toward someone standing in the open doorway.
+  vinMarker.rotation.y = -Math.PI * .42;
   rounded(.48, .26, .014, .012, vinOutline, v(0, 0, .018), vinMarker);
   rounded(.38, .17, .018, .008, vinPaper, v(0, 0, .035), vinMarker);
   for (let row = 0; row < 3; row++) rounded(.28, .009, .021, .003, vinOutline,
@@ -424,7 +430,8 @@ function viewFor(spec: Spec, target: string): View {
   else if (target === "odometer") { position = v(spec.glassFront + 1.12, Math.min(spec.belt + .42, spec.height - .07), spec.width * .44); look.set(spec.glassFront + .36, spec.belt + .095, spec.width * .215); fov = 49; }
   else if (target === "vin") {
     const marker = vinDoorJambPoint(spec);
-    position = marker.clone().add(v(.58, .28, 1.26));
+    // Stand forward of the pillar, outside the sill, looking back at the latch-side jamb.
+    position = marker.clone().add(v(-.62, .30, 1.18));
     look.copy(marker); fov = 36;
   }
   else if (target === "tire_tread") { position = v(spec.frontAxle - .92, spec.radius + .76, spec.width * .5 + 1.05); look.set(spec.frontAxle, spec.radius + .08, spec.width * .46); fov = 39; }

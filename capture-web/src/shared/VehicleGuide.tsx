@@ -64,7 +64,7 @@ export function VehicleGuide({ body, target: requestedTarget, className = "h-44"
     <div className={`relative w-full ${className}`} role="img" aria-label={`${bodyLabel(body)} guide: ${label}`}>
       <div ref={host} aria-hidden="true" className={`absolute inset-0 ${rendered ? "" : "invisible"}`} />
       {!rendered && <div className="flex h-full items-center" aria-hidden="true"><VehicleGuideFallback body={body} target={target} /></div>}
-      {rendered && <span className="absolute bottom-1 left-0 right-0 mx-auto w-fit max-w-[calc(100%-1rem)] rounded-md bg-white/90 px-2 py-0.5 text-center text-xs text-slate-700">{target === "odometer" ? "Mileage display · behind the steering wheel" : target === "vin" ? "VIN label · inside driver’s door jamb" : target === "interior" ? "Driver’s doorway · seats and dashboard" : `${bodyLabel(body)} · ${label}`}</span>}
+      {rendered && <span className="absolute bottom-1 left-0 right-0 mx-auto w-fit max-w-[calc(100%-1rem)] rounded-md bg-white/90 px-2 py-0.5 text-center text-xs text-slate-700">{target === "odometer" ? "Mileage display · behind the steering wheel" : target === "vin" ? "VIN label · door jamb beside the driver’s seat" : target === "interior" ? "Driver’s doorway · seats and dashboard" : `${bodyLabel(body)} · ${label}`}</span>}
     </div>
   );
 }
@@ -88,8 +88,8 @@ function VehicleGuideFallback({ body, target }: { body: BodyStyle; target: strin
       <path d="M92 64 L49 81 L51 102 L92 91 Z" fill="#3c5c71" />
       <path d="M55 117 L84 109" stroke="#405b6c" strokeWidth="5" strokeLinecap="round" />
       {target === "odometer" ? <g><rect x="123" y="60" width="52" height="23" rx="5" fill="none" stroke="#0c9d83" strokeWidth="3" /><path d="M192 37 L168 59 M168 59 L170 50 M168 59 L178 57" fill="none" stroke="#087b69" strokeWidth="3" /><text x="194" y="34" fill="#125b52" fontSize="12">Mileage display</text></g> : null}
-      {target === "vin" ? <g><rect x="89" y="100" width="23" height="13" rx="2" fill="#fff" stroke="#0c9d83" strokeWidth="2" /><path d="M96 104h10m-10 3h10m-10 3h8" stroke="#334155" strokeWidth="1" /><path d="M170 98L113 107" stroke="#087b69" strokeWidth="3" /><text x="174" y="96" fill="#125b52" fontSize="12">VIN label</text></g> : null}
-      <text x="180" y="158" textAnchor="middle" fill="currentColor" fontSize="11">Open the driver’s door · {target === "odometer" ? "look behind the steering wheel" : target === "vin" ? "find the door-jamb VIN label" : "include the seats and dashboard"}</text>
+      {target === "vin" ? <g><rect x="303" y="92" width="23" height="13" rx="2" fill="#fff" stroke="#0c9d83" strokeWidth="2" /><path d="M310 96h10m-10 3h10m-10 3h8" stroke="#334155" strokeWidth="1" /><path d="M262 44L306 91" stroke="#087b69" strokeWidth="3" /><text x="258" y="40" textAnchor="end" fill="#125b52" fontSize="12">VIN label · door jamb</text></g> : null}
+      <text x="180" y="158" textAnchor="middle" fill="currentColor" fontSize="11">Open the driver’s door · {target === "odometer" ? "look behind the steering wheel" : target === "vin" ? "find the VIN label on the jamb beside the seat" : "include the seats and dashboard"}</text>
     </svg>
   );
   const highlight = target === "roof" || target === "panel_roof" ? [130, 20, 130, 40]
