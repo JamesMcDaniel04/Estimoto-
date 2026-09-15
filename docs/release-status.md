@@ -1,4 +1,19 @@
-# Current web release — per-body 3D proportions, September 14, 2026
+# Current web release — closed greenhouse, clean panel edges and wheel wells, September 14, 2026
+
+The capture page at `/capture/` now vendors original Estimoto
+`894444b00c58f7ef96916ebb8c7de0daa52f61bb`. The 3D guide's cabin is one closed
+loft with exact-edged glass panes, the hood and door are cut along mesh lines
+with no sawtooth, wheel arches are exact circles with double-sided well liners
+and tires flush with the fender lip, and the hood stops at the grille top.
+
+Source `fd694d55330423f8284e67a782c8a490df1e6cf5` is deployed on web; `/version`
+reports it and `/ready` reports schema `d9e4b82013c7`. Capture source digests
+verified, 19 capture-web tests and the capture and web builds passed, and the
+served scene chunk hash matches the built artifact. Native installs load
+`/capture/` from the API origin, so no native build was produced. GitHub Actions
+did not run because of the existing account billing lock.
+
+# Historical web release — per-body 3D proportions, September 14, 2026
 
 The capture page at `/capture/` now vendors original Estimoto
 `d2089d8e432a991374e16868ad3b543e5cfa4ea3`. Each body style in the 3D guide has
