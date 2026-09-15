@@ -1,4 +1,20 @@
-# Current web release — cabin door panels and tighter landscape header, September 15, 2026
+# Current web release — no safe-area insets around the capture dialog, September 15, 2026
+
+The capture page at `/capture/` now vendors original Estimoto
+`22f6e42d00ec34af9ad1dcaa98f465b310993454`. In landscape the dialog no longer
+pads its top and bottom or the camera panel's bottom edge with the WebView's
+reported safe-area insets, and the Plus page zeroes the dialog's insets outright
+because the native host already keeps it clear of the system bars. The camera
+and the 3D guide take the recovered height.
+
+Source `5db87c00581ac37a28f8499391207a09ee15d385` is deployed on web; `/version`
+reports it and `/ready` reports schema `d9e4b82013c7`. Capture source digests
+verified, 19 capture-web tests and the capture and web builds passed, and the
+served stylesheet hash matches the built artifact. Native installs load
+`/capture/` from the API origin, so no native build was produced. GitHub Actions
+did not run because of the existing account billing lock.
+
+# Historical web release — cabin door panels and tighter landscape header, September 15, 2026
 
 The capture page at `/capture/` now vendors original Estimoto
 `466ff0e6c64761a92802f025bd4b7815aabe4f2f`. Dark inner door panels line the
