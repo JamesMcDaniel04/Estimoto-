@@ -483,6 +483,11 @@ function buildVehicle(spec: Spec) {
     rounded(.10, .17, .26, .041, seatMaterial, v(x + .23, seatBaseY + .61, z), interior);
     for (const zs of [-.17, .17]) rounded(.105, .44, .07, .03, seatMaterial, v(x + .12, seatBaseY + .29, z + zs), interior);
   }
+  // Inner door panels hide the bare shoulder of the side skin when looking in through the open doorway.
+  for (const side of [-1, 1]) for (const [start, end] of side === 1 ? [[doorEnd + .02, spec.glassRear - .04]] : [[doorStart, doorEnd - .02], [doorEnd + .02, spec.glassRear - .04]]) {
+    const cardTop = cabinBase((start + end) / 2) - .02;
+    rounded(end - start, cardTop - .40, .05, .03, seatMaterial, v((start + end) / 2, (cardTop + .40) / 2, side * (width * .86 - .045)), interior);
+  }
   rounded(.91, .18, .20, .04, trim, v(.01, seatBaseY - .02, 0), interior);
   rounded(.06, .16, .045, .018, chrome, v(-.14, seatBaseY + .11, 0), interior);
   rounded(.28, .18, spec.width * .75, .06, trim, v(spec.glassFront + .17, spec.belt - .08, 0), interior);

@@ -94,28 +94,32 @@
   .customer-camera, .customer-phone .customer-camera { padding:env(safe-area-inset-top) env(safe-area-inset-right) env(safe-area-inset-bottom) env(safe-area-inset-left); }
   .camera-shell { max-width:none; border-radius:0; box-shadow:none; grid-template-columns:minmax(0,3fr) minmax(0,7fr); grid-template-areas:"header header" "side view"; column-gap:.75rem; }
   .camera-shell { grid-template-rows:auto minmax(0,1fr); overflow:hidden; }
-  .camera-header, .customer-phone .camera-header { padding:0 1rem .25rem; }
+  /* One header row: wordmark, the step strip (which carries the progress), close; the track underneath. */
+  .camera-header, .customer-phone .camera-header { grid-template-columns:auto minmax(0,1fr) auto; column-gap:.75rem; padding:.125rem 1rem .25rem; }
   .camera-header .journey-wordmark { font-size:1.125rem; }
+  .camera-header .camera-progress { display:none; }
   .camera-header .camera-close { width:2.25rem; height:2.25rem; }
-  .camera-header .camera-step-strip { margin:.25rem -1rem 0; padding:0 1rem; }
+  .camera-header .camera-step-strip { grid-column:2; grid-row:1; margin:0; padding:0 .25rem; }
+  .camera-header .camera-progress-track { grid-row:2; margin-top:.25rem; }
   .camera-step-chip > button { min-height:2rem; font-size:.6875rem; }
   /* Left column stacks copy, guide, then the always-reachable controls; the
      guide gives up height first and the column scrolls only as a last resort. */
   .camera-side { display:flex; flex-direction:column; grid-area:side; min-height:0; overflow-y:auto; overscroll-behavior:contain; padding:0 0 max(.375rem,env(safe-area-inset-bottom)) 1rem; }
   .camera-step-copy { flex:none; padding:.375rem 0 0; }
   .camera-step-copy h2 { font-size:1.0625rem; letter-spacing:-.02rem; }
-  .camera-step-hint { font-size:.75rem; line-height:1.3; margin-top:.125rem; }
-  .capture-vehicle-guide { flex:1 1 4rem; min-height:4rem; margin:.375rem 0 0; }
+  .camera-step-hint { font-size:.75rem; line-height:1.3; margin-top:.125rem; -webkit-line-clamp:1; }
+  .capture-vehicle-guide { flex:1 1 7rem; min-height:5.5rem; margin:.375rem 0 0; }
   .capture-actions { flex:none; padding:.375rem 0 0; }
   .capture-settings-row { flex-wrap:wrap; gap:.25rem .5rem; margin-bottom:.375rem; }
   .camera-body-select { flex:1 1 0; min-width:6rem; max-width:none; }
   .camera-body-select select { min-height:2.25rem; font-size:.8125rem; }
   .camera-auto-toggle { flex:none; min-height:2rem; font-size:.75rem; white-space:nowrap; }
   .capture-buttons { flex-direction:column; gap:.375rem; }
-  .capture-upload, .capture-shutter { flex:none; width:100%; min-height:2.5rem; font-size:.875rem; }
+  .capture-upload { flex:none; width:100%; min-height:2.25rem; font-size:.8125rem; }
+  .capture-shutter { flex:none; width:100%; min-height:2.5rem; font-size:.875rem; }
   .capture-meta { justify-content:flex-start; margin-top:.25rem; }
   .capture-footnote { display:none; }
-  .capture-viewfinder { grid-area:view; margin:.375rem .5rem max(.5rem,env(safe-area-inset-bottom)) 0; }
+  .capture-viewfinder { grid-area:view; margin:.375rem .5rem max(.375rem,env(safe-area-inset-bottom)) 0; }
   .capture-coaching { inset:.5rem .5rem auto; font-size:.8125rem; padding:.5rem; }
   .capture-assist-conversation { margin-top:.375rem; padding:.375rem .5rem; }
   .capture-assist-transcript { height:3.5rem; }
@@ -124,6 +128,6 @@
 @media (orientation:landscape) and (max-height:400px) and (max-width:1200px) {
   .camera-header .camera-progress { display:none; }
   .camera-step-hint { -webkit-line-clamp:1; }
-  .capture-vehicle-guide { flex-basis:3rem; min-height:3rem; }
+  .capture-vehicle-guide { flex-basis:4rem; min-height:4rem; }
   .capture-footer-tools .capture-assist-trigger { min-height:2rem; }
 }
