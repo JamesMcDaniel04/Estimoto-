@@ -13,16 +13,21 @@ type Spec = {
   frontAxle: number; rearAxle: number; radius: number;
   glassFront: number; roofFront: number; roofRear: number; glassRear: number;
   rearHeight: number; doors: number; open?: boolean; bed?: boolean;
+  /** Greenhouse and beltline proportions: roof width as a share of the body
+   * half-width (tumblehome), beltline rise from cowl to tail, roof drop from
+   * the front of the roof to its rear, rocker (sill) height, cross-section
+   * boxiness (superellipse exponent) and how far the nose sits below the cowl. */
+  tumblehome: number; beltRise: number; roofDrop: number; sill: number; boxiness: number; noseDrop: number;
 };
 const SPECS: Record<string, Spec> = {
-  sedan: { length: 4.8, width: 1.86, belt: 1.08, height: 1.55, frontAxle: -1.48, rearAxle: 1.48, radius: .36, glassFront: -.99, roofFront: -.34, roofRear: .75, glassRear: 1.5, rearHeight: 1.08, doors: 4 },
-  coupe: { length: 4.64, width: 1.89, belt: 1.02, height: 1.42, frontAxle: -1.43, rearAxle: 1.4, radius: .36, glassFront: -.8, roofFront: -.19, roofRear: .60, glassRear: 1.48, rearHeight: 1.0, doors: 2 },
-  hatchback: { length: 4.12, width: 1.8, belt: 1.08, height: 1.53, frontAxle: -1.3, rearAxle: 1.28, radius: .35, glassFront: -.94, roofFront: -.42, roofRear: .92, glassRear: 1.61, rearHeight: 1.1, doors: 4 },
-  wagon: { length: 4.92, width: 1.87, belt: 1.09, height: 1.56, frontAxle: -1.5, rearAxle: 1.52, radius: .36, glassFront: -1.04, roofFront: -.4, roofRear: 1.54, glassRear: 2.02, rearHeight: 1.12, doors: 4 },
-  suv: { length: 4.8, width: 1.97, belt: 1.31, height: 1.94, frontAxle: -1.47, rearAxle: 1.46, radius: .43, glassFront: -1.01, roofFront: -.46, roofRear: 1.37, glassRear: 1.95, rearHeight: 1.33, doors: 4 },
-  pickup: { length: 5.5, width: 2.02, belt: 1.36, height: 1.99, frontAxle: -1.73, rearAxle: 1.71, radius: .44, glassFront: -1.16, roofFront: -.62, roofRear: .68, glassRear: .89, rearHeight: 1.34, doors: 4, bed: true },
-  van: { length: 5.05, width: 2.00, belt: 1.22, height: 2.08, frontAxle: -1.54, rearAxle: 1.58, radius: .40, glassFront: -1.72, roofFront: -1.1, roofRear: 1.81, glassRear: 2.16, rearHeight: 1.28, doors: 4 },
-  convertible: { length: 4.5, width: 1.9, belt: 1.02, height: 1.43, frontAxle: -1.39, rearAxle: 1.37, radius: .36, glassFront: -.88, roofFront: -.34, roofRear: .53, glassRear: 1.12, rearHeight: 1.02, doors: 2, open: true },
+  sedan: { length: 4.8, width: 1.86, belt: 1.08, height: 1.55, frontAxle: -1.48, rearAxle: 1.48, radius: .36, glassFront: -.99, roofFront: -.34, roofRear: .75, glassRear: 1.5, rearHeight: 1.08, doors: 4, tumblehome: .73, beltRise: .03, roofDrop: .045, sill: .24, boxiness: 4, noseDrop: .15 },
+  coupe: { length: 4.64, width: 1.89, belt: 1.02, height: 1.42, frontAxle: -1.43, rearAxle: 1.4, radius: .36, glassFront: -.8, roofFront: -.19, roofRear: .60, glassRear: 1.48, rearHeight: 1.0, doors: 2, tumblehome: .68, beltRise: .06, roofDrop: .10, sill: .22, boxiness: 3.6, noseDrop: .17 },
+  hatchback: { length: 4.12, width: 1.8, belt: 1.08, height: 1.53, frontAxle: -1.3, rearAxle: 1.28, radius: .35, glassFront: -.94, roofFront: -.42, roofRear: .92, glassRear: 1.61, rearHeight: 1.1, doors: 4, tumblehome: .75, beltRise: .05, roofDrop: .03, sill: .24, boxiness: 4, noseDrop: .13 },
+  wagon: { length: 4.92, width: 1.87, belt: 1.09, height: 1.56, frontAxle: -1.5, rearAxle: 1.52, radius: .36, glassFront: -1.04, roofFront: -.4, roofRear: 1.54, glassRear: 2.02, rearHeight: 1.12, doors: 4, tumblehome: .78, beltRise: .02, roofDrop: .015, sill: .24, boxiness: 4.4, noseDrop: .13 },
+  suv: { length: 4.8, width: 1.97, belt: 1.31, height: 1.94, frontAxle: -1.47, rearAxle: 1.46, radius: .43, glassFront: -1.01, roofFront: -.46, roofRear: 1.37, glassRear: 1.95, rearHeight: 1.33, doors: 4, tumblehome: .81, beltRise: .02, roofDrop: 0, sill: .34, boxiness: 5, noseDrop: .10 },
+  pickup: { length: 5.5, width: 2.02, belt: 1.36, height: 1.99, frontAxle: -1.73, rearAxle: 1.71, radius: .44, glassFront: -1.16, roofFront: -.62, roofRear: .68, glassRear: .89, rearHeight: 1.34, doors: 4, bed: true, tumblehome: .80, beltRise: 0, roofDrop: 0, sill: .40, boxiness: 5.5, noseDrop: .10 },
+  van: { length: 5.05, width: 2.00, belt: 1.22, height: 2.08, frontAxle: -1.54, rearAxle: 1.58, radius: .40, glassFront: -1.72, roofFront: -1.1, roofRear: 1.81, glassRear: 2.16, rearHeight: 1.28, doors: 4, tumblehome: .87, beltRise: 0, roofDrop: 0, sill: .30, boxiness: 6, noseDrop: .05 },
+  convertible: { length: 4.5, width: 1.9, belt: 1.02, height: 1.43, frontAxle: -1.39, rearAxle: 1.37, radius: .36, glassFront: -.88, roofFront: -.34, roofRear: .53, glassRear: 1.12, rearHeight: 1.02, doors: 2, open: true, tumblehome: .70, beltRise: .05, roofDrop: 0, sill: .22, boxiness: 3.6, noseDrop: .17 },
 };
 const normalBody = (body: string) => Object.hasOwn(SPECS, body) ? body : "sedan";
 const v = (x: number, y: number, z: number) => new THREE.Vector3(x, y, z);
@@ -80,17 +85,22 @@ function buildVehicle(spec: Spec) {
   const half = spec.length / 2, width = spec.width / 2, wheelY = spec.radius + .04;
   // The nose sits lower than the cowl and the plan narrows toward it, so the
   // hood reads as a sloping panel rather than one blunt loaf end.
-  const frontDrop = (x: number) => .15 * Math.pow(Math.max(0, -x / half), 2.5);
+  const frontDrop = (x: number) => spec.noseDrop * Math.pow(Math.max(0, -x / half), 2.5);
+  // The beltline climbs from the cowl toward the tail on wedge-shaped bodies.
+  const rise = (x: number) => spec.beltRise * Math.min(1, Math.max(0, (x - spec.glassFront) / (half - spec.glassFront)));
+  const beltAt = (x: number) => spec.belt + rise(x);
   const planW = (x: number) => width * (1 - .09 * Math.pow(Math.max(0, -x / half), 3));
   const loftScale = (x: number) => Math.max(0, 1 - (Math.abs(x) / half) ** 10) ** .1;
+  // Superellipse exponent: ~4 is a rounded sedan section, 5-6 a boxy van.
+  const n = spec.boxiness, e = 2 / n;
   const bodyWidth = (x: number) => planW(x) * (1 - .12 * Math.pow(Math.abs(x / half), 6));
   const sideProfile = (x: number, y: number) => {
     const t = (topY(x) - y) / (topY(x) - .23);
     return bodyWidth(x) * (.86 + .14 * Math.sin(Math.min(1, Math.max(0, t)) ** .65 * Math.PI * .8));
   };
-  const topY = (x: number) => spec.belt - frontDrop(x) - .04 * Math.pow(Math.max(0, -x / half), 5) + (spec.rearHeight - spec.belt) * Math.max(0, x / half);
+  const topY = (x: number) => beltAt(x) - frontDrop(x) - .04 * Math.pow(Math.max(0, -x / half), 5) + (spec.rearHeight - spec.belt) * Math.max(0, x / half);
   const archY = (x: number) => {
-    let y = spec.radius > .4 ? .36 : .23;
+    let y = spec.sill;
     for (const axle of [spec.frontAxle, spec.rearAxle]) {
       const dx = Math.abs(x - axle), r = spec.radius + .065;
       if (dx < r) y = Math.max(y, wheelY + Math.sqrt(r * r - dx * dx));
@@ -101,14 +111,14 @@ function buildVehicle(spec: Spec) {
   // share normals across the shoulder and fascia rather than meeting as sheets.
   // The hood pivots on a line just under its own rear edge, so nothing swings away from the cowl.
   const hingeX = spec.glassFront - .03, hingeY = topY(hingeX) - .035, hood = new THREE.Group(); hood.position.set(hingeX, hingeY, 0); group.add(hood);
-  const bottom = spec.radius > .4 ? .33 : .24;
+  const bottom = spec.sill;
   const midBody = (spec.belt + bottom) / 2, bodyH = (spec.belt - bottom) / 2;
   // Whether a point lies inside the lofted body; the upper half carries the nose drop.
   const insideLoft = (x: number, y: number, z: number) => {
     const scale = loftScale(x); if (scale <= 0) return false;
-    const u = Math.abs(y - midBody) / Math.max(1e-6, bodyH * scale - (y > midBody ? frontDrop(x) : 0));
+    const u = Math.abs(y - midBody) / Math.max(1e-6, bodyH * scale + (y > midBody ? rise(x) - frontDrop(x) : 0));
     const w = Math.abs(z) / (planW(x) * scale);
-    return u ** 4 + w ** 4 <= 1;
+    return u ** n + w ** n <= 1;
   };
   // How far toward `end` the skin reaches at a given height and offset.
   const bodyX = (y: number, z: number, end: number) => {
@@ -120,8 +130,8 @@ function buildVehicle(spec: Spec) {
   // Half-width of the lofted section at a given station and height.
   const sectionZ = (x: number, y: number) => {
     const scale = loftScale(x); if (scale <= 0) return 0;
-    const u = Math.abs(y - midBody) / Math.max(1e-6, bodyH * scale - (y > midBody ? frontDrop(x) : 0));
-    return planW(x) * scale * Math.pow(Math.max(0, 1 - u ** 4), .25);
+    const u = Math.abs(y - midBody) / Math.max(1e-6, bodyH * scale + (y > midBody ? rise(x) - frontDrop(x) : 0));
+    return planW(x) * scale * Math.pow(Math.max(0, 1 - u ** n), 1 / n);
   };
   const doorStart = spec.glassFront + .10, doorEnd = driverDoorEnd(spec);
   // The door hinge sits on the skin line at the front edge, so the open door stays attached.
@@ -140,9 +150,9 @@ function buildVehicle(spec: Spec) {
     const scale = loftScale(x);
     for (let j = 0; j <= nr; j++) {
       const angle = j / nr * Math.PI * 2, c = Math.cos(angle), sn = Math.sin(angle);
-      const up = Math.max(0, c) ** .5;
-      positions.push(x, midBody + bodyH * scale * Math.sign(c) * Math.abs(c) ** .5 - frontDrop(x) * up,
-        planW(x) * scale * Math.sign(sn) * Math.abs(sn) ** .5);
+      const up = Math.max(0, c) ** e;
+      positions.push(x, midBody + bodyH * scale * Math.sign(c) * Math.abs(c) ** e + (rise(x) - frontDrop(x)) * up,
+        planW(x) * scale * Math.sign(sn) * Math.abs(sn) ** e);
     }
   }
   for (let i = 0; i < nx; i++) for (let j = 0; j < nr; j++) {
@@ -213,8 +223,8 @@ function buildVehicle(spec: Spec) {
 
   const skinY = (x: number, z: number) => {
     const scale = loftScale(x);
-    const f = Math.max(0, scale ** 4 - (Math.abs(z) / planW(x)) ** 4) ** .25;
-    return midBody + bodyH * f - frontDrop(x) * f / Math.max(scale, 1e-6);
+    const f = Math.max(0, scale ** n - (Math.abs(z) / planW(x)) ** n) ** (1 / n);
+    return midBody + bodyH * f + (rise(x) - frontDrop(x)) * f / Math.max(scale, 1e-6);
   };
   // Blend the cabin sill into the curved body; no floating glass or open seams.
   for (const side of [-1, 1]) {
@@ -232,7 +242,9 @@ function buildVehicle(spec: Spec) {
   }, 40, 8), paint, shell);
 
   // Glazed cabin, thin metallic pillars, gently crowned roof.
-  const roofW = width * .73, sillW = width * .86, roofY = spec.height;
+  const roofW = width * spec.tumblehome, sillW = width * .86, roofY = spec.height;
+  // Fastback roofs fall away toward the rear; boxy roofs stay level.
+  const roofAt = (x: number) => roofY - spec.roofDrop * Math.min(1, Math.max(0, (x - spec.roofFront) / Math.max(.01, spec.roofRear - spec.roofFront)));
   const windGeometry = surface((u, t) => {
     const x = THREE.MathUtils.lerp(spec.glassFront, spec.roofFront, u), y = THREE.MathUtils.lerp(spec.belt + .025, roofY - .055, Math.sin(u * Math.PI / 2));
     return v(x - .025 * Math.sin(t * Math.PI), y + .022 * Math.sin(t * Math.PI), (2 * t - 1) * THREE.MathUtils.lerp(sillW, roofW, u));
@@ -245,15 +257,15 @@ function buildVehicle(spec: Spec) {
   line([v(spec.glassFront - .015, spec.belt + .025, -sillW), v(spec.glassFront - .034, spec.belt + .047, 0), v(spec.glassFront - .015, spec.belt + .025, sillW)], trim, .017, shell);
   for (const side of [-1, 1]) line([v(spec.glassFront + .02, spec.belt + .045, side * .12), v(spec.glassFront + .09, spec.belt + .095, side * .51)], trim, .009, shell);
   if (!spec.open) {
-    const roofGeometry = surface((u, t) => v(THREE.MathUtils.lerp(spec.roofFront, spec.roofRear, u), roofY - .035 + .06 * Math.sin(t * Math.PI) + .035 * Math.sin(u * Math.PI), (t * 2 - 1) * roofW), 26, 24);
+    const roofGeometry = surface((u, t) => { const x = THREE.MathUtils.lerp(spec.roofFront, spec.roofRear, u); return v(x, roofAt(x) - .035 + .06 * Math.sin(t * Math.PI) + .035 * Math.sin(u * Math.PI), (t * 2 - 1) * roofW); }, 26, 24);
     mesh(roofGeometry, paint, shell); focus("roof", roofGeometry, shell);
-    const backGlass = surface((u, t) => v(THREE.MathUtils.lerp(spec.roofRear, spec.glassRear, u), THREE.MathUtils.lerp(roofY - .055, topY(spec.glassRear) + .035, 1 - Math.cos(u * Math.PI / 2)) + .015 * Math.sin(t * Math.PI), (2 * t - 1) * THREE.MathUtils.lerp(roofW, sillW, u)), 16, 20);
+    const backGlass = surface((u, t) => v(THREE.MathUtils.lerp(spec.roofRear, spec.glassRear, u), THREE.MathUtils.lerp(roofAt(spec.roofRear) - .055, topY(spec.glassRear) + .035, 1 - Math.cos(u * Math.PI / 2)) + .015 * Math.sin(t * Math.PI), (2 * t - 1) * THREE.MathUtils.lerp(roofW, sillW, u)), 16, 20);
     mesh(backGlass, glass, shell);
     for (const side of [-1, 1]) {
       // Side glass lies on the inward sloping cabin, not on an upright box.
       const windowPoints = [
-        [spec.glassFront + .07, spec.belt + .065], [spec.roofFront + .035, roofY - .075],
-        [spec.roofRear - .045, roofY - .075], [spec.glassRear - .085, topY(spec.glassRear) + .065],
+        [spec.glassFront + .07, beltAt(spec.glassFront + .07) + .065], [spec.roofFront + .035, roofAt(spec.roofFront + .035) - .075],
+        [spec.roofRear - .045, roofAt(spec.roofRear - .045) - .075], [spec.glassRear - .085, topY(spec.glassRear) + .065],
       ];
       const [frontBottom, frontTop, rearTop, rearBottom] = windowPoints;
       const cutTop = [doorEnd, frontTop[1]];
@@ -274,10 +286,11 @@ function buildVehicle(spec: Spec) {
         const border = points.map(([x, y]) => v(x, y, side * THREE.MathUtils.lerp(sillW, roofW, (y - spec.belt) / (roofY - spec.belt)))); border.push(border[0].clone());
         onDoor(line(border, paint, .018, shell), side === 1 && pane === 0);
       });
-      line([v(spec.roofFront, roofY - .035, side * roofW), v((spec.roofFront + spec.roofRear) / 2, roofY - .022, side * roofW), v(spec.roofRear, roofY - .035, side * roofW), v(spec.glassRear, topY(spec.glassRear) + .035, side * sillW)], paint, .039, shell);
+      const midRoof = (spec.roofFront + spec.roofRear) / 2;
+      line([v(spec.roofFront, roofAt(spec.roofFront) - .035, side * roofW), v(midRoof, roofAt(midRoof) - .022, side * roofW), v(spec.roofRear, roofAt(spec.roofRear) - .035, side * roofW), v(spec.glassRear, topY(spec.glassRear) + .035, side * sillW)], paint, .039, shell);
       const pillarX = spec.doors === 2 ? .52 : .20;
-      line([v(pillarX, spec.belt + .07, side * (sillW - .012)), v(pillarX - .05, roofY - .061, side * (roofW + .005))], trim, .032, shell);
-      if (spec.roofRear > 1.1) line([v(1.11, spec.belt + .07, side * sillW), v(1.04, roofY - .061, side * roofW)], trim, .021, shell);
+      line([v(pillarX, beltAt(pillarX) + .07, side * (sillW - .012)), v(pillarX - .05, roofAt(pillarX - .05) - .061, side * (roofW + .005))], trim, .032, shell);
+      if (spec.roofRear > 1.1) line([v(1.11, beltAt(1.11) + .07, side * sillW), v(1.04, roofAt(1.04) - .061, side * roofW)], trim, .021, shell);
     }
     if (["suv", "wagon"].some(key => SPECS[key] === spec)) for (const side of [-1, 1]) line([v(spec.roofFront + .18, roofY + .05, side * roofW * .82), v(.4, roofY + .065, side * roofW * .82), v(spec.roofRear - .1, roofY + .05, side * roofW * .82)], chrome, .02, shell);
   }
@@ -293,7 +306,7 @@ function buildVehicle(spec: Spec) {
         const x = THREE.MathUtils.lerp(start + .03, end - .02, u), upper = topY(x), lower = archY(x), y = THREE.MathUtils.lerp(upper - .055, Math.max(lower + .025, .37), t);
         return v(x, y, side * (sideProfile(x, y) + .004));
       }, 10, 8); focus(`${name}_${suffix}`, doorGeometry);
-      onDoor(rounded(.155, .024, .032, .009, chrome, v(end - .15, spec.belt - .105, side * width * .947)), side === 1 && name === "front_door");
+      onDoor(rounded(.155, .024, .032, .009, chrome, v(end - .15, beltAt(end - .15) - .105, side * width * .947)), side === 1 && name === "front_door");
     }
     const mirror = rounded(.27, .105, .18, .045, paint, v(spec.glassFront + .12, spec.belt + .12, side * (width + .03)));
     onDoor(mirror, side === 1); mirror.rotation.y = side * .10;
@@ -310,7 +323,7 @@ function buildVehicle(spec: Spec) {
   // Smooth, continuous fascia. Lamps and the intake follow its curvature;
   // neither sits on a protruding rectangular bumper or chrome stack.
   for (const end of [-1, 1]) {
-    const lower = spec.radius > .4 ? .37 : .25;
+    const lower = bottom + .01;
     const upper = topY(end * (half - .045)), mid = (upper + lower) / 2;
     const fasciaX = (z: number, y: number) => end * bodyX(y, z, end);
     const fascia = surface((u, t) => {
