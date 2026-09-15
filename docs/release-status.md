@@ -1,4 +1,19 @@
-# Current web release — closed greenhouse, clean panel edges and wheel wells, September 14, 2026
+# Current web release — cabin door panels and tighter landscape header, September 15, 2026
+
+The capture page at `/capture/` now vendors original Estimoto
+`466ff0e6c64761a92802f025bd4b7815aabe4f2f`. Dark inner door panels line the
+cabin so the open-door interior views no longer show a bright bar behind the
+seats, and in landscape the camera header is one row with the step strip
+inline, giving the 3D guide and live camera more height.
+
+Source `5c68d9883856b2167b2ba8fe62058ac325dd2255` is deployed on web; `/version`
+reports it and `/ready` reports schema `d9e4b82013c7`. Capture source digests
+verified, 19 capture-web tests and the capture and web builds passed, and the
+served scene chunk hash matches the built artifact. Native installs load
+`/capture/` from the API origin, so no native build was produced. GitHub Actions
+did not run because of the existing account billing lock.
+
+# Historical web release — closed greenhouse, clean panel edges and wheel wells, September 14, 2026
 
 The capture page at `/capture/` now vendors original Estimoto
 `894444b00c58f7ef96916ebb8c7de0daa52f61bb`. The 3D guide's cabin is one closed
