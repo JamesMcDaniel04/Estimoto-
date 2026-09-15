@@ -14,9 +14,9 @@
     },
     {
       "source": "dashboard/src/pages/intake/vehicleScene.ts",
-      "source_sha256": "bd8a1f1a916c4472d6b2b60e3d269b4ae480f038d757d9a590c763fdf759bd7c",
+      "source_sha256": "dc40894ec66753f5c331178dd850bb268c7f5fb74980142db5d0aaf64f2e08d3",
       "target": "src/shared/vehicleScene.ts",
-      "target_sha256": "bd8a1f1a916c4472d6b2b60e3d269b4ae480f038d757d9a590c763fdf759bd7c"
+      "target_sha256": "dc40894ec66753f5c331178dd850bb268c7f5fb74980142db5d0aaf64f2e08d3"
     },
     {
       "source": "dashboard/src/pages/intake/template.ts",
@@ -31,6 +31,6 @@
       "target_sha256": "acffcc08c9daf37fe906e2669d9a5484ff69bcf098119ed650c8e48fb5829818"
     }
   ],
-  "source_commit": "f4633c93102ce17994d2f8d3d7edd5890eca0c63",
+  "source_commit": "894444b00c58f7ef96916ebb8c7de0daa52f61bb",
   "source_repository": "Estimoto"
 }

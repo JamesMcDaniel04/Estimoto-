@@ -62,12 +62,14 @@ function buildVehicle(spec: Spec) {
   const chrome = new THREE.MeshStandardMaterial({ color: 0xc1cdd5, metalness: .68, roughness: .35 });
   const brake = new THREE.MeshStandardMaterial({ color: 0x65717a, metalness: .8, roughness: .53 });
   const seatMaterial = new THREE.MeshStandardMaterial({ color: 0x393337, roughness: .92 });
+  // Double-sided: the well is seen from oblique angles through the arch, so both faces must block the view.
+  const wellMaterial = new THREE.MeshStandardMaterial({ color: 0x4d575f, roughness: .96, side: THREE.DoubleSide });
   const light = new THREE.MeshStandardMaterial({ color: 0xf2faff, emissive: 0xdaedff, emissiveIntensity: 1.15, roughness: .16, metalness: .25 });
   const tailLight = new THREE.MeshStandardMaterial({ color: 0xa70d22, emissive: 0xd90920, emissiveIntensity: .55, roughness: .23 });
   const highlightMaterial = new THREE.MeshBasicMaterial({ color: 0x06aeda, transparent: true, opacity: .13, depthWrite: false, side: THREE.DoubleSide, polygonOffset: true, polygonOffsetFactor: -2 });
   const vinOutline = new THREE.MeshBasicMaterial({ color: 0x009f91, depthTest: false, depthWrite: false });
   const vinPaper = new THREE.MeshBasicMaterial({ color: 0xf5ffff, depthTest: false, depthWrite: false });
-  materials.push(paint, glass, rubber, trim, chrome, brake, seatMaterial, light, tailLight, highlightMaterial, vinOutline, vinPaper);
+  materials.push(paint, glass, rubber, trim, chrome, brake, seatMaterial, wellMaterial, light, tailLight, highlightMaterial, vinOutline, vinPaper);
   const highlights = new Map<string, THREE.Object3D[]>();
   function mesh(geometry: THREE.BufferGeometry, material: THREE.Material, parent: THREE.Object3D = group) {
     const object = new THREE.Mesh(geometry, material); object.castShadow = true; object.receiveShadow = false; parent.add(object); return object;
@@ -145,7 +147,9 @@ function buildVehicle(spec: Spec) {
   const positions: number[] = [], bodyIndices: number[] = [], hoodIndices: number[] = [], doorIndices: number[] = [];
   // Stations land exactly on the hood hinge and door edges, and the hood and
   // door are cut along grid lines, so every panel edge is a clean curve.
-  const nr = 80, bodyStations = Array.from(new Set([...Array.from({ length: 225 }, (_, i) => -half * Math.cos(Math.PI * i / 224)), hingeX, doorStart, doorEnd])).sort((p, q) => p - q);
+  // The hood ends at the grille top rather than wrapping over the nose tip.
+  const hoodFront = -half + .17, archR = spec.radius + .055;
+  const nr = 128, bodyStations = Array.from(new Set([...Array.from({ length: 225 }, (_, i) => -half * Math.cos(Math.PI * i / 224)), hingeX, hoodFront, doorStart, doorEnd])).sort((p, q) => p - q);
   const nx = bodyStations.length - 1, ringStep = Math.PI * 2 / nr;
   const jHood = Math.round(Math.asin(Math.pow(.78, n / 2)) / ringStep);
   const jDoorTop = Math.ceil((Math.PI / 2 - Math.asin(Math.pow(.72, n / 2))) / ringStep);
@@ -160,19 +164,38 @@ function buildVehicle(spec: Spec) {
         planW(x) * scale * Math.sign(sn) * Math.abs(sn) ** e);
     }
   }
+  // Wheel arches: skin vertices inside the arch circle snap onto it, so the
+  // opening is an exact circle instead of a stair-stepped hole.
+  const original = positions.slice();
+  for (let k = 0; k < positions.length; k += 3) {
+    const x = original[k], y = original[k + 1], z = original[k + 2];
+    if (Math.abs(z) < width * .60) continue;
+    for (const axle of [spec.frontAxle, spec.rearAxle]) {
+      const dx = x - axle, dy = y - wheelY, d = Math.hypot(dx, dy);
+      // Only the fender edge snaps; the underside keeps its shape so nothing hangs below the arch.
+      if (d < archR && d > 1e-6 && y >= wheelY - .05) {
+        const nx2 = axle + dx / d * archR, ny2 = wheelY + dy / d * archR, was = sectionZ(x, y);
+        positions[k] = nx2; positions[k + 1] = ny2;
+        // Keep the moved vertex on the body section at its new station and height.
+        if (was > 1e-4) positions[k + 2] = z * sectionZ(nx2, ny2) / was;
+      }
+    }
+  }
   for (let i = 0; i < nx; i++) for (let j = 0; j < nr; j++) {
     const a = i * (nr + 1) + j, b = a + nr + 1;
     const ids = [a, b, a + 1, b, b + 1, a + 1];
-    const x = (positions[a * 3] + positions[(b + 1) * 3]) / 2;
-    const y = (positions[a * 3 + 1] + positions[(b + 1) * 3 + 1]) / 2;
-    const z = (positions[a * 3 + 2] + positions[(b + 1) * 3 + 2]) / 2;
-    const inWheel = Math.abs(z) > width * .63 && [spec.frontAxle, spec.rearAxle].some(axle => (x - axle) ** 2 + (y - wheelY) ** 2 < (spec.radius + .055) ** 2);
-    if (inWheel) continue;
+    const x = (bodyStations[i] + bodyStations[i + 1]) / 2;
+    const y = (original[a * 3 + 1] + original[(b + 1) * 3 + 1]) / 2;
+    const z = (original[a * 3 + 2] + original[(b + 1) * 3 + 2]) / 2;
+    // A quad leaves the skin only when all four corners sit inside an arch; quads
+    // straddling the edge stay and their inner corners were snapped onto the circle.
+    const inArch = (k: number) => Math.abs(original[k * 3 + 2]) > width * .63 && [spec.frontAxle, spec.rearAxle].some(axle => (original[k * 3] - axle) ** 2 + (original[k * 3 + 1] - wheelY) ** 2 < archR ** 2);
+    if ([a, b, a + 1, b + 1].every(inArch)) continue;
     const isTop = y > topY(x) - .14 && Math.abs(z) < width * .82;
     if (isTop && x > hingeX && x < spec.glassRear) continue;
     if (isTop && x >= spec.glassRear && spec.bed) continue;
     // The hood is a shallow lid on top of the fenders; the door is the side skin below the shoulder.
-    const isHood = x < hingeX && (j < jHood || j >= nr - jHood);
+    const isHood = x < hingeX && x > hoodFront && (j < jHood || j >= nr - jHood);
     const isDriverDoor = x > doorStart && x < doorEnd && j >= jDoorTop && j < jDoorBottom;
     (isHood ? hoodIndices : isDriverDoor ? doorIndices : bodyIndices).push(...ids);
   }
@@ -208,6 +231,12 @@ function buildVehicle(spec: Spec) {
         return v(x, y, side * sectionZ(x, y));
       });
       line(points, spec.radius > .4 ? trim : paint, spec.radius > .4 ? .026 : .019);
+      // A dark wheel-well liner closes the cavity behind the arch.
+      const innerZ = width * .655, liner = mesh(surface((u, t) => {
+        const a = Math.PI * u, x = axle + (archR - .01) * Math.cos(a), y = wheelY + (archR - .01) * Math.sin(a);
+        return v(x, y, side * THREE.MathUtils.lerp(innerZ, Math.max(innerZ + .02, sectionZ(x, y) - .05), t));
+      }, 20, 4), wellMaterial); liner.castShadow = false;
+      const wall = mesh(new THREE.CircleGeometry(archR - .015, 28, 0, Math.PI), wellMaterial); wall.position.set(axle, wheelY, side * innerZ); wall.rotation.y = side > 0 ? 0 : Math.PI; wall.castShadow = false;
     }
   }
   // Deck and cabin floor; pickup bed has an open ribbed load box.
@@ -224,7 +253,8 @@ function buildVehicle(spec: Spec) {
     for (let i = -5; i <= 5; i++) rounded(half - deckStart - .14, .025, .03, .009, trim, v((half + deckStart) / 2, .882, i * .13));
     rounded(.09, .47, spec.width * .82, .035, paint, v(half - .055, 1.09, 0));
   }
-  rounded(spec.glassRear - spec.glassFront, .1, spec.width * .8, .03, trim, v((spec.glassFront + spec.glassRear) / 2, spec.belt - .62, 0), interior);
+  // The cabin floor stays inboard of the wheel wells so it never shows through an arch.
+  rounded(spec.glassRear - spec.glassFront, .1, spec.width * .60, .03, trim, v((spec.glassFront + spec.glassRear) / 2, spec.belt - .62, 0), interior);
 
   const skinY = (x: number, z: number) => {
     const scale = loftScale(x);
@@ -415,8 +445,9 @@ function buildVehicle(spec: Spec) {
   }
   // Tires, machined twin spokes, inset vented discs, and individual tread blocks.
   for (const axle of [spec.frontAxle, spec.rearAxle]) for (const side of [-1, 1]) {
-    const wheel = new THREE.Group(); wheel.position.set(axle, wheelY, side * width * .89); group.add(wheel);
     const r = spec.radius, tireWidth = .225, face = side * (tireWidth / 2 + .012);
+    // The tire's outer face sits just inside the fender lip.
+    const wheel = new THREE.Group(); wheel.position.set(axle, wheelY, side * (sectionZ(axle, wheelY + r * .9) - .135)); group.add(wheel);
     const tire = mesh(new THREE.TorusGeometry(r - .084, .087, 12, 56), rubber, wheel); tire.scale.z = 1.42;
     for (const s of [-1, 1]) {
       const sidewall = mesh(new THREE.RingGeometry(r * .67, r * .96, 56), rubber, wheel); sidewall.position.z = s * tireWidth / 2; if (s < 0) sidewall.rotation.y = Math.PI;
@@ -444,8 +475,9 @@ function buildVehicle(spec: Spec) {
   }
   // Interior is modeled even when obscured by the roof.
   const seatBaseY = spec.belt - .41;
+  // Seats stay inboard of the wheel wells on cab-forward bodies.
   for (const x of [spec.glassFront + .77, Math.min(spec.glassRear - .49, .85)]) for (const side of [-1, 1]) {
-    const z = side * width * .43;
+    const z = side * width * .40;
     rounded(.48, .13, .46, .055, seatMaterial, v(x, seatBaseY, z), interior);
     const back = rounded(.13, .53, .47, .065, seatMaterial, v(x + .20, seatBaseY + .27, z), interior); back.rotation.z = .14;
     rounded(.10, .17, .26, .041, seatMaterial, v(x + .23, seatBaseY + .61, z), interior);
