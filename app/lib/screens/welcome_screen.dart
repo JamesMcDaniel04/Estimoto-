@@ -153,7 +153,12 @@ class _WelcomeScreenState extends State<WelcomeScreen> {
               controller: email,
               enabled: !busy && (!sent || existingCode),
               keyboardType: TextInputType.emailAddress,
+              autocorrect: false,
               autofillHints: const [AutofillHints.email],
+              textInputAction: sent
+                  ? TextInputAction.next
+                  : TextInputAction.done,
+              onSubmitted: (_) => sent ? null : signIn(),
               decoration: const InputDecoration(labelText: 'Email address'),
             ),
             if (sent) ...[
@@ -167,13 +172,19 @@ class _WelcomeScreenState extends State<WelcomeScreen> {
               TextField(
                 controller: code,
                 enabled: !busy,
+                autofocus: !existingCode,
                 keyboardType: TextInputType.number,
                 inputFormatters: [
                   FilteringTextInputFormatter.digitsOnly,
                   LengthLimitingTextInputFormatter(8),
                 ],
                 autofillHints: const [AutofillHints.oneTimeCode],
-                decoration: const InputDecoration(labelText: 'Email code'),
+                textInputAction: TextInputAction.done,
+                onSubmitted: (_) => signIn(),
+                decoration: const InputDecoration(
+                  labelText: 'Email code',
+                  helperText: '8 digits',
+                ),
               ),
             ],
             const SizedBox(height: 16),

@@ -15,6 +15,7 @@ class RepairsScreen extends StatelessWidget {
   Widget build(BuildContext context) {
     final data = controller.snapshot!;
     return PageBody(
+      onRefresh: controller.refresh,
       children: [
         const PageHeading(
           'Every step, in view.',

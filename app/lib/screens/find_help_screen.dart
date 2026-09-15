@@ -102,6 +102,7 @@ class _FindHelpScreenState extends WorkspaceState<FindHelpScreen> {
     if (!current) return unavailable;
     final postal = this.postal;
     return PageBody(
+      onRefresh: load,
       children: [
         const PageHeading(
           'Find your kind of help.',

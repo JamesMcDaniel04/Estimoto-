@@ -47,6 +47,7 @@ class Vehicle {
   String get nickname => textOf(json, 'nickname');
   String get vin => textOf(json, 'vin');
   int get mileage => intOf(json, 'mileage');
+  String get insurer => textOf(json, 'insurer');
   String get title => '$year $make $model';
   String get displayName => nickname.isEmpty ? '$make $model' : nickname;
   String get imageVersion => textOf(json, 'image_version');
@@ -282,6 +283,7 @@ class CustomerEstimate {
   String get description => textOf(json, 'description');
   String get providerName => textOf(json, 'provider_name');
   int? get amountCents => (json['amount_cents'] as num?)?.toInt();
+  String get updatedAt => textOf(json, 'updated_at');
   List<Json> get photos => rowsOf(json, 'photos');
   String get statusLabel => switch (status) {
     'draft' => 'Draft',

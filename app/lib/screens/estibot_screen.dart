@@ -56,14 +56,24 @@ class _EstibotScreenState extends WorkspaceState<EstibotScreen> {
     final value = prompt ?? message.text;
     if (value.trim().isEmpty || widget.controller.asking) return;
     message.clear();
-    await widget.controller.ask(value);
-    if (active && scroll.hasClients) {
-      await scroll.animateTo(
+    final asked = widget.controller.ask(value);
+    // The question is on screen before the answer arrives; keep the newest
+    // message visible in both cases.
+    scrollToLatest();
+    await asked;
+    scrollToLatest();
+  }
+
+  /// Scrolls after the pending frame so the new message has been laid out.
+  void scrollToLatest() {
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (!active || !scroll.hasClients) return;
+      scroll.animateTo(
         scroll.position.maxScrollExtent,
         duration: const Duration(milliseconds: 220),
         curve: Curves.easeOut,
       );
-    }
+    });
   }
 
   @override

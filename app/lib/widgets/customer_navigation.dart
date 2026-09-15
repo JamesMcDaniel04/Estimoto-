@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import '../state/plus_controller.dart';
 import '../theme.dart';
 
@@ -62,7 +63,12 @@ class CustomerNavigation extends StatelessWidget {
   ) {
     final selected = controller.tab == index;
     final color = selected ? PlusColors.blue : PlusColors.muted;
-    void select() => controller.selectTab(index);
+    void select() {
+      if (selected) return;
+      HapticFeedback.selectionClick();
+      controller.selectTab(index);
+    }
+
     return Expanded(
       child: Semantics(
         selected: selected,

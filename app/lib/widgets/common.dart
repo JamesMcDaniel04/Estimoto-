@@ -8,24 +8,38 @@ class PageBody extends StatelessWidget {
     super.key,
     required this.children,
     this.padding = const EdgeInsets.fromLTRB(20, 8, 20, 28),
+    this.onRefresh,
   });
   final List<Widget> children;
   final EdgeInsets padding;
+
+  /// When set, the page can be pulled down to refresh even when its content
+  /// is shorter than the screen.
+  final Future<void> Function()? onRefresh;
   @override
-  Widget build(BuildContext context) => SingleChildScrollView(
-    keyboardDismissBehavior: ScrollViewKeyboardDismissBehavior.onDrag,
-    padding: padding,
-    child: Align(
-      alignment: Alignment.topCenter,
-      child: ConstrainedBox(
-        constraints: const BoxConstraints(maxWidth: 760),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: children,
+  Widget build(BuildContext context) {
+    final body = SingleChildScrollView(
+      keyboardDismissBehavior: ScrollViewKeyboardDismissBehavior.onDrag,
+      physics: onRefresh == null ? null : const AlwaysScrollableScrollPhysics(),
+      padding: padding,
+      child: Align(
+        alignment: Alignment.topCenter,
+        child: ConstrainedBox(
+          constraints: const BoxConstraints(maxWidth: 760),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: children,
+          ),
         ),
       ),
-    ),
-  );
+    );
+    if (onRefresh == null) return body;
+    return RefreshIndicator.adaptive(
+      onRefresh: onRefresh!,
+      edgeOffset: 4,
+      child: body,
+    );
+  }
 }
 
 class PageHeading extends StatelessWidget {

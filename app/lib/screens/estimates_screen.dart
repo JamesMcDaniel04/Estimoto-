@@ -13,7 +13,12 @@ class EstimatesScreen extends StatelessWidget {
     final estimates = data.estimates
         .where((e) => e.discipline == controller.discipline)
         .toList();
+    final otherCount = data.estimates.length - estimates.length;
+    final pdr = controller.discipline == 'pdr';
+    final currentLabel = pdr ? 'PDR' : 'Collision';
+    final otherLabel = pdr ? 'Collision' : 'PDR';
     return PageBody(
+      onRefresh: controller.refresh,
       children: [
         const PageHeading(
           'Know where you stand.',
@@ -50,11 +55,16 @@ class EstimatesScreen extends StatelessWidget {
         ),
         const SectionHeading('Your estimates'),
         if (estimates.isEmpty)
-          const EmptyState(
+          EmptyState(
             icon: Icons.receipt_long_outlined,
             title: 'Your next estimate starts here',
-            message:
-                'Choose your saved vehicle, tell us about the damage and add a few photos.',
+            message: otherCount > 0
+                ? 'No $currentLabel estimates yet. You have $otherCount under $otherLabel.'
+                : 'Choose your saved vehicle, tell us about the damage and add a few photos.',
+            action: otherCount > 0 ? 'Show $otherLabel' : null,
+            onAction: otherCount > 0
+                ? () => controller.selectDiscipline(pdr ? 'collision' : 'pdr')
+                : null,
           )
         else
           for (final estimate in estimates)
@@ -126,10 +136,19 @@ class EstimatesScreen extends StatelessWidget {
                               ),
                           ],
                         ),
-                        if (estimate.providerName.isNotEmpty) ...[
+                        if (estimate.providerName.isNotEmpty ||
+                            estimate.updatedAt.isNotEmpty ||
+                            estimate.photos.isNotEmpty) ...[
                           const SizedBox(height: 12),
                           Text(
-                            estimate.providerName,
+                            [
+                              if (estimate.providerName.isNotEmpty)
+                                estimate.providerName,
+                              if (estimate.photos.isNotEmpty)
+                                '${estimate.photos.length} photo${estimate.photos.length == 1 ? '' : 's'}',
+                              if (estimate.updatedAt.isNotEmpty)
+                                'Updated ${dateText(estimate.updatedAt)}',
+                            ].join(' · '),
                             style: Theme.of(context).textTheme.bodySmall,
                           ),
                         ],

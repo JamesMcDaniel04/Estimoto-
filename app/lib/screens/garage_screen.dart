@@ -1,6 +1,7 @@
 import 'calendar_screen.dart';
 import 'package:flutter/material.dart';
 import '../domain/models.dart';
+import '../services/reminder_due.dart';
 import '../state/plus_controller.dart';
 import '../theme.dart';
 import '../widgets/common.dart';
@@ -53,12 +54,18 @@ class GarageScreen extends StatelessWidget {
   Widget build(BuildContext context) {
     final data = controller.snapshot!;
     final vehicle = controller.selectedVehicle;
-    final reminders = data.reminders
-        .where(
-          (r) => !r.completed && (vehicle == null || r.vehicleId == vehicle.id),
-        )
-        .toList();
+    final now = DateTime.now();
+    final reminders =
+        data.reminders
+            .where(
+              (r) =>
+                  !r.completed &&
+                  (vehicle == null || r.vehicleId == vehicle.id),
+            )
+            .toList()
+          ..sort((a, b) => _dueOrder(a).compareTo(_dueOrder(b)));
     return PageBody(
+      onRefresh: controller.refresh,
       children: [
         PageHeading(
           'Hi, ${data.profile.firstName}.',
@@ -160,11 +167,25 @@ class GarageScreen extends StatelessWidget {
                         ),
                       ),
                     ),
-                    const Icon(
-                      Icons.verified_user_outlined,
-                      size: 18,
-                      color: Color(0xFF73E1D5),
-                    ),
+                    if (vehicle.insurer.isNotEmpty) ...[
+                      const Icon(
+                        Icons.verified_user_outlined,
+                        size: 18,
+                        color: Color(0xFF73E1D5),
+                      ),
+                      const SizedBox(width: 6),
+                      Flexible(
+                        child: Text(
+                          vehicle.insurer,
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
+                          style: const TextStyle(
+                            color: Color(0xFFC5DAED),
+                            fontSize: 13,
+                          ),
+                        ),
+                      ),
+                    ],
                   ],
                 ),
               ],
@@ -213,41 +234,16 @@ class GarageScreen extends StatelessWidget {
             child: Column(
               children: [
                 for (final reminder in reminders)
-                  ListTile(
+                  _ReminderTile(
+                    reminder: reminder,
+                    due: ReminderDue.of(
+                      reminder,
+                      now: now,
+                      vehicleMileage: data.vehicle(reminder.vehicleId)?.mileage,
+                    ),
                     onTap: () =>
                         addReminder(context, controller, reminder: reminder),
-                    contentPadding: const EdgeInsets.symmetric(
-                      horizontal: 18,
-                      vertical: 7,
-                    ),
-                    leading: const CircleAvatar(
-                      backgroundColor: Color(0xFFE9F5F3),
-                      child: Icon(
-                        Icons.build_outlined,
-                        color: Color(0xFF08796D),
-                        size: 21,
-                      ),
-                    ),
-                    title: Text(
-                      reminder.title,
-                      style: const TextStyle(fontWeight: FontWeight.w600),
-                    ),
-                    subtitle: Padding(
-                      padding: const EdgeInsets.only(top: 4),
-                      child: Text(
-                        [
-                          if (reminder.dueDate.isNotEmpty)
-                            dateText(reminder.dueDate),
-                          if (reminder.dueMileage != null)
-                            '${mileageText(reminder.dueMileage!)} miles',
-                        ].join(' or '),
-                      ),
-                    ),
-                    trailing: IconButton(
-                      tooltip: 'Mark reminder complete',
-                      icon: const Icon(Icons.check_circle_outline),
-                      onPressed: () => _complete(context, reminder),
-                    ),
+                    onComplete: () => _complete(context, reminder),
                   ),
               ],
             ),
@@ -304,20 +300,27 @@ class GarageScreen extends StatelessWidget {
           Padding(
             padding: const EdgeInsets.only(bottom: 8),
             child: Card(
-              child: ListTile(
-                leading: const Icon(
-                  Icons.directions_car_outlined,
-                  color: PlusColors.blue,
+              child: Semantics(
+                selected: car.id == vehicle?.id,
+                child: ListTile(
+                  leading: const Icon(
+                    Icons.directions_car_outlined,
+                    color: PlusColors.blue,
+                  ),
+                  title: Text(car.title),
+                  subtitle: Text(
+                    car.nickname.isEmpty
+                        ? '${mileageText(car.mileage)} miles'
+                        : '${car.nickname} · ${mileageText(car.mileage)} miles',
+                  ),
+                  trailing: Icon(
+                    car.id == vehicle?.id
+                        ? Icons.radio_button_checked
+                        : Icons.radio_button_off,
+                    color: PlusColors.blue,
+                  ),
+                  onTap: () => controller.selectVehicle(car.id),
                 ),
-                title: Text(car.title),
-                subtitle: Text('${mileageText(car.mileage)} miles'),
-                trailing: Icon(
-                  car.id == vehicle?.id
-                      ? Icons.radio_button_checked
-                      : Icons.radio_button_off,
-                  color: PlusColors.blue,
-                ),
-                onTap: () => controller.selectVehicle(car.id),
               ),
             ),
           ),
@@ -417,4 +420,65 @@ class _QuickAction extends StatelessWidget {
       ),
     ),
   );
+}
+
+/// Reminders without a due date sort after dated ones, oldest first.
+int _dueOrder(ServiceReminder reminder) =>
+    DateTime.tryParse(reminder.dueDate)?.millisecondsSinceEpoch ??
+    (reminder.dueMileage ?? 1 << 52) + (1 << 53);
+
+class _ReminderTile extends StatelessWidget {
+  const _ReminderTile({
+    required this.reminder,
+    required this.due,
+    required this.onTap,
+    required this.onComplete,
+  });
+  final ServiceReminder reminder;
+  final ReminderDue due;
+  final VoidCallback onTap, onComplete;
+  @override
+  Widget build(BuildContext context) {
+    final overdue = due.urgency == ReminderUrgency.overdue;
+    final when = [
+      if (reminder.dueDate.isNotEmpty) dateText(reminder.dueDate),
+      if (reminder.dueMileage != null)
+        '${mileageText(reminder.dueMileage!)} miles',
+    ].join(' or ');
+    return ListTile(
+      onTap: onTap,
+      contentPadding: const EdgeInsets.symmetric(horizontal: 18, vertical: 7),
+      leading: CircleAvatar(
+        backgroundColor: overdue
+            ? const Color(0xFFFCEBEA)
+            : const Color(0xFFE9F5F3),
+        child: Icon(
+          overdue ? Icons.priority_high : Icons.build_outlined,
+          color: overdue ? due.color : const Color(0xFF08796D),
+          size: 21,
+        ),
+      ),
+      title: Text(
+        reminder.title,
+        style: const TextStyle(fontWeight: FontWeight.w600),
+      ),
+      subtitle: Padding(
+        padding: const EdgeInsets.only(top: 6),
+        child: Wrap(
+          spacing: 8,
+          runSpacing: 6,
+          crossAxisAlignment: WrapCrossAlignment.center,
+          children: [
+            if (due.label.isNotEmpty) StatusPill(due.label, color: due.color),
+            if (when.isNotEmpty) Text(when),
+          ],
+        ),
+      ),
+      trailing: IconButton(
+        tooltip: 'Mark reminder complete',
+        icon: const Icon(Icons.check_circle_outline),
+        onPressed: onComplete,
+      ),
+    );
+  }
 }
