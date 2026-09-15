@@ -391,6 +391,7 @@ class HistoryEditor extends StatefulWidget {
     super.key,
     required this.controller,
     this.record,
+    this.initial,
     this.receiptStore,
     this.captureService,
     this.pdfPicker,
@@ -399,6 +400,10 @@ class HistoryEditor extends StatefulWidget {
 
   /// When set, the editor changes this saved entry instead of creating one.
   final Json? record;
+
+  /// Starting values for a new entry, such as a scanned Gmail message.
+  /// The customer reviews and can change every field before saving.
+  final Json? initial;
   final ReceiptPendingStore? receiptStore;
   final EstimateCaptureService? captureService;
   final Future<XFile?> Function()? pdfPicker;
@@ -446,6 +451,20 @@ class _HistoryEditorState extends WorkspaceState<HistoryEditor> {
       }
       restoring = false;
       return;
+    }
+    final initial = widget.initial;
+    if (initial != null) {
+      final initialVehicle = textOf(initial, 'vehicle_id');
+      if (initialVehicle.isNotEmpty) vehicleId = initialVehicle;
+      type = textOf(initial, 'service_type', type);
+      date = DateTime.tryParse(textOf(initial, 'service_date')) ?? date;
+      for (final entry in fields.entries) {
+        final value = initial[entry.key];
+        if (value == null) continue;
+        entry.value.text = entry.key == 'cost_cents' && value is int
+            ? receiptCost(value).substring(1)
+            : value.toString();
+      }
     }
     restore();
   }

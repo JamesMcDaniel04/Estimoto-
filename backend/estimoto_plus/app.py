@@ -29,6 +29,7 @@ from .upload_limit import PhotoBodyLimit
 from .vehicle_images import router as vehicle_images_router
 from .android_download import router as android_download_router
 from .calendar_routes import router as calendar_router
+from .gmail_routes import router as gmail_router, retry_gmail_revocations
 from .calendar_sync import sync_calendar_batch
 from .capture_routes import router as capture_router
 from .discovery import router as discovery_router
@@ -39,7 +40,7 @@ from .shop_media_catalog import router as shop_media_router
 
 # Readiness fails closed until the database carries exactly this migration.
 # tests/test_readiness.py keeps it equal to the Alembic head.
-EXPECTED_SCHEMA_REVISION = "d9e4b82013c7"
+EXPECTED_SCHEMA_REVISION = "b7e2d9c4a1f6"
 
 
 def create_app(settings: Settings | None = None, *, auth_verifier=None, auth_client=None, bridge_transport=None):
@@ -48,6 +49,8 @@ def create_app(settings: Settings | None = None, *, auth_verifier=None, auth_cli
         raise ValueError("DATABASE_URL is required")
     if settings.places_enabled and not settings.google_places_api_key:
         raise ValueError('PLACES_ENABLED requires GOOGLE_PLACES_API_KEY on the backend')
+    if settings.youtube_enabled and not settings.youtube_api_key:
+        raise ValueError('YOUTUBE_ENABLED requires YOUTUBE_API_KEY on the backend')
     if settings.environment == "production":
         required = (settings.supabase_url, settings.supabase_publishable_key, settings.bridge_url,
                     settings.estimate_bridge_url, settings.bridge_key, settings.source_sha)
@@ -90,6 +93,7 @@ def create_app(settings: Settings | None = None, *, auth_verifier=None, auth_cli
                                             getattr(app.state, "shop_mail_transport", None),
                                             calendar_settings=settings, calendar_transport=app.state.calendar_transport)
                     await asyncio.to_thread(sync_calendar_batch, settings, app.state.session_factory, app.state.calendar_transport)
+                    await asyncio.to_thread(retry_gmail_revocations, settings, app.state.session_factory, app.state.gmail_transport)
                 except Exception as exc:
                     logging.getLogger(__name__).error("Plus background worker cycle failed: %s", type(exc).__name__)
         enabled = settings.worker_enabled if settings.worker_enabled is not None else settings.environment == "production"
@@ -174,6 +178,8 @@ def create_app(settings: Settings | None = None, *, auth_verifier=None, auth_cli
     app.state.calendar_transport = None
     app.state.capture_transport = None
     app.state.discovery_transport = None
+    app.state.youtube_transport = None
+    app.state.gmail_transport = None
     app.include_router(customer_router)
     app.include_router(bridge_router)
     app.include_router(saved_shops_router)
@@ -181,6 +187,7 @@ def create_app(settings: Settings | None = None, *, auth_verifier=None, auth_cli
     app.include_router(vehicle_images_router)
     app.include_router(android_download_router)
     app.include_router(calendar_router)
+    app.include_router(gmail_router)
     app.include_router(capture_router)
     app.include_router(discovery_router)
     app.include_router(receipts_router)

@@ -264,6 +264,37 @@ class ApiPlusRepository extends PlusRepository {
   @override
   Future<Json> retryCalendarSync(Json body) =>
       _send('POST', '/v1/calendar/google/sync/retry', body: body);
+  @override
+  Future<Json> getGmailStatus() => _send('GET', '/v1/mail/gmail/status');
+  @override
+  Future<Json> connectGmail() => _send('POST', '/v1/mail/gmail/connect');
+  @override
+  Future<Json> reconcileGmail(String attemptId) => _send(
+    'POST',
+    '/v1/mail/gmail/reconcile',
+    body: {'attempt_id': attemptId},
+  );
+  @override
+  Future<Json> listGmailMessages() => _send('GET', '/v1/mail/gmail/messages');
+  @override
+  Future<Json> scanGmail() => _send(
+    'POST',
+    '/v1/mail/gmail/scan',
+    timeout: const Duration(seconds: 60),
+  );
+  @override
+  Future<Json> setGmailMessageStatus(
+    String id,
+    String status, {
+    String? knowledgeRecordId,
+  }) => _send(
+    'PUT',
+    '/v1/mail/gmail/messages/${Uri.encodeComponent(id)}/status',
+    body: {'status': status, 'knowledge_record_id': ?knowledgeRecordId},
+  );
+  @override
+  Future<Json> disconnectGmail() =>
+      _send('DELETE', '/v1/mail/gmail/connection');
 
   @override
   Future<PlusSnapshot> bootstrap() async =>

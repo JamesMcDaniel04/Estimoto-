@@ -7,6 +7,7 @@ import 'data/api_repository.dart';
 import 'data/auth_storage.dart';
 import 'data/customer_auth.dart';
 import 'data/pending_request_store.dart';
+import 'services/reminder_notifications.dart';
 import 'data/demo_repository.dart';
 import 'data/repository.dart';
 import 'screens/welcome_screen.dart';
@@ -64,12 +65,14 @@ class PlusLauncher extends StatefulWidget {
     this.auth,
     this.repositoryFactory,
     this.pendingStore,
+    this.notifier,
   });
   final String? setupError;
   final CustomerAuth? auth;
   final PlusRepository Function(Future<String?> Function() token)?
   repositoryFactory;
   final PendingRequestStore? pendingStore;
+  final ReminderNotifier? notifier;
   @override
   State<PlusLauncher> createState() => _PlusLauncherState();
 }
@@ -89,6 +92,7 @@ class _PlusLauncherState extends State<PlusLauncher> {
         controller = PlusController(
           ApiPlusRepository(baseUrl: apiUrl, token: () async => devToken),
           pendingStore: widget.pendingStore ?? SecurePendingRequestStore(),
+          notifier: widget.notifier ?? defaultReminderNotifier(),
         );
       } catch (_) {
         error =
@@ -158,6 +162,7 @@ class _PlusLauncherState extends State<PlusLauncher> {
         controller = PlusController(
           repository,
           pendingStore: widget.pendingStore ?? SecurePendingRequestStore(),
+          notifier: widget.notifier ?? defaultReminderNotifier(),
         );
       });
     } catch (_) {

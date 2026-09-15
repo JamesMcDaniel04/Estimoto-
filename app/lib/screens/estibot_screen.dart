@@ -320,7 +320,18 @@ class _EstibotScreenState extends WorkspaceState<EstibotScreen> {
                                       children: [
                                         Text(textOf(video, 'title')),
                                         Text(
-                                          textOf(video, 'source'),
+                                          [
+                                            textOf(video, 'source'),
+                                            if (textOf(
+                                                  video,
+                                                  'published_at',
+                                                ).length >=
+                                                4)
+                                              textOf(
+                                                video,
+                                                'published_at',
+                                              ).substring(0, 4),
+                                          ].join(' · '),
                                           style: Theme.of(
                                             context,
                                           ).textTheme.bodySmall,

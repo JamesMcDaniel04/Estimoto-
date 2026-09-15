@@ -146,5 +146,27 @@ abstract class PlusRepository {
   Future<Json> retryCalendarSync(Json body) => _calendarUnavailable();
   Future<Json> _calendarUnavailable() =>
       throw const PlusApiException('Google Calendar is unavailable.', 503);
+  Future<Json> getGmailStatus() async => {
+    'configured': false,
+    'connected': false,
+    'status': 'unavailable',
+    'generation': 0,
+    'email_address': null,
+    'last_scan_at': null,
+    'attempt_id': null,
+    'message_counts': {'new': 0, 'saved': 0, 'dismissed': 0},
+  };
+  Future<Json> connectGmail() => _gmailUnavailable();
+  Future<Json> reconcileGmail(String attemptId) => _gmailUnavailable();
+  Future<Json> listGmailMessages() => _gmailUnavailable();
+  Future<Json> scanGmail() => _gmailUnavailable();
+  Future<Json> setGmailMessageStatus(
+    String id,
+    String status, {
+    String? knowledgeRecordId,
+  }) => _gmailUnavailable();
+  Future<Json> disconnectGmail() => _gmailUnavailable();
+  Future<Json> _gmailUnavailable() =>
+      throw const PlusApiException('Gmail is unavailable.', 503);
   void close() {}
 }

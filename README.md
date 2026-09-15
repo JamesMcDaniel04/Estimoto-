@@ -32,12 +32,13 @@ Open `http://127.0.0.1:4318`. Production customer sessions use the dedicated aut
 
 | Area | Implemented |
 | --- | --- |
-| Garage | Saved contact details, multiple vehicles, mileage and optional insurance; date/mileage reminders you can edit, delete or un-complete; representative CarsXE photos or private camera/gallery uploads |
+| Garage | Saved contact details, multiple vehicles, mileage and optional insurance; date/mileage reminders you can edit, delete or un-complete, with on-device alerts before and on the due date; representative CarsXE photos or private camera/gallery uploads |
 | Estimates | PDR/Collision tabs, guided required-photo capture, private readback, editable and deletable unshared drafts and photos, durable handoff to a selected Estimoto shop and reviewed estimate status |
 | Repairs | Shop-supplied timelines and update dates, request delivery/response status, cancellation |
 | Find Help | Participating shops/techs and reviewed local businesses within 30 miles; up to 30 results, real shop artwork, contact details, mini profiles and vehicle-specific dedicated shops |
-| Estibot | Guided estimate and routine-care topics, technician matching, saved-shop scheduling, private graph retrieval over service history, and labeled YouTube search links |
+| Estibot | Guided estimate and routine-care topics, technician matching, saved-shop scheduling, private graph retrieval over service history, and labeled YouTube videos (real retrieval when the server has a YouTube Data API key, otherwise search links) |
 | My shops | Private shop contacts, reviewed customer-authorized scheduling requests that can be discarded or withdrawn, and explicit shop acceptance |
+| Connections | Google Calendar availability and read-only Gmail scanning through Nango, each shown live in Settings; scanned estimates, receipts and appointment mail can be filed into service history |
 | Service history | Repair, maintenance and modification records with costs you can edit in place, private receipt photos/PDFs directly from the entry form, shop and parts details, per-vehicle valuation history; optional aggregated contributions |
 | Foundation | Separate `io.estimoto.plus` iOS/Android app, Supabase Auth client, customer ownership checks, migrations, durable request outbox and bridge contract |
 
@@ -72,6 +73,6 @@ Before releasing a clean commit, run `python3 scripts/check_release.py --integra
 
 Demolition Dent is connected for PDR and collision in its saved ZIP 80221. PDR LINX is the second authorized participant; its account has no saved service ZIP, so its location routing awaits that information. The [launch record](docs/launch/2026-09-14-customer-launch.md) separates source tests, live API/browser checks, device proof and Apple review.
 
-Physical-device capture, actual shop scheduling delivery and Apple external beta approval remain separate launch checks. CARFAX, push reminder delivery, automated phone/SMS booking and Google Play publication are not connected. Customer-reported records are not verified repair invoices. See the [automotive knowledge architecture](docs/automotive-knowledge.md) for the current graph, source attribution and optional aggregate sharing.
+Physical-device capture, actual shop scheduling delivery and Apple external beta approval remain separate launch checks. Reminder alerts are scheduled on the phone itself; server push is not used. CARFAX, automated phone/SMS booking and Google Play publication are not connected. Customer-reported records are not verified repair invoices. See the [automotive knowledge architecture](docs/automotive-knowledge.md) for the current graph, source attribution and optional aggregate sharing.
 
 [Product design](docs/superpowers/specs/2026-09-13-estimoto-plus-design.md) · [Implementation plan](docs/superpowers/plans/2026-09-13-estimoto-plus-foundation.md)

@@ -20,6 +20,8 @@ android {
     compileOptions {
         sourceCompatibility = JavaVersion.VERSION_17
         targetCompatibility = JavaVersion.VERSION_17
+        // Scheduled reminder notifications rely on java.time on older Android releases.
+        isCoreLibraryDesugaringEnabled = true
     }
 
     defaultConfig {
@@ -64,4 +66,8 @@ kotlin {
 
 flutter {
     source = "../.."
+}
+
+dependencies {
+    coreLibraryDesugaring("com.android.tools:desugar_jdk_libs:2.1.4")
 }

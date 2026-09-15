@@ -4,6 +4,7 @@ import 'package:flutter/foundation.dart';
 import '../data/repository.dart';
 import '../data/pending_request_store.dart';
 import '../domain/models.dart';
+import '../services/reminder_notifications.dart';
 
 class ChatEntry {
   ChatEntry.user(this.text)
@@ -28,9 +29,16 @@ class ChatEntry {
 }
 
 class PlusController extends ChangeNotifier {
-  PlusController(this.repository, {PendingRequestStore? pendingStore})
-    : pendingStore = pendingStore ?? MemoryPendingRequestStore();
+  PlusController(
+    this.repository, {
+    PendingRequestStore? pendingStore,
+    ReminderNotifier? notifier,
+  }) : pendingStore = pendingStore ?? MemoryPendingRequestStore(),
+       notifier = notifier ?? NoReminderNotifier();
   final PendingRequestStore pendingStore;
+
+  /// Delivers garage reminders on this device; a no-op on the web and in demo.
+  final ReminderNotifier notifier;
   PendingRequest? pendingRequest;
   final _pendingEstimates = <String, PendingRequest>{};
   final _sendingEstimates = <String>{};
@@ -113,6 +121,7 @@ class PlusController extends ChangeNotifier {
       if (!snapshot!.vehicles.any((v) => v.id == selectedVehicleId)) {
         selectedVehicleId = snapshot!.vehicles.firstOrNull?.id;
       }
+      syncNotifications();
     } catch (e) {
       if (!_disposed && generation == _refreshGeneration) {
         error = readableError(e);
@@ -123,6 +132,18 @@ class PlusController extends ChangeNotifier {
         _notify();
       }
     }
+  }
+
+  /// Re-plans on-device reminder alerts from the current snapshot.
+  ///
+  /// Delivery problems never surface as account errors; the garage stays
+  /// usable and the next refresh tries again.
+  Future<void> syncNotifications() async {
+    final current = snapshot;
+    if (current == null || isDemo || !notifier.supported) return;
+    try {
+      await notifier.sync(current);
+    } catch (_) {}
   }
 
   /// Revoke callback authority immediately, before Flutter disposes the old tree.
@@ -354,6 +375,10 @@ class PlusController extends ChangeNotifier {
   void dispose() {
     _disposed = true;
     repository.close();
+    if (notifier.supported && !repository.isDemo) {
+      // Alerts belong to the signed-in customer; none survive sign-out.
+      notifier.clear().catchError((_) {});
+    }
     super.dispose();
   }
 }

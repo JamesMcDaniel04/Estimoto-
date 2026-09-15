@@ -257,7 +257,10 @@ void calendarConnectionTests() {
       _CalendarRepository(_status(configured: false, state: 'unavailable')),
     );
     await _mountScreen(tester, controller);
-    expect(find.textContaining('Not available yet'), findsOneWidget);
+    expect(
+      find.text('Not available yet · offer times manually'),
+      findsOneWidget,
+    );
   });
 
   testWidgets('a configured but disconnected account invites connecting', (

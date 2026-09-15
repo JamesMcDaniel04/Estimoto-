@@ -61,11 +61,14 @@ def enhance_advice(result: dict, *, message: str, vehicle: dict | None,
         return fallback
     if re.search(r"(?:tire|tyre).*pressure|pressure.*(?:tire|tyre)", message, re.I):
         # Source/channel verified 2026-09-13: Michelin USA, "How to Check Tire Pressure".
-        fallback["videos"] = [{
+        # The hand-verified video leads; Data API results follow it, a search link is dropped.
+        curated = {
             "title": "How to check tire pressure",
             "url": "https://www.youtube.com/watch?v=dn0ShsQRgho",
             "source": "Michelin USA · use your vehicle's recommended pressure",
-        }]
+        }
+        retrieved = [v for v in result.get("videos", []) if v.get("video_id") and v.get("url") != curated["url"]]
+        fallback["videos"] = [curated, *retrieved][:3]
     key = os.getenv("OPENAI_API_KEY", "")
     if not key or os.getenv("ASSISTANT_ENABLED", "true").lower() != "true":
         return fallback

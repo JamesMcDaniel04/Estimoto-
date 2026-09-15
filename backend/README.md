@@ -22,7 +22,7 @@ Run `PYTHONPATH=. .venv/bin/pytest -q` from `backend/`. The tests use isolated S
 
 ## Authentication and authorization
 
-Private garage uploads and representative CarsXE imagery use the [vehicle-image contract](docs/vehicle-images.md). The current migration head is `a63e90b72d14`, including vehicle images, Google Calendar, local discovery, guided capture, public media, private receipts and vehicle valuation. Run `alembic upgrade head` before deployment; stopping at the older image revision `e21870f6a94b` omits later tables. Keep `CARSXE_API_KEY` only on the server.
+Private garage uploads and representative CarsXE imagery use the [vehicle-image contract](docs/vehicle-images.md). The current migration head is `b7e2d9c4a1f6`, including vehicle images, Google Calendar, local discovery, guided capture, public media, private receipts, vehicle valuation, the YouTube search budget and read-only Gmail. Run `alembic upgrade head` before deployment; stopping at the older image revision `e21870f6a94b` omits later tables. Keep `CARSXE_API_KEY` only on the server.
 
 All customer routes require a Supabase bearer access token. The server verifies it at the fixed `SUPABASE_URL/auth/v1/user` endpoint using a per-app pooled HTTP client and the publishable key. Successful GET/HEAD identity checks may be reused for at most 15 seconds from verification start, never beyond JWT expiry. The bounded cache holds at most 1,024 entries keyed by token hash; it retains neither raw bearer tokens nor errors/negative results. Writes always verify fresh and invalidate cached reads. JWT parsing only bounds cache lifetime; it does not authenticate a token locally. Read-only revocation visibility can therefore lag by up to 15 seconds.
 
@@ -35,6 +35,8 @@ Only an authenticated, confirmed, non-anonymous identity with a server-returned 
 Approved official shop logos/photos are stored as bounded PNG assets and served through exact `/public/shop-media/{kind}/{number}/{sha256}.png` routes after current listing/review checks. Participating provider logos retain their original opt-in-controlled route. Explicitly licensed Commons fallback photos retain source/creator attribution. These public business assets are separate from private customer photos and receipts. New artwork and the current 30-result selection need the corresponding source/catalog deployment; see the release record for delivery evidence.
 
 `POST /v1/vehicles/{id}/valuation` is an explicit customer-initiated CarsXE lookup using saved VIN/mileage plus selected state/condition. It returns bounded retail/wholesale figures when the provider supplies a valid matching result. Private service history and receipt spending are displayed separately and never sent to CarsXE or added to market value. The Flutter demo uses clearly labeled fixed fictional values and a synthetic VIN without contacting a provider. The production feature is controlled by `VALUATION_ENABLED` and server-side CarsXE configuration.
+
+Estibot care topics can link real YouTube videos when `YOUTUBE_ENABLED` and a server-side `YOUTUBE_API_KEY` are set; see [YouTube retrieval](docs/youtube.md). A read-only Gmail connection through Nango, controlled by `GMAIL_ENABLED`, lets customers file estimates, receipts and appointment mail into service history; see [Gmail](docs/gmail.md).
 
 ## Estimoto bridge contract
 

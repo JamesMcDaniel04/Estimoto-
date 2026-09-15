@@ -23,6 +23,7 @@ from .models import Customer, Estimate, EstimateOutbox, Outbox, Photo, Provider,
 from .postal import canonical_zip
 from .schemas import AssistantInput, EstimateCreate, EstimateSubmit, ProfileWrite, ReminderCreate, ReminderUpdate, EstimateUpdate, RequestCreate, VehicleCreate, VehicleUpdate
 from .workflow import bridge_details, creation_payload, payload_hash, queue_cancellation
+from . import youtube
 
 from .calendar_scheduling import check_slots, legacy_payload, sync_view, preferred_times, lock_customer
 from .capture_contract import DOCUMENT_KEYS, allowed_keys, PDR_PANELS
@@ -144,7 +145,7 @@ def bootstrap(request: Request, c: Customer = Depends(current_customer), db: Ses
                              "live_estimates": bool(request.app.state.settings.estimate_bridge_url and request.app.state.settings.bridge_key and not c.demo),
                              "required_estimate_photo_keys": list(ESTIMATE_PHOTO_KEYS),
                              "pdr_damage_panel_types": list(PDR_PANEL_TYPES),
-                             "carfax": False, "youtube_search": False, "demo": c.demo}}
+                             "carfax": False, "youtube_search": bool(youtube.configured(request.app.state.settings) and not c.demo), "demo": c.demo}}
 
 
 @router.put("/profile")
@@ -653,7 +654,11 @@ def assistant(body: AssistantInput, request: Request, c: Customer = Depends(curr
         topic = "check tire pressure" if re.search(r"tire|tyre|pressure", message) else ("oil service" if "oil" in message else "air filter replacement")
         vehicle_title = f"{car.year} {car.make} {car.model}" if car else "car"
         search = quote(f"{vehicle_title} {topic}", safe="")
-        videos = [{"title": "Search YouTube for this maintenance topic", "url": f"https://www.youtube.com/results?search_query={search}", "source": "YouTube search · review vehicle compatibility"}]
+        if not c.demo:
+            videos = youtube.search_videos(request.app.state.session_factory, getattr(request.app.state, "youtube_transport", None),
+                                           request.app.state.settings, f"{vehicle_title} {topic}")
+        if not videos:
+            videos = [{"title": "Search YouTube for this maintenance topic", "url": f"https://www.youtube.com/results?search_query={search}", "source": "YouTube search · review vehicle compatibility"}]
     result = {"reply": reply, "intent": intent, "specialty": specialty,
               "providers": [provider(p) for p in matches], "videos": videos}
     if directory_result:
