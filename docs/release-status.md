@@ -1,4 +1,19 @@
-# Current web release — larger capture panels and connected 3D car, September 14, 2026
+# Current web release — per-body 3D proportions, September 14, 2026
+
+The capture page at `/capture/` now vendors original Estimoto
+`d2089d8e432a991374e16868ad3b543e5cfa4ea3`. Each body style in the 3D guide has
+its own tumblehome, beltline rise, roof drop, rocker height, cross-section
+boxiness and nose drop, so sedans read as wedges, coupes as fastbacks and SUVs,
+pickups and vans as upright boxes, with the hood and door still on their hinges.
+
+Source `e4dc103e28c8b2381ce30ffa3f837e49b4988d0b` is deployed on web; `/version`
+reports it and `/ready` reports schema `d9e4b82013c7`. Capture source digests
+verified, 19 capture-web tests and the capture and web builds passed, and the
+served scene chunk hash matches the built artifact. Native installs load
+`/capture/` from the API origin, so no native build was produced. GitHub Actions
+did not run because of the existing account billing lock.
+
+# Historical web release — larger capture panels and connected 3D car, September 14, 2026
 
 The capture page at `/capture/` now vendors original Estimoto
 `1eb1cc8d77edd3a30955e8a4b374b3ada9fbc340`. The camera header collapses to one
