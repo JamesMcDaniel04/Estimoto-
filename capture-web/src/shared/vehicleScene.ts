@@ -143,10 +143,15 @@ function buildVehicle(spec: Spec) {
     return object;
   }
   const positions: number[] = [], bodyIndices: number[] = [], hoodIndices: number[] = [], doorIndices: number[] = [];
-  const nx = 224, nr = 80;
+  // Stations land exactly on the hood hinge and door edges, and the hood and
+  // door are cut along grid lines, so every panel edge is a clean curve.
+  const nr = 80, bodyStations = Array.from(new Set([...Array.from({ length: 225 }, (_, i) => -half * Math.cos(Math.PI * i / 224)), hingeX, doorStart, doorEnd])).sort((p, q) => p - q);
+  const nx = bodyStations.length - 1, ringStep = Math.PI * 2 / nr;
+  const jHood = Math.round(Math.asin(Math.pow(.78, n / 2)) / ringStep);
+  const jDoorTop = Math.ceil((Math.PI / 2 - Math.asin(Math.pow(.72, n / 2))) / ringStep);
+  const jDoorBottom = Math.floor((Math.PI / 2 + Math.asin(Math.pow(Math.min(1, Math.max(0, (midBody - .35) / bodyH)), n / 2))) / ringStep);
   for (let i = 0; i <= nx; i++) {
-    const theta = Math.PI * i / nx;
-    const x = -half * Math.cos(theta);
+    const x = bodyStations[i];
     const scale = loftScale(x);
     for (let j = 0; j <= nr; j++) {
       const angle = j / nr * Math.PI * 2, c = Math.cos(angle), sn = Math.sin(angle);
@@ -167,8 +172,8 @@ function buildVehicle(spec: Spec) {
     if (isTop && x > hingeX && x < spec.glassRear) continue;
     if (isTop && x >= spec.glassRear && spec.bed) continue;
     // The hood is a shallow lid on top of the fenders; the door is the side skin below the shoulder.
-    const isHood = x < hingeX && y > topY(x) - .07 && Math.abs(z) < width * .80;
-    const isDriverDoor = z > width * .72 && x > doorStart && x < doorEnd && y > .35;
+    const isHood = x < hingeX && (j < jHood || j >= nr - jHood);
+    const isDriverDoor = x > doorStart && x < doorEnd && j >= jDoorTop && j < jDoorBottom;
     (isHood ? hoodIndices : isDriverDoor ? doorIndices : bodyIndices).push(...ids);
   }
   const bodyGeometry = new THREE.BufferGeometry(); bodyGeometry.setAttribute("position", new THREE.Float32BufferAttribute(positions, 3));
@@ -226,74 +231,122 @@ function buildVehicle(spec: Spec) {
     const f = Math.max(0, scale ** n - (Math.abs(z) / planW(x)) ** n) ** (1 / n);
     return midBody + bodyH * f + (rise(x) - frontDrop(x)) * f / Math.max(scale, 1e-6);
   };
-  // Blend the cabin sill into the curved body; no floating glass or open seams.
+  // Blend the cabin sill into the curved body; the cabin loft starts exactly where the sills end.
+  const cabinLift = .045, sillW = width * .86, clamp01 = (t: number) => Math.min(1, Math.max(0, t));
+  const cabinBase = (x: number) => topY(x) + cabinLift;
   for (const side of [-1, 1]) {
     const segments = side === 1 ? [[spec.glassFront, doorStart], [doorStart, doorEnd], [doorEnd, spec.glassRear]] : [[spec.glassFront, spec.glassRear]];
     for (const [start, end] of segments) onDoor(mesh(surface((u, t) => {
       const x = THREE.MathUtils.lerp(start, end, u);
       const z = side * width * (.90 - .04 * t);
-      return v(x, THREE.MathUtils.lerp(skinY(x, side * width * .90), topY(x) + .06, t), z);
+      return v(x, THREE.MathUtils.lerp(skinY(x, side * width * .90), cabinBase(x), t), z);
     }, 24, 10), paint, shell), side === 1 && start === doorStart);
   }
   mesh(surface((u, t) => {
-    const z = (u * 2 - 1) * width * .86;
+    const z = (u * 2 - 1) * sillW;
     const x = spec.glassFront - .025 * Math.sin(u * Math.PI) - .03 * (1 - t);
-    return v(x, THREE.MathUtils.lerp(skinY(x, z), spec.belt + .028 + .022 * Math.sin(u * Math.PI), t), z);
+    return v(x, THREE.MathUtils.lerp(skinY(x, z), cabinBase(spec.glassFront) + .012 * Math.sin(u * Math.PI), t), z);
   }, 40, 8), paint, shell);
 
-  // Glazed cabin, thin metallic pillars, gently crowned roof.
-  const roofW = width * spec.tumblehome, sillW = width * .86, roofY = spec.height;
+  // One closed greenhouse loft: up the near sill, across the roof, down the far
+  // sill, from the cowl to the rear deck. Glass and pillars are painted onto
+  // this single surface, so every window meets its sill, pillar and roof rail
+  // by construction, and the driver's window frame is cut from the same skin.
+  const roofW = width * spec.tumblehome, roofY = spec.height;
   // Fastback roofs fall away toward the rear; boxy roofs stay level.
-  const roofAt = (x: number) => roofY - spec.roofDrop * Math.min(1, Math.max(0, (x - spec.roofFront) / Math.max(.01, spec.roofRear - spec.roofFront)));
-  const windGeometry = surface((u, t) => {
-    const x = THREE.MathUtils.lerp(spec.glassFront, spec.roofFront, u), y = THREE.MathUtils.lerp(spec.belt + .025, roofY - .055, Math.sin(u * Math.PI / 2));
-    return v(x - .025 * Math.sin(t * Math.PI), y + .022 * Math.sin(t * Math.PI), (2 * t - 1) * THREE.MathUtils.lerp(sillW, roofW, u));
-  }, 14, 24);
-  mesh(windGeometry, glass, shell); focus("windshield", windGeometry, shell);
-  for (const side of [-1, 1]) {
-    line(Array.from({ length: 16 }, (_, i) => { const u = i / 15; return v(THREE.MathUtils.lerp(spec.glassFront, spec.roofFront, u), THREE.MathUtils.lerp(spec.belt + .025, roofY - .055, Math.sin(u * Math.PI / 2)), side * THREE.MathUtils.lerp(sillW, roofW, u)); }), paint, .028, shell);
+  const roofAt = (x: number) => roofY - spec.roofDrop * clamp01((x - spec.roofFront) / Math.max(.01, spec.roofRear - spec.roofFront));
+  const cabinEnd = spec.open ? spec.roofFront : spec.glassRear + .02;
+  const roofTopFront = roofAt(spec.roofFront) - .02, roofTopRear = roofAt(spec.roofRear) - .02, cabinTail = topY(cabinEnd) + .012;
+  const capY = (x: number) => {
+    let y: number;
+    if (x <= spec.roofFront) y = THREE.MathUtils.lerp(cabinBase(spec.glassFront), roofTopFront, Math.sin(clamp01((x - spec.glassFront) / (spec.roofFront - spec.glassFront)) * Math.PI / 2));
+    else if (x <= spec.roofRear) y = roofAt(x) - .02;
+    else y = THREE.MathUtils.lerp(roofTopRear, cabinTail, 1 - Math.cos(clamp01((x - spec.roofRear) / Math.max(.01, cabinEnd - spec.roofRear)) * Math.PI / 2));
+    return Math.max(y, cabinBase(x));
+  };
+  // Rows are shared out as wall / top / wall with fixed counts, so the roof
+  // corners are exact mesh rows at every station: the door frame and the roof
+  // edge meet on one clean crease.
+  const cnv = 120, wallRows = 33, wallShare = wallRows / cnv;
+  const cabinPoint = (x: number, r: number) => {
+    const base = cabinBase(x), top = capY(x), h = Math.max(0, top - base);
+    const wTop = THREE.MathUtils.lerp(sillW, roofW, clamp01(h / Math.max(.05, roofY - spec.belt)));
+    const crown = (x > spec.roofFront && x < spec.roofRear ? .05 : .018) * Math.min(1, h / .3);
+    if (r >= wallShare && r <= 1 - wallShare) { const q = (r - .5) / (.5 - wallShare); return { y: top + crown * Math.cos(q * Math.PI / 2), z: q * wTop, top: true, q }; }
+    const side = r < .5 ? -1 : 1, vfrac = clamp01(side < 0 ? r / wallShare : (1 - r) / wallShare);
+    return { y: base + h * Math.pow(vfrac, .92), z: side * THREE.MathUtils.lerp(sillW, wTop, Math.pow(vfrac, 1.35)), top: false, q: side };
+  };
+  // Stations where the windshield and rear glass reach a given height: the A- and C-pillars follow them.
+  const xAtWindshield = (y: number) => spec.glassFront + Math.asin(clamp01((y - cabinBase(spec.glassFront)) / Math.max(.01, roofTopFront - cabinBase(spec.glassFront)))) * 2 / Math.PI * (spec.roofFront - spec.glassFront);
+  const xAtBackglass = (y: number) => spec.roofRear + Math.acos(1 - clamp01((roofTopRear - y) / Math.max(.01, roofTopRear - cabinTail))) * 2 / Math.PI * (cabinEnd - spec.roofRear);
+  const pillarX = spec.doors === 2 ? .52 : .20, longRoof = spec.roofRear > 1.1;
+  // Stations land exactly on the door edges so the door frame parts cleanly.
+  const cnu = 96;
+  const stations = Array.from(new Set([...Array.from({ length: cnu + 1 }, (_, i) => THREE.MathUtils.lerp(spec.glassFront, cabinEnd, i / cnu)), ...(spec.open ? [] : [doorStart, doorEnd])].filter(x => x >= spec.glassFront && x <= cabinEnd))).sort((p, q) => p - q);
+  const cabinPositions: number[] = [];
+  for (const x of stations) for (let j = 0; j <= cnv; j++) { const p = cabinPoint(x, j / cnv); cabinPositions.push(x, p.y, p.z); }
+  const shellIndex: number[] = [], doorIndex: number[] = [], roofIndex: number[] = [];
+  for (let i = 0; i < stations.length - 1; i++) for (let j = 0; j < cnv; j++) {
+    const a0 = i * (cnv + 1) + j, b0 = a0 + cnv + 1, ids = [a0, b0, a0 + 1, b0, b0 + 1, a0 + 1];
+    const x = (stations[i] + stations[i + 1]) / 2, r = (j + .5) / cnv, p = cabinPoint(x, r);
+    if (p.top && x > spec.roofFront && x <= spec.roofRear) roofIndex.push(...ids);
+    // The driver's door frame is the whole near wall between the door edges, up to the roof crease.
+    const door = !spec.open && !p.top && r > .5 && x > doorStart && x < doorEnd;
+    (door ? doorIndex : shellIndex).push(...ids);
   }
-  line([v(spec.roofFront, roofY - .036, -roofW), v(spec.roofFront - .016, roofY - .018, 0), v(spec.roofFront, roofY - .036, roofW)], paint, .029, shell);
-  line([v(spec.glassFront - .015, spec.belt + .025, -sillW), v(spec.glassFront - .034, spec.belt + .047, 0), v(spec.glassFront - .015, spec.belt + .025, sillW)], trim, .017, shell);
-  for (const side of [-1, 1]) line([v(spec.glassFront + .02, spec.belt + .045, side * .12), v(spec.glassFront + .09, spec.belt + .095, side * .51)], trim, .009, shell);
+  const cabinGeometry = new THREE.BufferGeometry();
+  cabinGeometry.setAttribute("position", new THREE.Float32BufferAttribute(cabinPositions, 3));
+  cabinGeometry.setIndex([...shellIndex, ...doorIndex]); cabinGeometry.computeVertexNormals();
+  const cabinSubset = (index: number[]) => { const geometry = cabinGeometry.clone(); geometry.setIndex(index); return geometry; };
+  mesh(cabinSubset(shellIndex), paint, shell);
+  if (doorIndex.length) onDoor(mesh(cabinSubset(doorIndex), paint, shell), true);
+  if (roofIndex.length) focus("roof", cabinSubset(roofIndex), shell);
+  cabinGeometry.dispose();
+  // Windows are exact-edged panes laid on the same loft surface, so their edges
+  // follow the pillars instead of the mesh grid and never leave the skin.
+  const paneGlass = glass.clone(); paneGlass.polygonOffset = true; paneGlass.polygonOffsetFactor = -2; paneGlass.polygonOffsetUnits = -2; materials.push(paneGlass);
+  const wallPoint = (x: number, y: number, side: number) => {
+    const base = cabinBase(x), top = capY(x), h = Math.max(1e-3, top - base);
+    const wTop = THREE.MathUtils.lerp(sillW, roofW, clamp01(h / Math.max(.05, roofY - spec.belt)));
+    const vfrac = Math.pow(clamp01((y - base) / h), 1 / .92);
+    return v(x, y, side * THREE.MathUtils.lerp(sillW, wTop, Math.pow(vfrac, 1.35)));
+  };
+  const topPane = (x0: number, x1: number) => surface((u, t) => {
+    const x = THREE.MathUtils.lerp(x0, x1, u), p = cabinPoint(x, .5 + (2 * t - 1) * .93 * (.5 - wallShare));
+    return v(x, p.y, p.z);
+  }, 48, 32);
+  const windshieldGeometry = topPane(spec.glassFront + .025, spec.roofFront - .004);
+  mesh(windshieldGeometry, paneGlass, shell); focus("windshield", windshieldGeometry, shell);
   if (!spec.open) {
-    const roofGeometry = surface((u, t) => { const x = THREE.MathUtils.lerp(spec.roofFront, spec.roofRear, u); return v(x, roofAt(x) - .035 + .06 * Math.sin(t * Math.PI) + .035 * Math.sin(u * Math.PI), (t * 2 - 1) * roofW); }, 26, 24);
-    mesh(roofGeometry, paint, shell); focus("roof", roofGeometry, shell);
-    const backGlass = surface((u, t) => v(THREE.MathUtils.lerp(spec.roofRear, spec.glassRear, u), THREE.MathUtils.lerp(roofAt(spec.roofRear) - .055, topY(spec.glassRear) + .035, 1 - Math.cos(u * Math.PI / 2)) + .015 * Math.sin(t * Math.PI), (2 * t - 1) * THREE.MathUtils.lerp(roofW, sillW, u)), 16, 20);
-    mesh(backGlass, glass, shell);
+    mesh(topPane(spec.roofRear + .004, cabinEnd - .03), paneGlass, shell);
+    const sidePane = (side: number, xFront: (y: number) => number, xRear: (y: number) => number, moves: boolean) => {
+      const yLow = (x: number) => cabinBase(x) + .04, yHigh = (x: number) => capY(x) - .045;
+      const geometry = surface((u, t) => {
+        const yGuess = THREE.MathUtils.lerp(yLow(pillarX), yHigh(pillarX), t);
+        const xGuess = THREE.MathUtils.lerp(xFront(yGuess), xRear(yGuess), u);
+        const y = THREE.MathUtils.lerp(yLow(xGuess), yHigh(xGuess), t);
+        return wallPoint(THREE.MathUtils.lerp(xFront(y), xRear(y), u), y, side);
+      }, 36, 24);
+      if (xRear(yLow(pillarX)) - xFront(yLow(pillarX)) < .12 && xRear(yHigh(pillarX)) - xFront(yHigh(pillarX)) < .12) { geometry.dispose(); return; }
+      onDoor(mesh(geometry, paneGlass, shell), moves);
+    };
     for (const side of [-1, 1]) {
-      // Side glass lies on the inward sloping cabin, not on an upright box.
-      const windowPoints = [
-        [spec.glassFront + .07, beltAt(spec.glassFront + .07) + .065], [spec.roofFront + .035, roofAt(spec.roofFront + .035) - .075],
-        [spec.roofRear - .045, roofAt(spec.roofRear - .045) - .075], [spec.glassRear - .085, topY(spec.glassRear) + .065],
-      ];
-      const [frontBottom, frontTop, rearTop, rearBottom] = windowPoints;
-      const cutTop = [doorEnd, frontTop[1]];
-      const cutBottom = [doorEnd, THREE.MathUtils.lerp(frontBottom[1], rearBottom[1], (doorEnd - frontBottom[0]) / (rearBottom[0] - frontBottom[0]))];
-      const panes = side === 1 ? [[frontBottom, frontTop, cutTop, cutBottom], [cutBottom, cutTop, rearTop, rearBottom]] : [windowPoints];
-      panes.forEach((points, pane) => {
-        const shape = new THREE.Shape();
-        points.forEach(([x, y], i) => {
-          const prev = points[(i + 3) % 4], next = points[(i + 1) % 4];
-          const enter = [THREE.MathUtils.lerp(x, prev[0], .04), THREE.MathUtils.lerp(y, prev[1], .04)];
-          const leave = [THREE.MathUtils.lerp(x, next[0], .04), THREE.MathUtils.lerp(y, next[1], .04)];
-          if (!i) shape.moveTo(enter[0], enter[1]); else shape.lineTo(enter[0], enter[1]);
-          shape.quadraticCurveTo(x, y, leave[0], leave[1]);
-        }); shape.closePath();
-        const geo = new THREE.ShapeGeometry(shape, 12), positions = geo.getAttribute("position");
-        for (let i = 0; i < positions.count; i++) positions.setZ(i, side * THREE.MathUtils.lerp(sillW, roofW, (positions.getY(i) - spec.belt) / (roofY - spec.belt)));
-        geo.computeVertexNormals(); onDoor(mesh(geo, glass, shell), side === 1 && pane === 0);
-        const border = points.map(([x, y]) => v(x, y, side * THREE.MathUtils.lerp(sillW, roofW, (y - spec.belt) / (roofY - spec.belt)))); border.push(border[0].clone());
-        onDoor(line(border, paint, .018, shell), side === 1 && pane === 0);
-      });
-      const midRoof = (spec.roofFront + spec.roofRear) / 2;
-      line([v(spec.roofFront, roofAt(spec.roofFront) - .035, side * roofW), v(midRoof, roofAt(midRoof) - .022, side * roofW), v(spec.roofRear, roofAt(spec.roofRear) - .035, side * roofW), v(spec.glassRear, topY(spec.glassRear) + .035, side * sillW)], paint, .039, shell);
-      const pillarX = spec.doors === 2 ? .52 : .20;
-      line([v(pillarX, beltAt(pillarX) + .07, side * (sillW - .012)), v(pillarX - .05, roofAt(pillarX - .05) - .061, side * (roofW + .005))], trim, .032, shell);
-      if (spec.roofRear > 1.1) line([v(1.11, beltAt(1.11) + .07, side * sillW), v(1.04, roofAt(1.04) - .061, side * roofW)], trim, .021, shell);
+      sidePane(side, (y) => Math.max(xAtWindshield(y) + .075, spec.glassFront + .06), () => pillarX - .035, side === 1);
+      sidePane(side, () => pillarX + .035, (y) => Math.min(xAtBackglass(y) - .08, longRoof ? 1.08 - .03 : Infinity, cabinEnd - .11), false);
+      if (longRoof) sidePane(side, () => 1.08 + .03, (y) => Math.min(xAtBackglass(y) - .08, cabinEnd - .11), false);
     }
-    if (["suv", "wagon"].some(key => SPECS[key] === spec)) for (const side of [-1, 1]) line([v(spec.roofFront + .18, roofY + .05, side * roofW * .82), v(.4, roofY + .065, side * roofW * .82), v(spec.roofRear - .1, roofY + .05, side * roofW * .82)], chrome, .02, shell);
   }
+  if (spec.open) {
+    const header = cabinPoint(spec.roofFront, .5);
+    line([v(spec.roofFront, header.y - .01, -roofW * .98), v(spec.roofFront - .01, header.y + .008, 0), v(spec.roofFront, header.y - .01, roofW * .98)], paint, .028, shell);
+  } else {
+    // A short lip carries the rear glass base down onto the deck.
+    mesh(surface((u, t) => { const z = (u * 2 - 1) * sillW * .98; const x = cabinEnd + .015 * t; return v(x, THREE.MathUtils.lerp(cabinBase(cabinEnd), topY(x) + .022 * Math.sin(u * Math.PI), t), z); }, 24, 4), paint, shell);
+  }
+  // Wiper rests and cowl trim at the windshield base.
+  line([v(spec.glassFront - .015, cabinBase(spec.glassFront) - .01, -sillW), v(spec.glassFront - .034, cabinBase(spec.glassFront) + .01, 0), v(spec.glassFront - .015, cabinBase(spec.glassFront) - .01, sillW)], trim, .017, shell);
+  for (const side of [-1, 1]) line([v(spec.glassFront + .02, cabinBase(spec.glassFront) + .02, side * .12), v(spec.glassFront + .09, cabinBase(spec.glassFront) + .07, side * .51)], trim, .009, shell);
+  if (["suv", "wagon"].some(key => SPECS[key] === spec)) for (const side of [-1, 1]) line([spec.roofFront + .18, .4, spec.roofRear - .1].map(x => { const p = cabinPoint(x, .5 + .82 * (.5 - wallShare)); return v(x, p.y + .022, side * p.z); }), chrome, .02, shell);
   // Separate inset seams and flush handles give doors tangible scale.
   for (const side of [-1, 1]) {
     const suffix = side === 1 ? "left" : "right", split = spec.doors === 2 ? .70 : .22;
