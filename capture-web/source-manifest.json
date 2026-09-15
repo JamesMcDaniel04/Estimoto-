@@ -26,11 +26,11 @@
     },
     {
       "source": "dashboard/src/index.css",
-      "source_sha256": "12319d3a8debd6ba2f28e0b152dba26abf73ae088a997399afbd06bb837f8e35",
+      "source_sha256": "676259d5c1a63a3aa80960a5a8d9ae04729977315facf87c21d03087dc688382",
       "target": "src/shared/camera.css",
-      "target_sha256": "0c4553a01f2e687fa088a7a50be82d6e99c053638cf4c610e401d58c56aff3bc"
+      "target_sha256": "97fa43c6ae71e8cfc9f4dc15d8aaad36c148d1f9b12855af9bd0b120546b2a34"
     }
   ],
-  "source_commit": "466ff0e6c64761a92802f025bd4b7815aabe4f2f",
+  "source_commit": "22f6e42d00ec34af9ad1dcaa98f465b310993454",
   "source_repository": "Estimoto"
 }

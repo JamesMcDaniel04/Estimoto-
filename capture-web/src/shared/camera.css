@@ -91,11 +91,12 @@
   .journey-stages { flex:1; padding:0; }
   .customer-intake .customer-step { padding:1rem; }
   .journey-step-heading h1 { font-size:1.5rem; }
-  .customer-camera, .customer-phone .customer-camera { padding:env(safe-area-inset-top) env(safe-area-inset-right) env(safe-area-inset-bottom) env(safe-area-inset-left); }
+  /* Sideways, the browser or native host already keeps the page clear of the status bar; only the side cut-outs need insets. */
+  .customer-camera, .customer-phone .customer-camera { padding:0 env(safe-area-inset-right) 0 env(safe-area-inset-left); }
   .camera-shell { max-width:none; border-radius:0; box-shadow:none; grid-template-columns:minmax(0,3fr) minmax(0,7fr); grid-template-areas:"header header" "side view"; column-gap:.75rem; }
   .camera-shell { grid-template-rows:auto minmax(0,1fr); overflow:hidden; }
   /* One header row: wordmark, the step strip (which carries the progress), close; the track underneath. */
-  .camera-header, .customer-phone .camera-header { grid-template-columns:auto minmax(0,1fr) auto; column-gap:.75rem; padding:.125rem 1rem .25rem; }
+  .camera-header, .customer-phone .camera-header { grid-template-columns:auto minmax(0,1fr) auto; column-gap:.75rem; padding:0 1rem .125rem; }
   .camera-header .journey-wordmark { font-size:1.125rem; }
   .camera-header .camera-progress { display:none; }
   .camera-header .camera-close { width:2.25rem; height:2.25rem; }
@@ -104,7 +105,7 @@
   .camera-step-chip > button { min-height:2rem; font-size:.6875rem; }
   /* Left column stacks copy, guide, then the always-reachable controls; the
      guide gives up height first and the column scrolls only as a last resort. */
-  .camera-side { display:flex; flex-direction:column; grid-area:side; min-height:0; overflow-y:auto; overscroll-behavior:contain; padding:0 0 max(.375rem,env(safe-area-inset-bottom)) 1rem; }
+  .camera-side { display:flex; flex-direction:column; grid-area:side; min-height:0; overflow-y:auto; overscroll-behavior:contain; padding:0 0 .375rem 1rem; }
   .camera-step-copy { flex:none; padding:.375rem 0 0; }
   .camera-step-copy h2 { font-size:1.0625rem; letter-spacing:-.02rem; }
   .camera-step-hint { font-size:.75rem; line-height:1.3; margin-top:.125rem; -webkit-line-clamp:1; }
@@ -119,7 +120,7 @@
   .capture-shutter { flex:none; width:100%; min-height:2.5rem; font-size:.875rem; }
   .capture-meta { justify-content:flex-start; margin-top:.25rem; }
   .capture-footnote { display:none; }
-  .capture-viewfinder { grid-area:view; margin:.375rem .5rem max(.375rem,env(safe-area-inset-bottom)) 0; }
+  .capture-viewfinder { grid-area:view; margin:.375rem .5rem .375rem 0; }
   .capture-coaching { inset:.5rem .5rem auto; font-size:.8125rem; padding:.5rem; }
   .capture-assist-conversation { margin-top:.375rem; padding:.375rem .5rem; }
   .capture-assist-transcript { height:3.5rem; }
