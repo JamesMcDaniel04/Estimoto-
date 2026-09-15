@@ -1,4 +1,23 @@
-# Current web and Android release — build 15, September 14, 2026
+# Current web release — capture layout and VIN guide, September 14, 2026
+
+The customer capture page at `/capture/` now vendors original Estimoto
+`5cfb2a9348db7c37dfaf5b42d8631b73a58ac691`. The guided camera splits the leftover
+height 30/70 between the 3D guide and the live camera in portrait and gives the
+camera 70% of the width at full height in landscape, so the shutter and upload
+controls stay on screen. A step strip lists every view with a saved check, jumps
+to a tapped view, and uploads a chosen photo straight to that view. The VIN
+marker and close-up sit on the latch-side door jamb beside the driver's seat.
+
+Source `4eec3c79034e1a76291c2ea96667628d27aeac72` is deployed on web; `/version`
+reports it and `/ready` reports schema `d9e4b82013c7`. Capture source digests
+verified, 19 capture-web tests and the capture and web builds passed, and the
+served `/capture/` index, JavaScript and CSS hashes match the built artifacts.
+Native Android and iOS load `/capture/` from the API origin, so build 15 and
+iOS 14 installs receive this layout without a new native build. No native
+artifacts were produced. GitHub Actions did not run because of the existing
+account billing lock; the checks above ran locally.
+
+# Historical web and Android release — build 15, September 14, 2026
 
 Settings includes Nango (Google Calendar) and Gmail icons under Connections. Both
 are explicitly **Not configured**, as requested. Gmail is described only for
